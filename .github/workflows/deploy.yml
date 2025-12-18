@@ -15,7 +15,7 @@ on:
         - staging
       version:
         description: 'Version to deploy (format: v1.0.0)'
-        required: true
+        required: false
 
 jobs:
   deploy:
@@ -29,17 +29,12 @@ jobs:
     - name: Get version
       id: get_version
       run: |
-        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.version }}" ]; then
           # 手动触发时使用输入的版本
           VERSION="${{ github.event.inputs.version }}"
         else
-          # 自动触发时读取版本文件
-          if [ -f "VERSION" ]; then
-            VERSION=$(cat VERSION)
-          else
-            # 获取最新的tag作为版本
-            VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "latest")
-          fi
+          # 自动触发时使用commit hash作为版本
+          VERSION=$(git rev-parse --short HEAD)
         fi
 
         echo "version=$VERSION" >> $GITHUB_OUTPUT
@@ -80,12 +75,11 @@ jobs:
         timeout: 30s
         command_timeout: 10m
         script: |
-          # 使用bash执行脚本
-          bash -c '
           # 设置变量
           VERSION="${{ steps.get_version.outputs.version }}"
           IMAGE_NAME="three_vue"
           CONTAINER_NAME="three_vue_app"
+          PORT=8001
 
           # 加载新镜像
           echo "Loading new image..."
@@ -102,10 +96,10 @@ jobs:
           fi
 
           # 启动新容器
-          echo "Starting new container with version: $VERSION"
+          echo "Starting new container with version: $VERSION on port $PORT"
           docker run -d \
             --name $CONTAINER_NAME \
-            -p 811:80 \
+            -p ${PORT}:80 \
             --restart unless-stopped \
             -e VERSION=$VERSION \
             $IMAGE_NAME:$VERSION
@@ -115,13 +109,56 @@ jobs:
           docker ps | grep $CONTAINER_NAME
 
           # 健康检查
-          echo "Performing health check..."
-          sleep 5
-          if curl -f http://localhost/health; then
+          echo "Performing health check on port $PORT..."
+          sleep 10
+          if curl -f http://localhost:${PORT}/health; then
             echo "✅ Deployment successful! Version: $VERSION"
+            echo "🌐 Application is running at: http://your-server-ip:${PORT}"
           else
             echo "❌ Health check failed!"
+            docker logs $CONTAINER_NAME
             exit 1
           fi
-          '
 
+  rollback:
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: failure()
+    environment: production
+
+    steps:
+    - name: Rollback deployment
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USERNAME }}
+        key: ${{ secrets.SSH_KEY }}
+        port: ${{ secrets.PORT || 22 }}
+        script: |
+          # 设置变量
+          CONTAINER_NAME="three_vue_app"
+          PORT=8001
+
+          echo "Rolling back deployment..."
+
+          # 尝试重启容器
+          if docker ps -a -q -f name=$CONTAINER_NAME | grep -q .; then
+            docker restart $CONTAINER_NAME
+            echo "Container restarted"
+
+            # 等待容器启动
+            sleep 10
+
+            # 检查状态
+            if curl -f http://localhost:${PORT}/health; then
+              echo "✅ Rollback successful!"
+              echo "🌐 Application is running at: http://your-server-ip:${PORT}"
+            else
+              echo "❌ Rollback failed!"
+              docker logs $CONTAINER_NAME
+              exit 1
+            fi
+          else
+            echo "No container found to rollback"
+            exit 1
+          fi
