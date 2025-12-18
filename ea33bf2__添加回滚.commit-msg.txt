@@ -1,0 +1,11 @@
+sha:        ea33bf29eb792c9f7a15d64eb6e4550d9343a387
+short:      ea33bf2
+author:     zlxmii <2096343460@qq.com>
+date:       2025-12-18T13:10:12+08:00
+subject:    添加回滚
+
+--- body ---
+
+
+--- files (1) ---
+.github/workflows/deploy.yml
