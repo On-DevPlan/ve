@@ -61,7 +61,7 @@ jobs:
         username: ${{ secrets.USERNAME }}
         key: ${{ secrets.SSH_KEY }}
         port: ${{ secrets.PORT || 22 }}
-        source: "app.tar.gz,docker-compose.yml,docker-compose.prod.yml"
+        source: "app.tar.gz,docker-compose.yml"
         target: "~/app/"
         strip_components: 0
 
@@ -110,18 +110,15 @@ jobs:
 
           # 停止旧服务
           echo "Stopping old services..."
-          $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml down || true
+          $COMPOSE_CMD down || true
 
-          # 拉取最新镜像（如果存在）
-          echo "Pulling latest image..."
-          docker pull $IMAGE_NAME:latest || true
-
-          # 重新标记镜像
+          # 重新标记镜像为latest
+          echo "Tagging image as latest..."
           docker tag $IMAGE_NAME:$VERSION $IMAGE_NAME:latest || true
 
           # 启动新服务
           echo "Starting new services with version: $VERSION"
-          $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml up -d
+          VERSION=$VERSION $COMPOSE_CMD up -d
 
           # 等待服务启动
           echo "Waiting for service to start..."
@@ -129,7 +126,7 @@ jobs:
 
           # 显示服务状态
           echo "Service status:"
-          $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml ps
+          $COMPOSE_CMD ps
 
           # 健康检查
           echo "Performing health check..."
@@ -145,7 +142,7 @@ jobs:
 
           # 如果所有健康检查都失败，显示日志并退出
           echo "❌ Health check failed after 6 attempts!"
-          $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml logs app
+          $COMPOSE_CMD logs app
           exit 1
           '
 
@@ -185,9 +182,9 @@ jobs:
 
           # 尝试重启服务
           echo "Restarting services..."
-          $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml restart || {
+          $COMPOSE_CMD restart || {
             echo "No services found, attempting to start..."
-            $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml up -d
+            $COMPOSE_CMD up -d
           }
 
           # 等待服务启动
@@ -195,7 +192,7 @@ jobs:
 
           # 显示服务状态
           echo "Service status after rollback:"
-          $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml ps
+          $COMPOSE_CMD ps
 
           # 检查状态
           echo "Performing health check after rollback..."
@@ -211,6 +208,6 @@ jobs:
 
           # 如果健康检查失败，显示日志
           echo "❌ Rollback failed after 3 attempts!"
-          $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml logs app
+          $COMPOSE_CMD logs app
           exit 1
           '
