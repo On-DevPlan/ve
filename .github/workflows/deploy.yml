@@ -75,6 +75,8 @@ jobs:
         timeout: 30s
         command_timeout: 10m
         script: |
+          # 使用bash执行脚本
+          bash -c '
           # 设置变量
           VERSION="${{ steps.get_version.outputs.version }}"
           IMAGE_NAME="three_vue"
@@ -119,6 +121,7 @@ jobs:
             docker logs $CONTAINER_NAME
             exit 1
           fi
+          '
 
   rollback:
     runs-on: ubuntu-latest
@@ -135,6 +138,8 @@ jobs:
         key: ${{ secrets.SSH_KEY }}
         port: ${{ secrets.PORT || 22 }}
         script: |
+          # 使用bash执行脚本
+          bash -c '
           # 设置变量
           CONTAINER_NAME="three_vue_app"
           PORT=8001
@@ -162,3 +167,4 @@ jobs:
             echo "No container found to rollback"
             exit 1
           fi
+          '
