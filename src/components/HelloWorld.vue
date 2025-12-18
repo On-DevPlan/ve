@@ -500,7 +500,7 @@ onUnmounted(() => {
   window.removeEventListener('mousemove', handleMouseMove)
   window.removeEventListener('click', handleClick)
 
-  // 清理资源
+  // 清理资
   cards.forEach(card => {
     card.traverse(child => {
       if (child.geometry) child.geometry.dispose()
