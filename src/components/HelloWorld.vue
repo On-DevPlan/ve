@@ -40,7 +40,97 @@ const comments = [
     time: '2024-7-29',
     likes: 892,
     replies: 421
-  }
+  },
+  {
+    id: 4,
+    avatar: '🌸',
+    username: '樱花雨',
+    content: '春天的花海是你眼里的星光',
+    time: '2024-7-28',
+    likes: 456,
+    replies: 234
+  },
+  {
+    id: 5,
+    avatar: '🦋',
+    username: '梦蝶',
+    content: '破茧成蝶，只为在最美的花丛中遇见你',
+    time: '2024-7-27',
+    likes: 789,
+    replies: 312
+  },
+  {
+    id: 6,
+    avatar: '🌈',
+    username: '彩虹桥',
+    content: '雨过天晴后，架起通往你心里的桥',
+    time: '2024-7-26',
+    likes: 345,
+    replies: 167
+  },
+  {
+    id: 7,
+    avatar: '🌺',
+    username: '夏夜的风',
+    content: '蝉鸣声里藏着我对你的思念',
+    time: '2024-7-25',
+    likes: 623,
+    replies: 289
+  },
+  {
+    id: 8,
+    avatar: '🌻',
+    username: '向日葵',
+    content: '我朝着阳光的方向，也朝着你的方向',
+    time: '2024-7-24',
+    likes: 834,
+    replies: 445
+  },
+  {
+    id: 9,
+    avatar: '🍃',
+    username: '叶落知秋',
+    content: '一片落叶，一段心事，一个想念的你',
+    time: '2024-7-23',
+    likes: 267,
+    replies: 123
+  },
+  {
+    id: 10,
+    avatar: '☁️',
+    username: '云游者',
+    content: '云卷云舒，看尽人间，最想念的还是你',
+    time: '2024-7-22',
+    likes: 512,
+    replies: 234
+  },
+  {
+    id: 11,
+    avatar: '🌹',
+    username: '玫瑰情',
+    content: '带刺的玫瑰，藏着我温柔的心',
+    time: '2024-7-21',
+    likes: 945,
+    replies: 567
+  },
+  {
+    id: 12,
+    avatar: '🎐',
+    username: '风铃响',
+    content: '风起时，铃声起，思念如潮涌',
+    time: '2024-7-20',
+    likes: 432,
+    replies: 198
+  },
+  {
+    id: 13,
+    avatar: '💫',
+    username: '流星语',
+    content: '愿为你坠落，只为照亮你的路',
+    time: '2024-7-19',
+    likes: 721,
+    replies: 376
+  },
 ]
 
 // 初始化Three.js场景
