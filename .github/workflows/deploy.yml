@@ -42,6 +42,7 @@ jobs:
         timeout: 30s
         command_timeout: 10m
         script: |
+          bash -c '
           # 设置变量
           APP_DIR="$HOME/app"
           CONTAINER_NAME="three_vue_app"
@@ -97,3 +98,4 @@ jobs:
           echo "❌ Health check failed after 6 attempts!"
           docker logs $CONTAINER_NAME
           exit 1
+          '
