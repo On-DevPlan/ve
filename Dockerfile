@@ -22,11 +22,17 @@ RUN npm run build
 # 第二阶段：nginx服务
 FROM nginx:alpine
 
-# 复制自定义nginx配置
-COPY nginx.conf /etc/nginx/nginx.conf
+# 复制自定义nginx站点配置（覆盖默认配置）
+COPY default.conf /etc/nginx/conf.d/default.conf
 
 # 从构建阶段复制构建产物到nginx目录
 COPY --from=builder /app/dist /usr/share/nginx/html
+
+# 验证文件是否正确复制
+RUN ls -la /usr/share/nginx/html/ && \
+    if [ ! -f /usr/share/nginx/html/index.html ]; then \
+        echo "Error: index.html not found!" && exit 1; \
+    fi
 
 # 暴露端口
 EXPOSE 80
