@@ -1,0 +1,16 @@
+sha:        78615fad7f71fa351302fe4b10ef481cd07c0ccb
+short:      78615fa
+author:     zlxmii <2096343460@qq.com>
+date:       2025-12-18T13:10:12+08:00
+subject:    replay: snapshot of commit ea33bf2
+
+--- body ---
+replay: snapshot of commit ea33bf2
+
+original-subject: 添加回滚
+original-author:  zlxmii <2096343460@qq.com>
+original-date:    2025-12-18T13:10:12+08:00
+files:            1
+
+--- files (1) ---
+".commit-msgs/ea33bf2__\346\267\273\345\212\240\345\233\236\346\273\232.commit-msg.txt"
