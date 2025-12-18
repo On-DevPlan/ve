@@ -1,0 +1,16 @@
+sha:        c356052046a7b831875d105e92ab6c12544b4f8c
+short:      c356052
+author:     zlxmii <2096343460@qq.com>
+date:       2025-12-18T13:25:49+08:00
+subject:    replay: snapshot of commit d88f47d
+
+--- body ---
+replay: snapshot of commit d88f47d
+
+original-subject: retry
+original-author:  zlxmii <2096343460@qq.com>
+original-date:    2025-12-18T13:25:49+08:00
+files:            2
+
+--- files (1) ---
+.commit-msgs/d88f47d__retry.commit-msg.txt
