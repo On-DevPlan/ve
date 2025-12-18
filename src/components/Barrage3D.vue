@@ -26,7 +26,7 @@ const generateComments = () => {
   const mainComments = [
     { username: 'NENG', content: '是最真挚的祝福，是善意的一路陪伴', likes: 211, replies: 934 },
     { username: '11暖心小天使', content: '愿所有美好都围绕着你', likes: 523, replies: 212 },
-    { username: ' 月光守护者', content: '这份温柔让人感动', likes: 189, replies: 156 }
+    { username: '22 月光守护者', content: '这份温柔让人感动', likes: 189, replies: 156 }
   ]
 
   const shortComments = [

@@ -54,18 +54,18 @@ jobs:
       run: |
         docker save three_vue:${{ steps.get_version.outputs.version }} | gzip > app.tar.gz
 
-    - name: Copy image to server
+    - name: Copy files to server
       uses: appleboy/scp-action@v0.1.7
       with:
         host: ${{ secrets.HOST }}
         username: ${{ secrets.USERNAME }}
         key: ${{ secrets.SSH_KEY }}
         port: ${{ secrets.PORT || 22 }}
-        source: "app.tar.gz"
-        target: "~/"
+        source: "app.tar.gz,docker-compose.yml,docker-compose.prod.yml"
+        target: "~/app/"
         strip_components: 0
 
-    - name: Load and run image on server
+    - name: Deploy using Docker Compose
       uses: appleboy/ssh-action@v1.0.3
       with:
         host: ${{ secrets.HOST }}
@@ -79,48 +79,74 @@ jobs:
           bash -c '
           # 设置变量
           VERSION="${{ steps.get_version.outputs.version }}"
+          APP_DIR="$HOME/app"
           IMAGE_NAME="three_vue"
-          CONTAINER_NAME="three_vue_app"
-          PORT=8001
 
-          # 加载新镜像
-          echo "Loading new image..."
+          # 检测Docker Compose命令
+          if command -v docker-compose &> /dev/null; then
+            COMPOSE_CMD="docker-compose"
+          elif docker compose version &> /dev/null; then
+            COMPOSE_CMD="docker compose"
+          else
+            echo "Error: Neither docker-compose nor docker compose is available"
+            exit 1
+          fi
+
+          echo "Using Docker Compose command: $COMPOSE_CMD"
+
+          # 创建应用目录
+          mkdir -p $APP_DIR
+          cd $APP_DIR
+
+          # 加载Docker镜像
+          echo "Loading Docker image..."
           docker load < app.tar.gz
 
           # 清理压缩文件
           rm app.tar.gz
 
-          # 停止并删除旧容器
-          echo "Stopping old container..."
-          if docker ps -q -f name=$CONTAINER_NAME | grep -q .; then
-            docker stop $CONTAINER_NAME
-            docker rm $CONTAINER_NAME
-          fi
+          # 设置环境变量
+          export VERSION=$VERSION
 
-          # 启动新容器
-          echo "Starting new container with version: $VERSION on port $PORT"
-          docker run -d \
-            --name $CONTAINER_NAME \
-            -p ${PORT}:80 \
-            --restart unless-stopped \
-            -e VERSION=$VERSION \
-            $IMAGE_NAME:$VERSION
+          # 停止旧服务
+          echo "Stopping old services..."
+          $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml down || true
 
-          # 显示运行状态
-          echo "Container status:"
-          docker ps | grep $CONTAINER_NAME
+          # 拉取最新镜像（如果存在）
+          echo "Pulling latest image..."
+          docker pull $IMAGE_NAME:latest || true
+
+          # 重新标记镜像
+          docker tag $IMAGE_NAME:$VERSION $IMAGE_NAME:latest || true
+
+          # 启动新服务
+          echo "Starting new services with version: $VERSION"
+          $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+          # 等待服务启动
+          echo "Waiting for service to start..."
+          sleep 15
+
+          # 显示服务状态
+          echo "Service status:"
+          $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml ps
 
           # 健康检查
-          echo "Performing health check on port $PORT..."
-          sleep 10
-          if curl -f http://localhost:${PORT}/health; then
-            echo "✅ Deployment successful! Version: $VERSION"
-            echo "🌐 Application is running at: http://your-server-ip:${PORT}"
-          else
-            echo "❌ Health check failed!"
-            docker logs $CONTAINER_NAME
-            exit 1
-          fi
+          echo "Performing health check..."
+          for i in {1..6}; do
+            if curl -f http://localhost:8001/health; then
+              echo "✅ Deployment successful! Version: $VERSION"
+              echo "🌐 Application is running at: http://your-server-ip:8001"
+              exit 0
+            fi
+            echo "Health check attempt $i/6 failed, retrying in 10s..."
+            sleep 10
+          done
+
+          # 如果所有健康检查都失败，显示日志并退出
+          echo "❌ Health check failed after 6 attempts!"
+          $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml logs app
+          exit 1
           '
 
   rollback:
@@ -141,30 +167,50 @@ jobs:
           # 使用bash执行脚本
           bash -c '
           # 设置变量
-          CONTAINER_NAME="three_vue_app"
+          APP_DIR="$HOME/app"
           PORT=8001
 
-          echo "Rolling back deployment..."
+          # 检测Docker Compose命令
+          if command -v docker-compose &> /dev/null; then
+            COMPOSE_CMD="docker-compose"
+          elif docker compose version &> /dev/null; then
+            COMPOSE_CMD="docker compose"
+          else
+            echo "Error: Neither docker-compose nor docker compose is available"
+            exit 1
+          fi
 
-          # 尝试重启容器
-          if docker ps -a -q -f name=$CONTAINER_NAME | grep -q .; then
-            docker restart $CONTAINER_NAME
-            echo "Container restarted"
+          echo "Rolling back deployment using: $COMPOSE_CMD"
+          cd $APP_DIR
 
-            # 等待容器启动
-            sleep 10
+          # 尝试重启服务
+          echo "Restarting services..."
+          $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml restart || {
+            echo "No services found, attempting to start..."
+            $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml up -d
+          }
 
-            # 检查状态
+          # 等待服务启动
+          sleep 15
+
+          # 显示服务状态
+          echo "Service status after rollback:"
+          $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml ps
+
+          # 检查状态
+          echo "Performing health check after rollback..."
+          for i in {1..3}; do
             if curl -f http://localhost:${PORT}/health; then
               echo "✅ Rollback successful!"
               echo "🌐 Application is running at: http://your-server-ip:${PORT}"
-            else
-              echo "❌ Rollback failed!"
-              docker logs $CONTAINER_NAME
-              exit 1
+              exit 0
             fi
-          else
-            echo "No container found to rollback"
-            exit 1
-          fi
+            echo "Health check attempt $i/3 failed, retrying in 10s..."
+            sleep 10
+          done
+
+          # 如果健康检查失败，显示日志
+          echo "❌ Rollback failed after 3 attempts!"
+          $COMPOSE_CMD -f docker-compose.yml -f docker-compose.prod.yml logs app
+          exit 1
           '
