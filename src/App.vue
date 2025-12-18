@@ -19,6 +19,6 @@ import Barrage3D from './components/Barrage3D.vue'
   width: 100vw;
   height: 100vh;
   overflow: hidden;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #16c225ff 0%, #764ba2 100%);
 }
 </style>
