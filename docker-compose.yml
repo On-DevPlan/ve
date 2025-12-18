@@ -3,8 +3,10 @@ version: '3.8'
 services:
   # 主应用服务
   app:
-    # 部署时不构建，使用已有镜像
-    image: three_vue:${VERSION:-latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: three_vue:latest
     container_name: three_vue_app
     ports:
       - "8001:80"
