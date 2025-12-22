@@ -26,13 +26,29 @@ const generateComments = () => {
   const mainComments = [
     { username: 'NENG', content: '是最真挚的祝福，是善意的一路陪伴', likes: 211, replies: 934 },
     { username: '11暖心小天使', content: '愿所有美好都围绕着你', likes: 523, replies: 212 },
-    { username: '22 月光守护者', content: '这份温柔让人感动', likes: 189, replies: 156 }
+    { username: '22 月光守护者', content: '这份温柔让人感动', likes: 189, replies: 156 },
+    { username: '樱花雨', content: '春天的花海是你眼里的星光', likes: 456, replies: 234 },
+    { username: '梦蝶', content: '破茧成蝶，只为在最美的花丛中遇见你', likes: 789, replies: 312 },
+    { username: '彩虹桥', content: '雨过天晴后，架起通往你心里的桥', likes: 345, replies: 167 },
+    { username: '夏夜的风', content: '蝉鸣声里藏着我对你的思念', likes: 623, replies: 289 },
+    { username: '向日葵', content: '我朝着阳光的方向，也朝着你的方向', likes: 834, replies: 445 },
+    { username: '叶落知秋', content: '一片落叶，一段心事，一个想念的你', likes: 267, replies: 123 },
+    { username: '云游者', content: '云卷云舒，看尽人间，最想念的还是你', likes: 512, replies: 234 },
+    { username: '玫瑰情', content: '带刺的玫瑰，藏着我温柔的心', likes: 945, replies: 567 },
+    { username: '风铃响', content: '风起时，铃声起，思念如潮涌', likes: 432, replies: 198 },
+    { username: '流星语', content: '愿为你坠落，只为照亮你的路', likes: 721, replies: 376 },
+    { username: '星梦缘', content: '星星点灯，照亮我们的相遇', likes: 658, replies: 423 },
+    { username: '月光曲', content: '皎洁的月光下，聆听心跳的声音', likes: 543, replies: 287 }
   ]
 
   const shortComments = [
     '暖心不凡', '爱你！', '太治愈了', '感动到哭',
     '温柔治愈', '人间美好', '温暖如初', '治愈系',
-    '美好时光', '温柔以待', '爱心满满', '暖暖的'
+    '美好时光', '温柔以待', '爱心满满', '暖暖的',
+    '超赞！', '太美了', '心动', '喜欢💕',
+    '感动', '治愈', '温暖', '美好',
+    '星光', '月色', '温柔如水', '甜甜的',
+    '超爱', '绝美', '心动瞬间', '满满的爱'
   ]
 
   const comments = []
@@ -69,12 +85,12 @@ const initScene = () => {
 
   // 创建相机
   camera = new THREE.PerspectiveCamera(
-    60,
+    75,
     window.innerWidth / window.innerHeight,
     0.1,
     1000
   )
-  camera.position.set(0, 0, 50)
+  camera.position.set(0, 0, 80) // 拉远相机以适应更大的卡片
 
   // 创建渲染器
   renderer = new THREE.WebGLRenderer({
@@ -105,20 +121,20 @@ const initScene = () => {
   setupLighting()
 }
 
-// 创建粉紫渐变背景
+// 创建淡灰色背景
 const createGradientBackground = () => {
   const canvas = document.createElement('canvas')
   canvas.width = 512
   canvas.height = 512
   const context = canvas.getContext('2d')
 
-  // 创建径向渐变，从中心向外的粉紫渐变
+  // 创建径向渐变，从中心向外的灰色渐变
   const gradient = context.createRadialGradient(256, 256, 50, 256, 256, 300)
-  gradient.addColorStop(0, 'rgba(255, 200, 220, 0.9)')
-  gradient.addColorStop(0.3, 'rgba(255, 182, 193, 0.7)')
-  gradient.addColorStop(0.5, 'rgba(221, 160, 221, 0.6)')
-  gradient.addColorStop(0.7, 'rgba(218, 112, 214, 0.5)')
-  gradient.addColorStop(1, 'rgba(147, 112, 219, 0.3)')
+  gradient.addColorStop(0, 'rgba(240, 240, 240, 0.9)')
+  gradient.addColorStop(0.3, 'rgba(220, 220, 220, 0.7)')
+  gradient.addColorStop(0.5, 'rgba(200, 200, 200, 0.6)')
+  gradient.addColorStop(0.7, 'rgba(180, 180, 180, 0.5)')
+  gradient.addColorStop(1, 'rgba(160, 160, 160, 0.3)')
 
   context.fillStyle = gradient
   context.fillRect(0, 0, 512, 512)
@@ -163,7 +179,8 @@ const createFloatingParticles = () => {
     positions[i + 2] = -30 + Math.random() * 40
 
     const color = new THREE.Color()
-    color.setHSL(0.9 + Math.random() * 0.1, 0.7, 0.8)
+    const grayValue = 0.5 + Math.random() * 0.3
+    color.setRGB(grayValue, grayValue, grayValue)
     colors[i] = color.r
     colors[i + 1] = color.g
     colors[i + 2] = color.b
@@ -211,10 +228,31 @@ const setupLighting = () => {
 const createCommentCards = () => {
   const mainComments = comments.filter(c => c.type === 'main')
 
-  mainComments.forEach((comment, index) => {
+  // 创建多列卡片流
+  const columns = 5 // 列数（与createCommentCard中的保持一致）
+  const rowsPerColumn = Math.ceil(mainComments.length / columns)
+
+  // 生成更多卡片以填满屏幕
+  const totalCards = 50 // 减少总卡片数以适应更大的卡片
+  const extendedComments = []
+
+  for (let i = 0; i < totalCards; i++) {
+    const baseComment = mainComments[i % mainComments.length]
+    extendedComments.push({
+      ...baseComment,
+      id: i,
+      // 随机调整点赞和回复数
+      likes: baseComment.likes + Math.floor(Math.random() * 200),
+      replies: baseComment.replies + Math.floor(Math.random() * 50)
+    })
+  }
+
+  // 分批创建卡片，创建连续流动效果
+  extendedComments.forEach((comment, index) => {
+    const delay = index * 150 // 增加延迟时间，避免过于密集
     setTimeout(() => {
       createCommentCard(comment, index)
-    }, index * 800) // 延迟创建，形成波浪效果
+    }, delay)
   })
 }
 
@@ -223,8 +261,10 @@ const createCommentCard = (comment, index) => {
   // 创建卡片组
   const cardGroup = new THREE.Group()
 
-  // 创建卡片背景（磨砂玻璃效果）
-  const cardGeometry = new THREE.BoxGeometry(20, 8, 1)
+  // 创建卡片背景（磨砂玻璃效果）- 放大卡片尺寸
+  const cardWidth = 15
+  const cardHeight = 8
+  const cardGeometry = new THREE.BoxGeometry(cardWidth, cardHeight, 0.5)
 
   // 使用自定义着色器实现磨砂玻璃效果
   const cardMaterial = new THREE.MeshPhysicalMaterial({
@@ -251,13 +291,13 @@ const createCommentCard = (comment, index) => {
     transparent: true,
     alphaTest: 0.01
   })
-  const textGeometry = new THREE.PlaneGeometry(18, 6)
+  const textGeometry = new THREE.PlaneGeometry(cardWidth * 0.9, cardHeight * 0.8)
   const textMesh = new THREE.Mesh(textGeometry, textMaterial)
-  textMesh.position.z = 0.51
+  textMesh.position.z = 0.26
   cardGroup.add(textMesh)
 
   // 添加高光边缘
-  const edgeGeometry = new THREE.BoxGeometry(20.2, 8.2, 1.1)
+  const edgeGeometry = new THREE.BoxGeometry(cardWidth * 1.02, cardHeight * 1.02, 0.52)
   const edgeMaterial = new THREE.MeshBasicMaterial({
     color: comment.color,
     transparent: true,
@@ -267,28 +307,44 @@ const createCommentCard = (comment, index) => {
   const edgeMesh = new THREE.Mesh(edgeGeometry, edgeMaterial)
   cardGroup.add(edgeMesh)
 
-  // 设置初始位置（3D空间中）
-  const angle = (index / 3) * Math.PI * 2
-  const radius = 15
-  cardGroup.position.x = Math.cos(angle) * radius
-  cardGroup.position.y = Math.sin(angle) * radius
-  cardGroup.position.z = Math.random() * 10 - 5
+  // 设置流式布局位置
+  const columns = 5 // 减少列数以适应更大的卡片
+  const spacingX = 18 // 增加列间距
+  const spacingY = 10 // 增加行间距
+  const column = index % columns
+  const row = Math.floor(index / columns)
+
+  // 计算屏幕坐标
+  const screenWidth = columns * spacingX
+  const startX = -screenWidth / 2 + spacingX / 2
+  const x = startX + column * spacingX
+
+  // 初始位置从屏幕底部下方开始
+  const y = -40 - row * spacingY - Math.random() * 10
+  const z = -10 + (Math.random() - 0.5) * 20 // 随机深度
+
+  cardGroup.position.set(x, y, z)
 
   // 初始动画参数
-  cardGroup.scale.set(0.8, 0.8, 0.8)
-  cardGroup.rotation.z = (Math.random() - 0.5) * 0.3
+  cardGroup.scale.set(0.8, 0.8, 0.8) // 增大初始缩放
+  cardGroup.rotation.z = (Math.random() - 0.5) * 0.2
   cardGroup.visible = false
 
   // 保存动画数据
   cardGroup.userData = {
     type: 'card',
     comment: comment,
-    targetPosition: cardGroup.position.clone(),
-    targetScale: new THREE.Vector3(1, 1, 1),
-    targetRotation: new THREE.Vector3(0, 0, 0),
+    startX: x,
+    startY: y,
+    speed: 0.1 + Math.random() * 0.05, // 向上移动速度
+    floatAmplitude: 0.2 + Math.random() * 0.3, // 左右摆动幅度
+    floatFrequency: 0.5 + Math.random() * 0.5, // 摆动频率
+    phase: Math.random() * Math.PI * 2,
     animationStart: time,
-    bouncePhase: 0,
-    floatOffset: Math.random() * Math.PI * 2,
+    opacity: 0,
+    targetOpacity: 0.9,
+    fadeInDuration: 1,
+    fadeOutY: 40, // 淡出高度
     targetLikes: comment.likes,
     currentLikes: 0,
     displayReplies: comment.replies || 0
@@ -481,6 +537,21 @@ const formatNumber = (num) => {
   return num.toString()
 }
 
+// 创建心形几何体
+const createHeartGeometry = () => {
+  const shape = new THREE.Shape()
+  const x = 0, y = 0
+  shape.moveTo(x + 0.5, y + 0.5)
+  shape.bezierCurveTo(x + 0.5, y + 0.5, x + 0.4, y, x, y)
+  shape.bezierCurveTo(x - 0.6, y, x - 0.6, y + 0.7, x - 0.6, y + 0.7)
+  shape.bezierCurveTo(x - 0.6, y + 1.1, x - 0.3, y + 1.54, x + 0.5, y + 1.9)
+  shape.bezierCurveTo(x + 1.2, y + 1.54, x + 1.6, y + 1.1, x + 1.6, y + 0.7)
+  shape.bezierCurveTo(x + 1.6, y + 0.7, x + 1.6, y, x + 1, y)
+  shape.bezierCurveTo(x + 0.7, y, x + 0.5, y + 0.5, x + 0.5, y + 0.5)
+
+  return new THREE.ShapeGeometry(shape)
+}
+
 // 动画循环
 const animate = () => {
   animationId = requestAnimationFrame(animate)
@@ -497,63 +568,67 @@ const animate = () => {
     const userData = card.userData
     const elapsed = time - userData.animationStart
 
-    // 入场动画（0.8秒）
-    if (elapsed < 0.8) {
-      if (!card.visible) {
-        card.visible = true
-      }
+    // 入场动画
+    if (elapsed < userData.fadeInDuration && !card.visible) {
+      card.visible = true
+    }
 
-      const progress = elapsed / 0.8
+    if (elapsed < userData.fadeInDuration) {
+      const progress = elapsed / userData.fadeInDuration
       const easeProgress = easeOutElastic(progress)
 
-      // Z轴旋转 + 缩放
-      card.rotation.z = userData.targetRotation.z + (1 - easeProgress) * 0.3
-      card.scale.setScalar(0.8 + easeProgress * 0.2)
-
-      // 位置动画
-      card.position.lerpVectors(
-        userData.targetPosition.clone().add(new THREE.Vector3(0, 0, 20)),
-        userData.targetPosition,
-        easeProgress
-      )
+      // 缩放动画
+      const scale = 0.8 + easeProgress * 0.2 // 增大最终尺寸
+      card.scale.set(scale, scale, scale)
 
       // 透明度动画
+      userData.opacity = easeProgress * userData.targetOpacity
       card.traverse((child) => {
-        if (child.material) {
-          if (child.material.transparent !== undefined) {
-            child.material.opacity = easeProgress
-          }
+        if (child.material && child.material.transparent !== undefined) {
+          child.material.opacity = userData.opacity
         }
       })
     }
 
-    // 弹性震动动画
-    if (elapsed > 0.8 && elapsed < 1.6) {
-      userData.bouncePhase += 0.1
-      const bounceAmount = Math.sin(userData.bouncePhase * 2) * Math.exp(-userData.bouncePhase * 0.5) * 0.05
-      card.scale.setScalar(1 + bounceAmount)
-    }
+    // 持续的向上滚动动画
+    if (elapsed >= userData.fadeInDuration) {
+      // 更新Y位置 - 向上移动
+      card.position.y += userData.speed
 
-    // 持续的浮动效果
-    if (elapsed >= 0.8) {
-      const floatY = Math.sin(time * 0.3 + userData.floatOffset) * 0.5
-      const floatX = Math.cos(time * 0.2 + userData.floatOffset) * 0.3
-      card.position.x = userData.targetPosition.x + floatX
-      card.position.y = userData.targetPosition.y + floatY
+      // 左右摆动效果
+      const floatX = Math.sin(time * userData.floatFrequency + userData.phase) * userData.floatAmplitude
+      card.position.x = userData.startX + floatX
 
-      // 微妙的旋转
-      card.rotation.z = Math.sin(time * 0.5 + userData.floatOffset) * 0.02
+      // 轻微的旋转
+      card.rotation.z = Math.sin(time * 0.5 + userData.phase) * 0.05
+
+      // 透明度根据高度调整
+      if (card.position.y > userData.fadeOutY - 10) {
+        const fadeProgress = (card.position.y - (userData.fadeOutY - 10)) / 10
+        userData.opacity = userData.targetOpacity * (1 - fadeProgress)
+        card.traverse((child) => {
+          if (child.material && child.material.transparent !== undefined) {
+            child.material.opacity = userData.opacity
+          }
+        })
+      }
 
       // 更新点赞数动画
       if (userData.currentLikes < userData.targetLikes) {
         userData.currentLikes = Math.min(userData.currentLikes + 5, userData.targetLikes)
-        // 更新纹理以显示新的点赞数
         const newTexture = createCommentTextTexture({
           ...userData.comment,
           likes: Math.floor(userData.currentLikes)
         })
         card.children[1].material.map = newTexture
         card.children[1].material.needsUpdate = true
+      }
+
+      // 重置位置 - 当卡片超出屏幕顶部时，重新从底部开始
+      if (card.position.y > userData.fadeOutY) {
+        card.position.y = userData.startY
+        userData.phase = Math.random() * Math.PI * 2
+        userData.speed = 0.1 + Math.random() * 0.05
       }
     }
   })
@@ -609,10 +684,8 @@ const animate = () => {
     }
   })
 
-  // 相机缓慢移动
-  camera.position.x = Math.sin(time * 0.1) * 2
-  camera.position.y = Math.cos(time * 0.15) * 1
-  camera.lookAt(scene.position)
+  // 相机固定，观察流式卡片
+  camera.lookAt(0, 0, 0)
 
   // 渲染场景
   renderer.render(scene, camera)
@@ -655,16 +728,21 @@ const handleMouseMove = (event) => {
     const intersects = raycaster.intersectObject(card, true)
 
     if (intersects.length > 0) {
-      // 鼠标悬停效果：略微放大并停止移动
-      card.scale.setScalar(1.05)
+      // 鼠标悬停效果：略微放大
+      if (!card.userData.hovered) {
+        card.userData.hovered = true
+        card.userData.originalScale = card.scale.x
+      }
+      card.scale.setScalar(card.userData.originalScale * 1.2)
       hovered = true
 
       // 更新鼠标样式
       renderer.domElement.style.cursor = 'pointer'
     } else {
       // 恢复正常大小
-      if (card.scale.x > 1.01) {
-        card.scale.setScalar(1)
+      if (card.userData.hovered) {
+        card.userData.hovered = false
+        card.scale.setScalar(card.userData.originalScale || 1)
       }
     }
   })
@@ -706,50 +784,62 @@ const handleClick = (event) => {
     const intersects = raycaster.intersectObject(card, true)
 
     if (intersects.length > 0) {
-      // 点击时产生弹跳动画
-      card.userData.bouncePhase = 0
-
       // 增加点赞数
-      card.userData.targetLikes += 1
+      card.userData.targetLikes += 50 // 增加更多点赞以产生明显效果
 
-      // 创建粒子爆炸效果
-      createParticleExplosion(card.position)
+      // 创建心形粒子爆炸效果
+      createHeartParticleExplosion(card.position)
     }
   })
 }
 
-// 创建粒子爆炸效果
-const createParticleExplosion = (position) => {
-  const particleCount = 20
+// 创建心形粒子爆炸效果
+const createHeartParticleExplosion = (position) => {
+  const particleCount = 30
   const particles = []
 
   for (let i = 0; i < particleCount; i++) {
-    const particleGeometry = new THREE.SphereGeometry(0.2)
-    const particleMaterial = new THREE.MeshBasicMaterial({
-      color: new THREE.Color().setHSL(0.9 + Math.random() * 0.1, 0.7, 0.8),
+    // 创建心形粒子
+    const heartGeometry = createHeartGeometry()
+    const heartMaterial = new THREE.MeshBasicMaterial({
+      color: new THREE.Color().setHSL(0.95 + Math.random() * 0.05, 0.8, 0.7),
       transparent: true,
       opacity: 1
     })
-    const particle = new THREE.Mesh(particleGeometry, particleMaterial)
+    const heart = new THREE.Mesh(heartGeometry, heartMaterial)
 
-    particle.position.copy(position)
-    particle.velocity = new THREE.Vector3(
-      (Math.random() - 0.5) * 2,
-      (Math.random() - 0.5) * 2,
-      (Math.random() - 0.5) * 2
+    // 缩小心形
+    heart.scale.setScalar(0.1 + Math.random() * 0.1)
+
+    heart.position.copy(position)
+
+    // 心形向外爆炸的轨迹
+    const angle = (i / particleCount) * Math.PI * 2
+    const speed = 0.5 + Math.random() * 0.5
+    heart.velocity = new THREE.Vector3(
+      Math.cos(angle) * speed,
+      Math.sin(angle) * speed,
+      (Math.random() - 0.5) * 0.5
     )
 
-    particle.life = 1
-    particles.push(particle)
-    scene.add(particle)
+    heart.life = 1
+    particles.push(heart)
+    scene.add(heart)
   }
 
-  // 更新粒子动画
-  const updateParticles = () => {
+  // 更新心形粒子动画
+  const updateHeartParticles = () => {
     particles.forEach((particle, index) => {
       particle.position.add(particle.velocity)
-      particle.life -= 0.02
+      particle.life -= 0.015
       particle.material.opacity = particle.life
+
+      // 旋转和缩放动画
+      particle.rotation.z += 0.1
+      particle.scale.setScalar(particle.scale.x * 0.98)
+
+      // 添加重力效果
+      particle.velocity.y -= 0.01
 
       if (particle.life <= 0) {
         scene.remove(particle)
@@ -760,10 +850,10 @@ const createParticleExplosion = (position) => {
     })
 
     if (particles.length > 0) {
-      requestAnimationFrame(updateParticles)
+      requestAnimationFrame(updateHeartParticles)
     }
   }
-  updateParticles()
+  updateHeartParticles()
 }
 
 onMounted(() => {
