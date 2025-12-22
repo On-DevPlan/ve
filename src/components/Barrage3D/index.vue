@@ -8,12 +8,9 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 import * as THREE from 'three'
-import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
-import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
-import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js'
 
 const container = ref(null)
-let scene, camera, renderer, composer
+let scene, camera, renderer
 let commentCards = []
 let shortComments = []
 let animationId
@@ -99,14 +96,8 @@ const initScene = () => {
     premultipliedAlpha: false
   })
   renderer.setSize(window.innerWidth, window.innerHeight)
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-  renderer.toneMapping = THREE.ACESFilmicToneMapping
-  renderer.toneMappingExposure = 1.2
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)) // 限制像素比以优化性能
   container.value.appendChild(renderer.domElement)
-
-  // 创建后期处理
-  composer = new EffectComposer(renderer)
-  composer.addPass(new RenderPass(scene, camera))
 
   // 创建粉紫渐变背景
   createGradientBackground()
@@ -706,9 +697,6 @@ const handleResize = () => {
   camera.aspect = window.innerWidth / window.innerHeight
   camera.updateProjectionMatrix()
   renderer.setSize(window.innerWidth, window.innerHeight)
-  if (composer) {
-    composer.setSize(window.innerWidth, window.innerHeight)
-  }
 }
 
 // 处理鼠标移动
@@ -902,11 +890,7 @@ onUnmounted(() => {
     }
   }
 
-  // 清理后期处理
-  if (composer) {
-    composer.dispose()
-  }
-})
+  })
 </script>
 
 <style scoped>
