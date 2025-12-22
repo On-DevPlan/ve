@@ -23,7 +23,7 @@ export default {
   },
 
   // 全屏模式（可选）
-  fullscreen: false,
+  fullscreen: true,
 
   // 默认属性
   defaultProps: {
