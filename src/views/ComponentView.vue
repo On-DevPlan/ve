@@ -20,6 +20,7 @@ const error = ref(null)
 
 // 计算属性
 const componentConfig = computed(() => component.value?.config || {})
+const isFullscreen = computed(() => component.value?.fullscreen || false)
 
 // 加载组件
 const loadComponent = async () => {
@@ -107,21 +108,14 @@ onUnmounted(() => {
       </div>
 
       <!-- 组件展示 -->
-      <div v-else-if="component" class="component-display">
-        <!-- 标签页 -->
-        <div class="tabs">
+      <div v-else-if="component" :class="['component-display', { fullscreen: isFullscreen }]">
+        <!-- 非全屏模式显示标签页 -->
+        <div v-if="!isFullscreen" class="tabs">
           <button
             :class="['tab', { active: activeTab === 'demo' }]"
             @click="activeTab = 'demo'"
           >
             演示
-          </button>
-          <button
-            :class="['tab', { active: activeTab === 'config' }]"
-            @click="activeTab = 'config'"
-            v-if="$DEV_MODE"
-          >
-            配置
           </button>
           <button
             :class="['tab', { active: activeTab === 'info' }]"
@@ -132,36 +126,24 @@ onUnmounted(() => {
         </div>
 
         <!-- 标签内容 -->
-        <div class="tab-content">
+        <div class="tab-content" :class="{ fullscreen: isFullscreen }">
           <!-- 演示标签页 -->
           <div v-if="activeTab === 'demo'" class="demo-panel">
-            <div class="demo-container">
+            <div class="demo-container" :class="{ fullscreen: isFullscreen }">
               <!-- 组件演示区域 -->
-              <div class="demo-area" :style="componentConfig.preview?.demo?.style || {}">
+              <div class="demo-area" :class="{ fullscreen: isFullscreen }">
                 <component
                   :is="component.module"
                   v-bind="componentProps"
-                  v-if="componentConfig.performance?.suspense !== false"
-                >
-                  <template #fallback>
-                    <div class="demo-loading">
-                      <div class="spinner"></div>
-                    </div>
-                  </template>
-                </component>
-                <component
-                  :is="component.module"
-                  v-bind="componentProps"
-                  v-else
                 />
               </div>
 
-              <!-- 控制面板 -->
-              <div class="control-panel" v-if="componentConfig.preview?.demo?.showControls">
+              <!-- 非全屏模式显示控制面板 -->
+              <div v-if="!isFullscreen && component.defaultProps" class="control-panel">
                 <h3>控制面板</h3>
                 <div class="controls">
                   <button
-                    v-for="prop in Object.keys(componentConfig.defaultProps || {})"
+                    v-for="prop in Object.keys(component.defaultProps)"
                     :key="prop"
                     class="control-btn"
                     @click="toggleProp(prop)"
@@ -173,21 +155,8 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <!-- 配置标签页（仅开发模式） -->
-          <div v-else-if="activeTab === 'config' && $DEV_MODE" class="config-panel">
-            <div class="config-section">
-              <h3>组件配置</h3>
-              <pre>{{ JSON.stringify(componentConfig, null, 2) }}</pre>
-            </div>
-
-            <div class="config-section">
-              <h3>Props</h3>
-              <pre>{{ JSON.stringify(componentProps, null, 2) }}</pre>
-            </div>
-          </div>
-
           <!-- 信息标签页 -->
-          <div v-else-if="activeTab === 'info'" class="info-panel">
+          <div v-else-if="activeTab === 'info' && !isFullscreen" class="info-panel">
             <div class="info-section">
               <h3>基本信息</h3>
               <table class="info-table">
@@ -211,10 +180,6 @@ onUnmounted(() => {
                   <td>类别</td>
                   <td>{{ component.category }}</td>
                 </tr>
-                <tr>
-                  <td>作者</td>
-                  <td>{{ component.author }}</td>
-                </tr>
               </table>
             </div>
 
@@ -231,10 +196,10 @@ onUnmounted(() => {
               </div>
             </div>
 
-            <div class="info-section" v-if="component.resources">
-              <h3>资源依赖</h3>
+            <div class="info-section" v-if="component.dependencies">
+              <h3>依赖</h3>
               <ul class="resource-list">
-                <li v-for="dep in component.resources.dependencies || []" :key="dep">
+                <li v-for="dep in component.dependencies" :key="dep">
                   {{ dep }}
                 </li>
               </ul>
@@ -517,5 +482,27 @@ onUnmounted(() => {
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+}
+
+/* 全屏模式样式 */
+.component-display.fullscreen {
+  height: 100vh;
+}
+
+.tab-content.fullscreen {
+  height: calc(100vh - 60px);
+}
+
+.demo-container.fullscreen {
+  height: 100%;
+}
+
+.demo-area.fullscreen {
+  width: 100vw;
+  height: 100vh;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1;
 }
 </style>
