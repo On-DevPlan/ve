@@ -1,0 +1,11 @@
+sha:        8e5565fa15f95e87356c93b9375f66d7c5de3403
+short:      8e5565f
+author:     zlxmii <2096343460@qq.com>
+date:       2025-12-22T18:08:11+08:00
+subject:    全屏
+
+--- body ---
+
+
+--- files (1) ---
+src/components/HelloWorld/component.js
