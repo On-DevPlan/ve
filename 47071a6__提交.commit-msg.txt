@@ -1,0 +1,19 @@
+sha:        47071a66581b5d44aa4bc59651e54f1b9c9024b6
+short:      47071a6
+author:     zlxmii <2096343460@qq.com>
+date:       2025-12-22T17:37:10+08:00
+subject:    提交
+
+--- body ---
+
+
+--- files (9) ---
+package-lock.json
+package.json
+src/App.vue
+src/components/index.js
+src/utils/componentDiscovery.js
+src/utils/dynamicImports.js
+src/utils/testImports.js
+src/views/ComponentView.vue
+vite.config.js
