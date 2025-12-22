@@ -58,7 +58,7 @@ const generateComments = () => {
       ...comment,
       id: i,
       type: 'main',
-      color: new THREE.Color().setHSL(0.9, 0.6, 0.7)
+      color: new THREE.Color(0x888888) // 灰色
     })
   })
 
@@ -68,7 +68,7 @@ const generateComments = () => {
       id: mainComments.length + i,
       type: 'short',
       content: shortComments[Math.floor(Math.random() * shortComments.length)],
-      color: new THREE.Color().setHSL(0.85 + Math.random() * 0.1, 0.5, 0.8)
+      color: new THREE.Color(0x999999) // 淡灰色
     })
   }
 
@@ -169,7 +169,7 @@ const createGradientBackground = () => {
 // 创建漂浮粒子
 const createFloatingParticles = () => {
   const particlesGeometry = new THREE.BufferGeometry()
-  const particlesCount = 100
+  const particlesCount = 50 // 减少粒子数量
   const positions = new Float32Array(particlesCount * 3)
   const colors = new Float32Array(particlesCount * 3)
 
@@ -207,12 +207,12 @@ const setupLighting = () => {
   const ambientLight = new THREE.AmbientLight(0xffffff, 0.5)
   scene.add(ambientLight)
 
-  // 柔和的点光源
-  const pointLight1 = new THREE.PointLight(0xffb6c1, 0.8, 100)
+  // 柔和的灰色点光源
+  const pointLight1 = new THREE.PointLight(0xcccccc, 0.8, 100)
   pointLight1.position.set(-30, 20, 20)
   scene.add(pointLight1)
 
-  const pointLight2 = new THREE.PointLight(0xda70d6, 0.8, 100)
+  const pointLight2 = new THREE.PointLight(0xb8b8b8, 0.8, 100)
   pointLight2.position.set(30, -20, 20)
   scene.add(pointLight2)
 
@@ -233,7 +233,7 @@ const createCommentCards = () => {
   const rowsPerColumn = Math.ceil(mainComments.length / columns)
 
   // 生成更多卡片以填满屏幕
-  const totalCards = 50 // 减少总卡片数以适应更大的卡片
+  const totalCards = 25 // 进一步减少卡片数量以优化性能
   const extendedComments = []
 
   for (let i = 0; i < totalCards; i++) {
