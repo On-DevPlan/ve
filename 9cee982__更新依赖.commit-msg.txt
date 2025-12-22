@@ -1,0 +1,14 @@
+sha:        9cee982d7b992b3c1d1891a348844a25ee683333
+short:      9cee982
+author:     zlxmii <2096343460@qq.com>
+date:       2025-12-22T17:30:58+08:00
+subject:    更新依赖
+
+--- body ---
+
+
+--- files (4) ---
+package-lock.json
+package.json
+src/components/HelloWorld/component.js
+src/components/HelloWorld/index.vue
