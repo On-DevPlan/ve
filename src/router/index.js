@@ -26,6 +26,15 @@ const router = createRouter({
         title: '组件详情'
       }
     },
+    {
+      path: '/components/:id',
+      name: 'ComponentPage',
+      component: ComponentView,
+      props: true,
+      meta: {
+        title: '组件详情'
+      }
+    },
     // 404页面
     {
       path: '/:pathMatch(.*)*',
