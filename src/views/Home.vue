@@ -2,9 +2,14 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useComponentDiscovery } from '../utils/componentDiscovery'
+import ComponentInfoModal from '../components/ComponentInfoModal.vue'
 
 const router = useRouter()
 const { components, groups, loading } = useComponentDiscovery()
+
+// 信息弹窗状态
+const selectedComponent = ref(null)
+const showInfoModal = ref(false)
 
 // 搜索状态
 const searchQuery = ref('')
@@ -78,6 +83,17 @@ const getComponentUrl = (component) => {
   return component.config?.route?.path || `/components/${component.id}`
 }
 
+const showComponentInfo = (component, event) => {
+  event.stopPropagation() // 阻止事件冒泡，避免触发卡片点击
+  selectedComponent.value = component
+  showInfoModal.value = true
+}
+
+const closeInfoModal = () => {
+  showInfoModal.value = false
+  selectedComponent.value = null
+}
+
 onMounted(() => {
   // 组件已在App.vue中初始化
 })
@@ -140,7 +156,16 @@ onMounted(() => {
         >
           <div class="card-header">
             <span class="component-icon">{{ component.config?.route?.meta?.icon || '📦' }}</span>
-            <span class="component-version">v{{ component.version }}</span>
+            <div class="header-right">
+              <span class="component-version">v{{ component.version }}</span>
+              <button
+                class="info-btn"
+                @click="showComponentInfo(component, $event)"
+                title="查看详细信息"
+              >
+                ℹ️
+              </button>
+            </div>
           </div>
 
           <h3 class="component-title">{{ component.title }}</h3>
@@ -186,6 +211,13 @@ onMounted(() => {
         <a href="#" class="link">API文档</a>
       </div>
     </aside>
+
+    <!-- 信息弹窗 -->
+    <ComponentInfoModal
+      :visible="showInfoModal"
+      :component="selectedComponent"
+      @close="closeInfoModal"
+    />
   </div>
 </template>
 
@@ -312,12 +344,38 @@ onMounted(() => {
   font-size: 24px;
 }
 
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .component-version {
   font-size: 12px;
   color: #999;
   background: #e8e8e8;
   padding: 2px 8px;
   border-radius: 12px;
+}
+
+.info-btn {
+  background: none;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+}
+
+.info-btn:hover {
+  background: rgba(0, 0, 0, 0.1);
+  transform: scale(1.1);
 }
 
 .component-title {
