@@ -29,8 +29,10 @@ const loadComponent = async () => {
   try {
     const componentData = getComponent(props.componentId || route.params.id)
     if (!componentData) {
-      throw new Error('Component not found')
+      throw new Error(`Component not found: ${props.componentId || route.params.id}`)
     }
+
+    console.log('Loading component:', componentData.name)
 
     // 动态导入组件
     const componentModule = await componentData.loader()
@@ -38,8 +40,10 @@ const loadComponent = async () => {
       ...componentData,
       module: componentModule.default || componentModule
     }
+
+    console.log('Component loaded successfully:', component.value.name)
   } catch (err) {
-    error.value = err.message
+    error.value = err.message || 'Failed to load component'
     console.error('Failed to load component:', err)
   } finally {
     loading.value = false

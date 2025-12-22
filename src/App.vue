@@ -2,11 +2,16 @@
 import { onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { setupComponentRoutes } from './router'
+import { testComponentImports } from './utils/testImports.js'
 
 const route = useRoute()
 
 // 初始化组件路由
 onMounted(async () => {
+  // 在开发模式下测试导入
+  if (import.meta.env.DEV) {
+    await testComponentImports()
+  }
   await setupComponentRoutes()
 })
 </script>

@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { getDynamicComponentLoader } from './dynamicImports.js'
 
 /**
  * 组件自动发现系统
@@ -39,10 +40,28 @@ export class ComponentDiscovery {
               ...componentConfig,
               id: componentName,
               path: path.replace('/component.js', ''),
+              // 预计算组件路径
+              componentModulePath: path.replace('/component.js', '/index.vue'),
               loader: async () => {
-                // 动态导入实际的Vue组件
-                const componentPath = path.replace('/component.js', '/' + componentConfig.component)
-                return import(/* @vite-ignore */ componentPath)
+                // 使用预定义的动态导入
+                try {
+                  const componentLoader = getDynamicComponentLoader(componentName)
+                  if (componentLoader) {
+                    console.log(`Loading component ${componentName} from pre-defined loader`)
+                    return await componentLoader()
+                  }
+                  // 如果没有预定义的，使用glob导入作为后备
+                  const modules = import.meta.glob('../components/**/index.vue')
+                  const modulePath = path.replace('/component.js', '/index.vue')
+                  if (modules[modulePath]) {
+                    console.log(`Loading component ${componentName} from glob`)
+                    return await modules[modulePath]()
+                  }
+                  throw new Error(`Component ${componentName} not found`)
+                } catch (error) {
+                  console.error(`Failed to load component ${componentName}:`, error)
+                  throw error
+                }
               }
             }
 
