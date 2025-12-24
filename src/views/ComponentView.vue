@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { useComponentDiscovery } from '../utils/componentDiscovery'
 
 const props = defineProps({
@@ -11,7 +11,6 @@ const props = defineProps({
 })
 
 const route = useRoute()
-const router = useRouter()
 const { getComponent } = useComponentDiscovery()
 
 const component = ref(null)
@@ -43,11 +42,6 @@ const loadComponent = async () => {
   }
 }
 
-// 返回首页
-const goBack = () => {
-  router.push('/')
-}
-
 onMounted(() => {
   loadComponent()
 })
@@ -55,11 +49,6 @@ onMounted(() => {
 
 <template>
   <div class="component-view">
-    <!-- 返回按钮（浮在左上角） -->
-    <button class="back-btn" @click="goBack">
-      ← 返回
-    </button>
-
     <!-- 加载状态 -->
     <div v-if="loading" class="loading">
       <div class="spinner"></div>
@@ -89,27 +78,6 @@ onMounted(() => {
   width: 100vw;
   position: relative;
   background: #000;
-}
-
-.back-btn {
-  position: fixed;
-  top: 20px;
-  left: 20px;
-  background: rgba(0, 0, 0, 0.7);
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  padding: 10px 20px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: all 0.2s;
-  z-index: 1000;
-  backdrop-filter: blur(10px);
-}
-
-.back-btn:hover {
-  background: rgba(0, 0, 0, 0.9);
-  border-color: rgba(255, 255, 255, 0.4);
 }
 
 .loading {

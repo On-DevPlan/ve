@@ -155,7 +155,9 @@ onMounted(() => {
           @click="navigateToComponent(component)"
         >
           <div class="card-header">
-            <span class="component-icon">{{ component.config?.route?.meta?.icon || '📦' }}</span>
+            <div class="header-left">
+              <span class="component-icon">{{ component.config?.route?.meta?.icon || '📦' }}</span>
+            </div>
             <div class="header-right">
               <span class="component-version">v{{ component.version }}</span>
               <button
@@ -172,18 +174,22 @@ onMounted(() => {
           <p class="component-description">{{ component.description }}</p>
 
           <div class="card-footer">
-            <span class="component-group">{{ component.group }}</span>
-            <div class="component-tags">
-              <span
-                v-for="tag in component.tags.slice(0, 3)"
-                :key="tag"
-                class="tag"
-              >
-                {{ tag }}
-              </span>
-              <span v-if="component.tags.length > 3" class="tag-more">
-                +{{ component.tags.length - 3 }}
-              </span>
+            <div class="footer-left">
+              <span class="component-group">{{ component.group }}</span>
+            </div>
+            <div class="footer-right">
+              <div class="component-tags">
+                <span
+                  v-for="tag in component.tags.slice(0, 3)"
+                  :key="tag"
+                  class="tag"
+                >
+                  {{ tag }}
+                </span>
+                <span v-if="component.tags.length > 3" class="tag-more">
+                  +{{ component.tags.length - 3 }}
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -344,17 +350,22 @@ onMounted(() => {
   font-size: 24px;
 }
 
+.header-left {
+  display: flex;
+  align-items: center;
+}
+
 .header-right {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .component-version {
   font-size: 12px;
   color: #999;
   background: #e8e8e8;
-  padding: 2px 8px;
+  padding: 4px 8px;
   border-radius: 12px;
 }
 
@@ -369,8 +380,8 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
 }
 
 .info-btn:hover {
@@ -396,6 +407,12 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
+}
+
+.footer-left {
+  display: flex;
+  align-items: center;
 }
 
 .component-group {
@@ -404,6 +421,11 @@ onMounted(() => {
   background: #e0e0e0;
   padding: 4px 10px;
   border-radius: 4px;
+}
+
+.footer-right {
+  display: flex;
+  align-items: center;
 }
 
 .component-tags {
