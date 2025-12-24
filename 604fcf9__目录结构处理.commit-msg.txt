@@ -1,0 +1,14 @@
+sha:        604fcf9ca715f4d5d2677ede2f8232dba07bac26
+short:      604fcf9
+author:     zlxmii <2096343460@qq.com>
+date:       2025-12-24T12:19:59+08:00
+subject:    目录结构处理
+
+--- body ---
+
+
+--- files (4) ---
+src/components/three/Barrage3D/component.js
+src/components/three/Barrage3D/index.vue
+src/components/three/CyberTemple/component.js
+src/components/three/CyberTemple/index.vue
