@@ -1,0 +1,18 @@
+sha:        c6a2243c4154cb7f852cd3ffc03f71a6a1198f62
+short:      c6a2243
+author:     zlxmii <2096343460@qq.com>
+date:       2025-12-24T12:18:09+08:00
+subject:    简化结构
+
+--- body ---
+
+
+--- files (8) ---
+CLAUDE.md
+README.md
+src/App.vue
+src/components/CyberTemple/component.js
+src/components/CyberTemple/index.vue
+src/utils/componentDiscovery.js
+src/utils/dynamicImports.js
+src/utils/testImports.js
