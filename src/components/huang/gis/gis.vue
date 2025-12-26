@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onUnmounted, shallowRef } from 'vue'
+import { ref, onMounted, onUnmounted, shallowRef, computed } from 'vue'
 import 'ol/ol.css'
 import Map from 'ol/Map'
 import View from 'ol/View'
@@ -20,7 +20,7 @@ import { getLength } from 'ol/sphere'
 import Overlay from 'ol/Overlay'
 import Select from 'ol/interaction/Select'
 import PointEditor from './PointEditor.vue'
-import PointList from './PointList.vue'
+import ControlPanel from './ControlPanel.vue'
 
 // 地图容器
 const mapContainer = ref(null)
@@ -86,6 +86,9 @@ const previewPosition = ref({ x: 0, y: 0 })  // 预览位置
 // 地图点悬浮图片预览
 const pointImageOverlay = ref(null)  // 点的图片预览 overlay
 const carImageUrl = '/map/right.gif'  // 小车图片（只用一张）
+
+// 计算临时路线点数量（传递给 ControlPanel）
+const tempRoutePointsCount = computed(() => tempRoutePoints.value.length)
 const animationRouteSource = new VectorSource()  // 动画路线源（显示已走过的部分）
 const animationRouteLayer = new VectorLayer({
   source: animationRouteSource,
@@ -848,79 +851,26 @@ onUnmounted(() => {
 
 <template>
   <div class="gis-container">
-    <!-- 左侧面板 -->
-    <div class="side-panel">
-
-      
-      <!-- 记录点列表 -->
-      <PointList
-        :points="recordPoints"
-        @edit="handleEditPoint"
-        @delete="handleDeletePoint"
-        @select="flyToPoint"
-        @preview="handleImagePreview"
-      />
-
-      <!-- 路线管理 -->
-      <div class="panel-section">
-        <h3>🛣️ 我的路线</h3>
-
-        <div v-if="!isDrawingRoute" class="route-input">
-          <button @click="startDrawRoute" class="btn-primary full-width">
-            ✏️ 开始绘制路线
-          </button>
-        </div>
-
-        <div v-else class="drawing-actions">
-          <button @click="finishRoute" class="btn-success">
-            ✓ 完成绘制
-          </button>
-          <button @click="cancelDrawRoute" class="btn-cancel">
-            ✕ 取消
-          </button>
-        </div>
-
-        <div v-if="isDrawingRoute" class="drawing-hint">
-          💡 已添加 {{ tempRoutePoints.length }} 个点
-        </div>
-
-        <div v-if="routes.length > 0" class="route-list">
-          <div
-            v-for="route in routes"
-            :key="route.id"
-            class="route-item"
-          >
-            <div class="route-info">
-              <span class="route-name">{{ route.name || route.title || '未命名路线' }}</span>
-              <span class="route-length">{{ route.length }}</span>
-            </div>
-            <div class="route-actions">
-              <button @click="playRouteAnimation(route.id)" title="播放动画">🚗</button>
-              <button @click="zoomToRoute(route.id)" title="定位">🎯</button>
-              <button @click="deleteRoute(route.id)" title="删除">🗑️</button>
-            </div>
-          </div>
-        </div>
-
-        <p v-else class="empty-text">暂无路线记录</p>
-      </div>
-
-      <!-- 图层切换 -->
-      <div class="panel-section">
-        <h3>🗺️ 地图图层</h3>
-        <div class="layer-buttons">
-          <button
-            v-for="(layer, index) in layers"
-            :key="index"
-            :class="{ active: currentLayerIndex === index }"
-            @click="switchLayer(index)"
-            class="layer-btn"
-          >
-            {{ layer.name }}
-          </button>
-        </div>
-      </div>
-    </div>
+    <!-- 左侧控制面板 -->
+    <ControlPanel
+      :record-points="recordPoints"
+      :routes="routes"
+      :layers="layers"
+      :current-layer-index="currentLayerIndex"
+      :is-drawing-route="isDrawingRoute"
+      :temp-route-points-count="tempRoutePointsCount"
+      @switch-layer="switchLayer"
+      @start-draw-route="startDrawRoute"
+      @routefinish-="finishRoute"
+      @cancel-draw-route="cancelDrawRoute"
+      @play-route-animation="playRouteAnimation"
+      @zoom-to-route="zoomToRoute"
+      @delete-route="deleteRoute"
+      @edit-point="handleEditPoint"
+      @delete-point="handleDeletePoint"
+      @select-point="flyToPoint"
+      @preview-image="handleImagePreview"
+    />
 
     <!-- 地图容器 -->
     <div class="map-wrapper">
@@ -956,219 +906,6 @@ onUnmounted(() => {
   height: 100vh;
   background: #fdf2f8;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-}
-
-.side-panel {
-  width: 320px;
-  background: #fff;
-  padding: 20px;
-  overflow-y: auto;
-  border-right: 2px solid #fce7f3;
-}
-
-.side-panel::-webkit-scrollbar {
-  width: 6px;
-}
-
-.side-panel::-webkit-scrollbar-thumb {
-  background: #fbcfe8;
-  border-radius: 3px;
-}
-
-.panel-section {
-  margin-bottom: 24px;
-}
-
-.panel-section h3 {
-  margin: 0 0 16px 0;
-  font-size: 16px;
-  color: #ec4899;
-  font-weight: 600;
-}
-
-.route-input {
-  margin-bottom: 12px;
-}
-
-.input-field {
-  flex: 1;
-  padding: 12px;
-  border: 2px solid #fce7f3;
-  border-radius: 12px;
-  font-size: 14px;
-  transition: border-color 0.2s;
-}
-
-.input-field:focus {
-  outline: none;
-  border-color: #ec4899;
-}
-
-.input-field::placeholder {
-  color: #fbcfe8;
-}
-
-.btn-primary,
-.btn-success,
-.btn-cancel {
-  padding: 12px 20px;
-  border: none;
-  border-radius: 12px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  white-space: nowrap;
-}
-
-.btn-primary {
-  background: linear-gradient(135deg, #f472b6, #ec4899);
-  color: #fff;
-}
-
-.btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(236, 72, 153, 0.4);
-}
-
-.btn-primary.full-width {
-  width: 100%;
-}
-
-.btn-success {
-  background: linear-gradient(135deg, #34d399, #10b981);
-  color: #fff;
-  flex: 1;
-}
-
-.btn-success:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
-}
-
-.btn-cancel {
-  background: #f3f4f6;
-  color: #6b7280;
-  flex: 1;
-}
-
-.btn-cancel:hover {
-  background: #e5e7eb;
-}
-
-.drawing-actions {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.drawing-hint {
-  background: #fce7f3;
-  color: #ec4899;
-  padding: 12px;
-  border-radius: 12px;
-  text-align: center;
-  font-size: 13px;
-  margin-bottom: 12px;
-  animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
-}
-
-.route-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  max-height: 200px;
-  overflow-y: auto;
-}
-
-.route-item {
-  background: #fdf2f8;
-  border-radius: 12px;
-  padding: 12px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
-}
-
-.route-info {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.route-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: #374151;
-}
-
-.route-length {
-  font-size: 12px;
-  color: #9ca3af;
-}
-
-.route-actions {
-  display: flex;
-  gap: 6px;
-}
-
-.route-actions button {
-  width: 32px;
-  height: 32px;
-  background: #fff;
-  border: 2px solid #fce7f3;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: all 0.2s;
-  color: #ec4899;
-}
-
-.route-actions button:hover {
-  border-color: #ec4899;
-  transform: scale(1.1);
-}
-
-.empty-text {
-  text-align: center;
-  color: #d1d5db;
-  font-size: 13px;
-  padding: 20px 0;
-}
-
-.layer-buttons {
-  display: grid;
-  gap: 8px;
-}
-
-.layer-btn {
-  padding: 12px;
-  background: #fdf2f8;
-  border: 2px solid #fce7f3;
-  border-radius: 12px;
-  color: #6b7280;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 600;
-  transition: all 0.2s;
-}
-
-.layer-btn:hover {
-  border-color: #f9a8d4;
-  background: #fce7f3;
-}
-
-.layer-btn.active {
-  background: linear-gradient(135deg, #f472b6, #ec4899);
-  border-color: #ec4899;
-  color: #fff;
 }
 
 .map-wrapper {
