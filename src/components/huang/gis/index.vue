@@ -623,7 +623,8 @@ const playRouteAnimation = (routeId) => {
     const dx = endCoord[0] - startCoord[0]
     const dy = endCoord[1] - startCoord[1]
     // atan2 在屏幕坐标系（x向右为正，y向下为正）中的返回值
-    const angle = Math.atan2(dy, dx) * 180 / Math.PI
+    // 上下相反，所以需要取反角度
+    const angle = -Math.atan2(dy, dx) * 180 / Math.PI
 
     // 更新小车位置和旋转
     carOverlay.value.setPosition([x, y])
