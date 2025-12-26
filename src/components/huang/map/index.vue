@@ -198,7 +198,8 @@ const provinceIdMap = {
   '新疆': 'xinjiang',
   '西藏': 'xizang',
   '云南': 'yunnan',
-  '浙江': 'zhejiang'
+  '浙江': 'zhejiang',
+  '山东':'shandong'
 }
 
 // 飞机SVG路径
