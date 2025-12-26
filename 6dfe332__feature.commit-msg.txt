@@ -1,0 +1,12 @@
+sha:        6dfe332dcab4789b4c5d898e288ecf403f3862ac
+short:      6dfe332
+author:     zlxmii <2096343460@qq.com>
+date:       2025-12-26T18:29:39+08:00
+subject:    feature
+
+--- body ---
+
+
+--- files (2) ---
+src/components/huang/gis/PointEditor.vue
+src/components/huang/gis/index.vue
