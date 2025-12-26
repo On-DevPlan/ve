@@ -1,0 +1,11 @@
+sha:        079da25cb2dcb8f22ec2640c04e043db56915ecc
+short:      079da25
+author:     zlxmii <2096343460@qq.com>
+date:       2025-12-26T17:42:11+08:00
+subject:    点结构的实现
+
+--- body ---
+
+
+--- files (1) ---
+src/components/huang/gis/index.vue
