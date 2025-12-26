@@ -17,6 +17,7 @@ import Feature from 'ol/Feature'
 import Point from 'ol/geom/Point'
 import LineString from 'ol/geom/LineString'
 import { getLength } from 'ol/sphere'
+import Overlay from 'ol/Overlay'
 import Select from 'ol/interaction/Select'
 import PointEditor from './PointEditor.vue'
 import PointList from './PointList.vue'
@@ -72,6 +73,12 @@ const hoveredPointId = ref(null)
 
 // Select 交互
 const selectInteraction = ref(null)
+
+// 动画相关
+const carOverlay = ref(null)  // 小车 overlay
+const animationProgress = ref(0)  // 动画进度 0-1
+const animationId = ref(null)  // 动画帧 ID
+const carImageUrl = '/map/test.gif'  // 小车动图 URL
 
 // 图层配置
 const layers = ref([
@@ -558,6 +565,85 @@ const zoomToRoute = (routeId) => {
   }
 }
 
+// 播放路线动画
+const playRouteAnimation = (routeId) => {
+  const route = routes.value.find(r => r.id === routeId)
+  if (!route || !map.value) return
+
+  // 停止之前的动画
+  if (animationId.value) {
+    cancelAnimationFrame(animationId.value)
+    animationId.value = null
+  }
+
+  // 创建小车 overlay
+  if (!carOverlay.value) {
+    const carElement = document.createElement('div')
+    carElement.className = 'car-marker'
+    carElement.innerHTML = `<img src="${carImageUrl}" alt="car" />`
+
+    carOverlay.value = new Overlay({
+      element: carElement,
+      positioning: 'center-center',
+      stopEvent: false,
+      offset: [0, 0]
+    })
+
+    map.value.addOverlay(carOverlay.value)
+  }
+
+  // 获取路线坐标
+  const coordinates = route.coordinates
+  if (!coordinates || coordinates.length < 2) return
+
+  // 固定10秒完成整条路线
+  const duration = 10000 // 固定10秒
+
+  const startTime = Date.now()
+  animationProgress.value = 0
+
+  const animate = () => {
+    const elapsed = Date.now() - startTime
+    const progress = Math.min(elapsed / duration, 1)
+    animationProgress.value = progress
+
+    // 计算当前位置
+    const totalSegments = coordinates.length - 1
+    const currentSegment = Math.min(Math.floor(progress * totalSegments), totalSegments - 1)
+    const segmentProgress = (progress * totalSegments) - currentSegment
+
+    const startCoord = coordinates[currentSegment]
+    const endCoord = coordinates[currentSegment + 1]
+
+    // 线性插值
+    const x = startCoord[0] + (endCoord[0] - startCoord[0]) * segmentProgress
+    const y = startCoord[1] + (endCoord[1] - startCoord[1]) * segmentProgress
+
+    // 计算小车旋转角度
+    const angle = Math.atan2(endCoord[1] - startCoord[1], endCoord[0] - startCoord[0]) * 180 / Math.PI
+
+    // 更新小车位置和旋转
+    carOverlay.value.setPosition([x, y])
+    const carElement = carOverlay.value.getElement()
+    if (carElement) {
+      carElement.style.transform = `rotate(${angle + 90}deg)`
+    }
+
+    if (progress < 1) {
+      animationId.value = requestAnimationFrame(animate)
+    } else {
+      // 动画结束，隐藏小车
+      setTimeout(() => {
+        if (carOverlay.value) {
+          carOverlay.value.setPosition(undefined)
+        }
+      }, 500)
+    }
+  }
+
+  animate()
+}
+
 // 初始化地图
 onMounted(() => {
   const tileLayers = layers.value.map(layer => {
@@ -594,6 +680,12 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  // 清理动画
+  if (animationId.value) {
+    cancelAnimationFrame(animationId.value)
+    animationId.value = null
+  }
+
   if (map.value) {
     map.value.setTarget(null)
     map.value = null
@@ -649,6 +741,7 @@ onUnmounted(() => {
               <span class="route-length">{{ route.length }}</span>
             </div>
             <div class="route-actions">
+              <button @click="playRouteAnimation(route.id)" title="播放动画">🚗</button>
               <button @click="zoomToRoute(route.id)" title="定位">🎯</button>
               <button @click="deleteRoute(route.id)" title="删除">🗑️</button>
             </div>
@@ -942,5 +1035,17 @@ onUnmounted(() => {
 
 .map-container.drawing {
   cursor: crosshair;
+}
+
+.car-marker {
+  width: 40px;
+  height: 40px;
+  transition: transform 0.1s linear;
+}
+
+.car-marker img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 </style>
