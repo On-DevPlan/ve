@@ -1,0 +1,16 @@
+sha:        a6c2953eea42efbd76fced537eb16f5c1c344e17
+short:      a6c2953
+author:     zlxmii <2096343460@qq.com>
+date:       2025-12-26T18:18:47+08:00
+subject:    replay: snapshot of commit afd7819
+
+--- body ---
+replay: snapshot of commit afd7819
+
+original-subject: fix:css
+original-author:  zlxmii <2096343460@qq.com>
+original-date:    2025-12-26T18:18:47+08:00
+files:            1
+
+--- files (1) ---
+.commit-msgs/afd7819__fix_css.commit-msg.txt
