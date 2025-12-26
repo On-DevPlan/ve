@@ -11,7 +11,7 @@ export default {
   tags: ['basic', 'text', 'demo', 'beginner'],
 
   // 入口文件
-  component: './index.vue',
+  component: './hhhh.vue',
 
   // 路由配置
   route: {
