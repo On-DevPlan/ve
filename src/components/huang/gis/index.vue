@@ -57,14 +57,15 @@ const routeLayer = new VectorLayer({
 const recordPoints = ref([])
 const routes = ref([])
 const isDrawingRoute = ref(false)
-const tempRoutePoints = ref([])
+const tempRoutePoints = ref([])  // 存储转折点对象 { coordinate, feature, data }
 const tempRouteFeature = ref(null)
 
 // 编辑器状态
 const showEditor = ref(false)
 const editingPoint = ref(null)
-const editorMode = ref('create') // 'create' | 'edit' | 'route'
+const editorMode = ref('create') // 'create' | 'edit' | 'view' | 'route' | 'route-point'
 const editingRoute = ref(null)
+const editingRoutePointIndex = ref(null)  // 正在编辑的路线转折点索引
 
 // 悬停的点
 const hoveredPointId = ref(null)
@@ -145,28 +146,51 @@ const handleClick = (event) => {
   const coords = event.coordinate
   const lonLat = toLonLat(coords)
 
-  // 如果正在绘制路线，收集点
+  // 如果正在绘制路线，添加转折点
   if (isDrawingRoute.value) {
-    tempRoutePoints.value.push(coords)
+    const pointId = `route-point-${Date.now()}-${tempRoutePoints.value.length}`
 
+    // 创建转折点对象
+    const routePoint = {
+      coordinate: coords,
+      data: {
+        id: pointId,
+        lon: lonLat[0],
+        lat: lonLat[1],
+        title: '',
+        description: '',
+        images: []
+      }
+    }
+
+    // 创建转折点 Feature
     const pointFeature = new Feature({
-      geometry: new Point(coords)
+      geometry: new Point(coords),
+      ...routePoint.data,
+      isRoutePoint: true,
+      routePointIndex: tempRoutePoints.value.length
     })
+    pointFeature.setId(pointId)
     pointFeature.setStyle(new Style({
       image: new Circle({
-        radius: 6,
+        radius: 8,
         fill: new Fill({ color: '#f472b6' }),
         stroke: new Stroke({ color: '#fff', width: 2 })
       })
     }))
+
+    routePoint.feature = pointFeature
+    tempRoutePoints.value.push(routePoint)
     vectorSource.addFeature(pointFeature)
 
+    // 更新路线
     if (tempRoutePoints.value.length > 1) {
       if (tempRouteFeature.value) {
         routeSource.removeFeature(tempRouteFeature.value)
       }
 
-      const lineString = new LineString([...tempRoutePoints.value])
+      const coordinates = tempRoutePoints.value.map(p => p.coordinate)
+      const lineString = new LineString(coordinates)
       tempRouteFeature.value = new Feature({
         geometry: lineString
       })
@@ -183,31 +207,66 @@ const handleClick = (event) => {
     return
   }
 
-  // 检查是否点击了已有的记录点
+  // 检查是否点击了已有的要素
   const feature = map.value.forEachFeatureAtPixel(event.pixel, (feature) => {
-    if (feature.getId()) {
-      return feature
-    }
+    return feature
   }, { hitTolerance: 10 })
 
   if (feature) {
-    // 点击了已有的点，查看详情
-    const point = recordPoints.value.find(p => p.id === feature.getId())
-    if (point) {
-      editingPoint.value = { ...point }
-      editorMode.value = 'view'
-      showEditor.value = true
+    const props = feature.getProperties()
+
+    // 检查是否是路线转折点
+    if (props.isRoutePoint) {
+      // 找到对应的路线
+      let targetRoute = null
+      let pointIndex = props.routePointIndex
+
+      // 检查是否是正在绘制的临时路线
+      if (isDrawingRoute.value) {
+        editingPoint.value = { ...tempRoutePoints.value[pointIndex].data }
+        editingRoutePointIndex.value = pointIndex
+        editorMode.value = 'route-point'
+        showEditor.value = true
+      } else {
+        // 查找已保存的路线
+        for (const route of routes.value) {
+          if (route.points && route.points[pointIndex]) {
+            targetRoute = route
+            break
+          }
+        }
+
+        if (targetRoute) {
+          editingRoute.value = targetRoute
+          editingPoint.value = { ...targetRoute.points[pointIndex] }
+          editingRoutePointIndex.value = pointIndex
+          editorMode.value = 'route-point'
+          showEditor.value = true
+        }
+      }
+      return
     }
-  } else {
-    // 正常模式：打开编辑器添加新记录
-    editingPoint.value = {
-      lon: lonLat[0],
-      lat: lonLat[1],
-      time: new Date().toLocaleString('zh-CN')
+
+    // 检查是否是普通记录点
+    if (feature.getId()) {
+      const point = recordPoints.value.find(p => p.id === feature.getId())
+      if (point) {
+        editingPoint.value = { ...point }
+        editorMode.value = 'view'
+        showEditor.value = true
+        return
+      }
     }
-    editorMode.value = 'create'
-    showEditor.value = true
   }
+
+  // 点击空白区域：添加新记录点
+  editingPoint.value = {
+    lon: lonLat[0],
+    lat: lonLat[1],
+    time: new Date().toLocaleString('zh-CN')
+  }
+  editorMode.value = 'create'
+  showEditor.value = true
 }
 
 // 处理鼠标移动（hover 效果）
@@ -215,16 +274,26 @@ const handlePointerMove = (event) => {
   if (isDrawingRoute.value) return
 
   const feature = map.value.forEachFeatureAtPixel(event.pixel, (feature) => {
-    if (feature.getId()) {
-      return feature
-    }
+    return feature
   }, { hitTolerance: 10 })
 
   // 重置之前 hover 的点
   if (hoveredPointId.value && (!feature || feature.getId() !== hoveredPointId.value)) {
     const prevFeature = vectorSource.getFeatureById(hoveredPointId.value)
     if (prevFeature) {
-      updatePointStyle(prevFeature, false)
+      const props = prevFeature.getProperties()
+      if (props.isRoutePoint) {
+        // 恢复路线转折点样式
+        prevFeature.setStyle(new Style({
+          image: new Circle({
+            radius: 8,
+            fill: new Fill({ color: '#f472b6' }),
+            stroke: new Stroke({ color: '#fff', width: 2 })
+          })
+        }))
+      } else {
+        updatePointStyle(prevFeature, false)
+      }
     }
     hoveredPointId.value = null
     mapContainer.value.style.cursor = 'default'
@@ -233,7 +302,26 @@ const handlePointerMove = (event) => {
   // 设置当前 hover 的点
   if (feature && feature.getId()) {
     if (hoveredPointId.value !== feature.getId()) {
-      updatePointStyle(feature, true)
+      const props = feature.getProperties()
+      if (props.isRoutePoint) {
+        // 路线转折点 hover 效果
+        feature.setStyle(new Style({
+          image: new Circle({
+            radius: 12,
+            fill: new Fill({ color: '#f472b6' }),
+            stroke: new Stroke({ color: '#fff', width: 3 })
+          }),
+          text: new Text({
+            text: props.title || '',
+            offsetY: -18,
+            fill: new Fill({ color: '#f472b6' }),
+            stroke: new Stroke({ color: '#fff', width: 3 }),
+            font: 'bold 12px sans-serif'
+          })
+        }))
+      } else {
+        updatePointStyle(feature, true)
+      }
       hoveredPointId.value = feature.getId()
       mapContainer.value.style.cursor = 'pointer'
     }
@@ -245,6 +333,7 @@ const handleSavePoint = (data) => {
   if (editorMode.value === 'route') {
     // 保存路线信息
     if (editingRoute.value) {
+      editingRoute.value.name = data.title
       editingRoute.value.title = data.title
       editingRoute.value.description = data.description
       editingRoute.value.images = data.images
@@ -264,8 +353,23 @@ const handleSavePoint = (data) => {
         })
       }))
     }
+  } else if (editorMode.value === 'route-point') {
+    // 保存路线转折点信息
+    if (editingRoute.value && editingRoutePointIndex.value !== null) {
+      const pointIndex = editingRoutePointIndex.value
+      editingRoute.value.points[pointIndex] = {
+        ...editingRoute.value.points[pointIndex],
+        ...data
+      }
+
+      // 更新转折点样式显示标题
+      const feature = vectorSource.getFeatureById(editingRoute.value.points[pointIndex].id)
+      if (feature) {
+        feature.set('title', data.title)
+      }
+    }
   } else {
-    // 保存记录点
+    // 保存普通记录点
     const point = {
       id: editingPoint.value?.id || Date.now(),
       lon: editingPoint.value.lon,
@@ -287,6 +391,7 @@ const handleSavePoint = (data) => {
   showEditor.value = false
   editingPoint.value = null
   editingRoute.value = null
+  editingRoutePointIndex.value = null
   editorMode.value = 'create'
 }
 
@@ -354,7 +459,11 @@ const finishRoute = () => {
     routeSource.removeFeature(tempRouteFeature.value)
   }
 
-  const lineString = new LineString([...tempRoutePoints.value])
+  // 提取坐标和转折点数据
+  const coordinates = tempRoutePoints.value.map(p => p.coordinate)
+  const points = tempRoutePoints.value.map(p => p.data)
+
+  const lineString = new LineString(coordinates)
   const length = getLength(lineString, { projection: 'EPSG:3857' })
 
   const feature = new Feature({
@@ -378,7 +487,8 @@ const finishRoute = () => {
     description: '',
     images: [],
     length: formatLength(length),
-    coordinates: [...tempRoutePoints.value],
+    coordinates: coordinates,
+    points: points,
     feature: feature,
     time: new Date().toLocaleString('zh-CN')
   }
@@ -399,12 +509,16 @@ const finishRoute = () => {
   tempRoutePoints.value = []
   tempRouteFeature.value = null
   enableDoubleClickZoom()
-
-  // 清除临时点
-  refreshMapPoints()
 }
 
 const cancelDrawRoute = () => {
+  // 清除转折点
+  tempRoutePoints.value.forEach(p => {
+    if (p.feature) {
+      vectorSource.removeFeature(p.feature)
+    }
+  })
+
   if (tempRouteFeature.value) {
     routeSource.removeFeature(tempRouteFeature.value)
   }
@@ -419,6 +533,16 @@ const cancelDrawRoute = () => {
 const deleteRoute = (routeId) => {
   const route = routes.value.find(r => r.id === routeId)
   if (route) {
+    // 清除转折点
+    if (route.points) {
+      route.points.forEach(point => {
+        const feature = vectorSource.getFeatureById(point.id)
+        if (feature) {
+          vectorSource.removeFeature(feature)
+        }
+      })
+    }
+
     routeSource.removeFeature(route.feature)
     routes.value = routes.value.filter(r => r.id !== routeId)
   }
@@ -519,7 +643,7 @@ onUnmounted(() => {
             class="route-item"
           >
             <div class="route-info">
-              <span class="route-name">{{ route.name }}</span>
+              <span class="route-name">{{ route.name || route.title || '未命名路线' }}</span>
               <span class="route-length">{{ route.length }}</span>
             </div>
             <div class="route-actions">

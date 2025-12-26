@@ -29,6 +29,7 @@ const formData = ref({
 const dialogTitle = computed(() => {
   if (props.mode === 'view') return '📍 查看记录'
   if (props.mode === 'route') return '🛣️ 编辑路线'
+  if (props.mode === 'route-point') return '📍 编辑转折点'
   if (props.point) return '✏️ 编辑记录'
   return '📍 新建记录'
 })
