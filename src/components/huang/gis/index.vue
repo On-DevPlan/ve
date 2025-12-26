@@ -849,7 +849,8 @@ onUnmounted(() => {
 })
 </script>
 
-<template>
+<template>  
+
   <div class="gis-container">
     <!-- 左侧控制面板 -->
     <ControlPanel
