@@ -6,6 +6,6 @@ export default {
   group: 'Huang',
   category: '旅行记录',
   tags: ['旅行', '日记', '地图', '记录'],
-  component: './index.vue',
+  component: './gis.vue',
   fullscreen: true,
 }
