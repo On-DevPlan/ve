@@ -11,16 +11,18 @@ import OSM from 'ol/source/OSM'
 import { fromLonLat, toLonLat } from 'ol/proj'
 import { defaults as defaultControls } from 'ol/control'
 import { ScaleLine, FullScreen, MousePosition } from 'ol/control'
-import { defaults as defaultInteractions } from 'ol/interaction'
+import { defaults as defaultInteractions, DoubleClickZoom } from 'ol/interaction'
 import Draw from 'ol/interaction/Draw'
 import Modify from 'ol/interaction/Modify'
 import Snap from 'ol/interaction/Snap'
 import Select from 'ol/interaction/Select'
-import { Style, Fill, Stroke, Circle } from 'ol/style'
+import { Style, Fill, Stroke, Circle, Text } from 'ol/style'
 import Feature from 'ol/Feature'
 import Point from 'ol/geom/Point'
+import LineString from 'ol/geom/LineString'
 import { GeoJSON } from 'ol/format'
 import { getArea, getLength } from 'ol/sphere'
+import { unByKey as observableUnByKey } from 'ol/Observable'
 
 // 地图容器
 const mapContainer = ref(null)
@@ -47,6 +49,30 @@ const vectorLayer = new VectorLayer({
     })
   })
 })
+
+// 路线专用矢量源和图层
+const routeSource = new VectorSource()
+const routeLayer = new VectorLayer({
+  source: routeSource,
+  style: new Style({
+    stroke: new Stroke({
+      color: '#3b82f6',
+      width: 4,
+      lineDash: [10, 5]
+    })
+  }),
+  zIndex: 100  // 确保路线图层在最上层
+})
+// 路线列表
+const routes = ref([])
+// 当前路线名称
+const currentRouteName = ref('')
+// 是否正在绘制路线
+const isDrawingRoute = ref(false)
+// 路线绘制交互
+const routeDrawInteraction = ref(null)
+// 点击事件监听器 key
+const clickListenerKey = ref(null)
 
 // 图层配置
 const layers = ref([
@@ -245,6 +271,218 @@ const handleClick = (event) => {
   }
 }
 
+// ========== 路线管理功能 ==========
+
+// 获取地图所有交互
+const getAllInteractions = () => {
+  return map.value.getInteractions().getArray()
+}
+
+// 禁用双击缩放
+const disableDoubleClickZoom = () => {
+  const interactions = getAllInteractions()
+  interactions.forEach(interaction => {
+    if (interaction instanceof DoubleClickZoom) {
+      interaction.setActive(false)
+    }
+  })
+}
+
+// 启用双击缩放
+const enableDoubleClickZoom = () => {
+  const interactions = getAllInteractions()
+  interactions.forEach(interaction => {
+    if (interaction instanceof DoubleClickZoom) {
+      interaction.setActive(true)
+    }
+  })
+}
+
+// 开始绘制路线
+const startDrawRoute = () => {
+  if (!map.value) {
+    console.error('地图未初始化')
+    return
+  }
+
+  if (isDrawingRoute.value) {
+    // 取消绘制
+    cancelDrawRoute()
+    return
+  }
+
+  if (!currentRouteName.value || !currentRouteName.value.trim()) {
+    alert('请先输入路线名称')
+    return
+  }
+
+  console.log('开始绘制路线:', currentRouteName.value)
+  isDrawingRoute.value = true
+
+  // 先移除旧的绘制交互
+  if (routeDrawInteraction.value) {
+    map.value.removeInteraction(routeDrawInteraction.value)
+    routeDrawInteraction.value = null
+  }
+
+  // 移除点击事件监听器（避免与绘制冲突）
+  if (clickListenerKey.value) {
+    console.log('移除点击事件监听器')
+    observableUnByKey(clickListenerKey.value)
+    clickListenerKey.value = null
+  }
+
+  // 禁用双击缩放
+  disableDoubleClickZoom()
+  console.log('双击缩放已禁用')
+
+  routeDrawInteraction.value = new Draw({
+    source: routeSource,
+    type: 'LineString',
+    style: new Style({
+      stroke: new Stroke({
+        color: '#3b82f6',
+        width: 4,
+        lineDash: [5, 5]
+      }),
+      image: new Circle({
+        radius: 5,
+        fill: new Fill({ color: '#3b82f6' }),
+        stroke: new Stroke({ color: '#fff', width: 2 })
+      })
+    })
+  })
+
+  // 添加绘制事件监听
+  routeDrawInteraction.value.on('drawstart', (event) => {
+    console.log('开始绘制点', event.feature)
+  })
+
+  routeDrawInteraction.value.on('drawend', (event) => {
+    console.log('绘制完成')
+    const geometry = event.feature.getGeometry()
+    const coordinates = geometry.getCoordinates()
+    const length = getLength(geometry, { projection: 'EPSG:3857' })
+    console.log('坐标点数:', coordinates.length, '长度:', length)
+
+    // 保存路线信息
+    const route = {
+      id: Date.now(),
+      name: currentRouteName.value,
+      length: formatLength(length),
+      coordinates: coordinates,
+      feature: event.feature
+    }
+
+    routes.value.push(route)
+    console.log('路线已保存:', route)
+
+    // 设置路线样式（带标签）
+    event.feature.setStyle(new Style({
+      stroke: new Stroke({
+        color: '#3b82f6',
+        width: 5
+      }),
+      text: new Text({
+        text: currentRouteName.value,
+        offsetY: -15,
+        fill: new Fill({ color: '#3b82f6' }),
+        stroke: new Stroke({ color: '#fff', width: 3 }),
+        font: 'bold 14px sans-serif'
+      })
+    }))
+
+    // 重置状态并恢复交互
+    currentRouteName.value = ''
+    isDrawingRoute.value = false
+
+    // 恢复双击缩放
+    enableDoubleClickZoom()
+    console.log('双击缩放已恢复')
+
+    // 重新添加点击事件监听器
+    clickListenerKey.value = map.value.on('click', handleClick)
+    console.log('点击事件监听器已恢复')
+
+    setTimeout(() => {
+      if (routeDrawInteraction.value) {
+        map.value.removeInteraction(routeDrawInteraction.value)
+        routeDrawInteraction.value = null
+      }
+    }, 100)
+  })
+
+  map.value.addInteraction(routeDrawInteraction.value)
+  console.log('绘制交互已添加，当前交互数量:', map.value.getInteractions().getLength())
+  console.log('Draw interaction active:', routeDrawInteraction.value.getActive())
+
+  // 添加 pointerdrag 事件来调试（不影响绘制）
+  map.value.on('pointerdrag', (event) => {
+    if (isDrawingRoute.value) {
+      console.log('pointerdrag event')
+    }
+  })
+}
+
+// 取消绘制路线
+const cancelDrawRoute = () => {
+  if (routeDrawInteraction.value) {
+    map.value.removeInteraction(routeDrawInteraction.value)
+    routeDrawInteraction.value = null
+  }
+  isDrawingRoute.value = false
+
+  // 恢复双击缩放
+  enableDoubleClickZoom()
+
+  // 重新添加点击事件监听器
+  if (!clickListenerKey.value) {
+    clickListenerKey.value = map.value.on('click', handleClick)
+  }
+}
+
+// 删除路线
+const deleteRoute = (routeId) => {
+  const route = routes.value.find(r => r.id === routeId)
+  if (route) {
+    routeSource.removeFeature(route.feature)
+    routes.value = routes.value.filter(r => r.id !== routeId)
+  }
+}
+
+// 定位到路线
+const zoomToRoute = (routeId) => {
+  const route = routes.value.find(r => r.id === routeId)
+  if (route && route.feature) {
+    const geometry = route.feature.getGeometry()
+    const extent = geometry.getExtent()
+    const view = map.value.getView()
+    view.fit(extent, { padding: [50, 50, 50, 50], duration: 1000 })
+  }
+}
+
+// 切换路线显示
+const toggleRouteVisibility = (routeId) => {
+  const route = routes.value.find(r => r.id === routeId)
+  if (route && route.feature) {
+    const currentStyle = route.feature.getStyle()
+    if (currentStyle) {
+      route.feature.setStyle(null)
+    } else {
+      route.feature.setStyle(new Style({
+        stroke: new Stroke({ color: '#3b82f6', width: 4 }),
+        text: new Text({
+          text: route.name,
+          offsetY: -15,
+          fill: new Fill({ color: '#3b82f6' }),
+          stroke: new Stroke({ color: '#fff', width: 3 }),
+          font: 'bold 14px sans-serif'
+        })
+      }))
+    }
+  }
+}
+
 onMounted(() => {
   // 创建图层
   const tileLayers = layers.value.map(layer => {
@@ -263,7 +501,7 @@ onMounted(() => {
   // 创建地图
   map.value = new Map({
     target: mapContainer.value,
-    layers: [...tileLayers, vectorLayer],
+    layers: [...tileLayers, vectorLayer, routeLayer],
     view: new View({
       center: fromLonLat([116.4074, 39.9042]),
       zoom: 4,
@@ -283,8 +521,8 @@ onMounted(() => {
     interactions: defaultInteractions()
   })
 
-  // 添加点击事件
-  map.value.on('click', handleClick)
+  // 添加点击事件（保存 key 用于后续移除）
+  clickListenerKey.value = map.value.on('click', handleClick)
 
   // 添加默认标记点
   markers.value.forEach(marker => addMarker(marker))
@@ -354,6 +592,45 @@ onUnmounted(() => {
       </div>
 
       <div class="panel-section">
+        <h3>🛣️ 路线管理</h3>
+        <div class="route-input">
+          <input
+            v-model="currentRouteName"
+            type="text"
+            placeholder="输入路线名称"
+            :disabled="isDrawingRoute"
+          />
+          <button
+            @click="startDrawRoute"
+            :class="{ active: isDrawingRoute }"
+          >
+            {{ isDrawingRoute ? '取消绘制' : '开始绘制' }}
+          </button>
+        </div>
+        <div v-if="isDrawingRoute" class="drawing-hint">
+          💡 单击添加点，最后一点双击完成绘制
+        </div>
+        <div v-if="routes.length > 0" class="route-list">
+          <div
+            v-for="route in routes"
+            :key="route.id"
+            class="route-item"
+          >
+            <div class="route-info">
+              <span class="route-name">{{ route.name }}</span>
+              <span class="route-length">{{ route.length }}</span>
+            </div>
+            <div class="route-actions">
+              <button @click="zoomToRoute(route.id)" title="定位">🎯</button>
+              <button @click="toggleRouteVisibility(route.id)" title="显示/隐藏">👁️</button>
+              <button @click="deleteRoute(route.id)" title="删除">🗑️</button>
+            </div>
+          </div>
+        </div>
+        <p v-else class="hint">暂无路线，请先绘制</p>
+      </div>
+
+      <div class="panel-section">
         <h3>📍 当前位置</h3>
         <div v-if="selectedMarker" class="current-position">
           <p>经度: {{ selectedMarker.lon }}</p>
@@ -364,7 +641,7 @@ onUnmounted(() => {
     </div>
 
     <!-- 地图容器 -->
-    <div ref="mapContainer" class="map-container"></div>
+    <div ref="mapContainer" class="map-container" :class="{ drawing: isDrawingRoute }"></div>
   </div>
 </template>
 
@@ -576,5 +853,140 @@ onUnmounted(() => {
   border-radius: 4px;
   top: 8px;
   right: 8px;
+}
+
+/* 路线管理 */
+.route-input {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.route-input input {
+  flex: 1;
+  padding: 8px 10px;
+  background: #444;
+  border: 1px solid #555;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 12px;
+}
+
+.route-input input:disabled {
+  opacity: 0.5;
+}
+
+.route-input button {
+  padding: 8px 14px;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.route-input button.active {
+  background: #ef4444;
+}
+
+.route-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.route-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.route-list::-webkit-scrollbar-thumb {
+  background: #555;
+  border-radius: 2px;
+}
+
+.route-item {
+  background: #444;
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.route-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.route-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #e0e0e0;
+}
+
+.route-length {
+  font-size: 11px;
+  color: #888;
+}
+
+.route-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.route-actions button {
+  width: 28px;
+  height: 28px;
+  background: #555;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.route-actions button:hover {
+  background: #666;
+}
+
+/* 绘制提示 */
+.drawing-hint {
+  background: rgba(59, 130, 246, 0.2);
+  border: 1px solid #3b82f6;
+  color: #60a5fa;
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  text-align: center;
+  margin-bottom: 12px;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* 绘制状态下的地图光标 */
+.map-container.drawing :deep(.ol-unselectable) {
+  cursor: crosshair !important;
+}
+
+.map-container.drawing {
+  cursor: crosshair;
 }
 </style>
