@@ -605,6 +605,8 @@ onUnmounted(() => {
   <div class="gis-container">
     <!-- 左侧面板 -->
     <div class="side-panel">
+
+      
       <!-- 记录点列表 -->
       <PointList
         :points="recordPoints"
