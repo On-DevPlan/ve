@@ -13,26 +13,16 @@ import { defaults as defaultControls } from 'ol/control'
 import { ScaleLine, FullScreen, MousePosition } from 'ol/control'
 import { defaults as defaultInteractions, DoubleClickZoom } from 'ol/interaction'
 import Draw from 'ol/interaction/Draw'
-import Modify from 'ol/interaction/Modify'
-import Snap from 'ol/interaction/Snap'
-import Select from 'ol/interaction/Select'
 import { Style, Fill, Stroke, Circle, Text } from 'ol/style'
 import Feature from 'ol/Feature'
 import Point from 'ol/geom/Point'
 import LineString from 'ol/geom/LineString'
-import { GeoJSON } from 'ol/format'
-import { getArea, getLength } from 'ol/sphere'
+import { getLength } from 'ol/sphere'
 
 // 地图容器
 const mapContainer = ref(null)
 // 地图实例（使用 shallowRef 避免深层响应式）
 const map = shallowRef(null)
-// 绘制交互
-const drawInteraction = ref(null)
-const modifyInteraction = ref(null)
-const selectInteraction = ref(null)
-// 当前绘制类型
-const currentDrawType = ref(null)
 // 当前选中图层
 const currentLayerIndex = ref(0)
 // 矢量源
@@ -84,16 +74,6 @@ const showControls = ref({
   mousePosition: true
 })
 
-// 绘制工具选项
-const drawTypes = [
-  { type: 'Point', name: '点标记', icon: '📍' },
-  { type: 'LineString', name: '线段', icon: '📏' },
-  { type: 'Polygon', name: '多边形', icon: '⬡' },
-  { type: 'Circle', name: '圆形', icon: '⭕' },
-  { type: 'Square', name: '方形', icon: '⬜' },
-  { type: 'Box', name: '矩形', icon: '▭' }
-]
-
 // 预设标记点
 const markers = ref([
   { name: '北京', coords: [116.4074, 39.9042], desc: '中国首都' },
@@ -105,8 +85,6 @@ const markers = ref([
 
 // 当前选择的标记点
 const selectedMarker = ref(null)
-// 测量结果
-const measureResult = ref('')
 
 // 切换图层
 const switchLayer = (index) => {
@@ -147,117 +125,6 @@ const flyTo = (coords, zoom = 10) => {
   })
 }
 
-// 开始绘制
-const startDraw = (type) => {
-  if (!map.value) return
-
-  // 移除之前的绘制交互
-  if (drawInteraction.value) {
-    map.value.removeInteraction(drawInteraction.value)
-  }
-
-  if (currentDrawType.value === type) {
-    // 取消绘制
-    currentDrawType.value = null
-    return
-  }
-
-  currentDrawType.value = type
-  drawInteraction.value = new Draw({
-    source: vectorSource,
-    type: type
-  })
-
-  drawInteraction.value.on('drawend', (event) => {
-    const geometry = event.feature.getGeometry()
-
-    // 计算测量结果
-    if (type === 'Polygon' || type === 'Circle') {
-      const area = getArea(geometry, { projection: 'EPSG:3857' })
-      measureResult.value = `面积: ${formatArea(area)}`
-    } else if (type === 'LineString') {
-      const length = getLength(geometry, { projection: 'EPSG:3857' })
-      measureResult.value = `长度: ${formatLength(length)}`
-    }
-
-    setTimeout(() => {
-      currentDrawType.value = null
-      map.value.removeInteraction(drawInteraction.value)
-    }, 100)
-  })
-
-  map.value.addInteraction(drawInteraction.value)
-}
-
-// 格式化长度
-const formatLength = (length) => {
-  if (length > 1000) {
-    return (length / 1000).toFixed(2) + ' km'
-  }
-  return Math.round(length) + ' m'
-}
-
-// 格式化面积
-const formatArea = (area) => {
-  if (area > 10000) {
-    return (area / 1000000).toFixed(2) + ' km²'
-  }
-  return Math.round(area) + ' m²'
-}
-
-// 清除所有绘制
-const clearDrawings = () => {
-  vectorSource.clear()
-  measureResult.value = ''
-}
-
-// 切换选择模式
-const toggleSelect = () => {
-  if (!map.value) return
-
-  if (selectInteraction.value) {
-    map.value.removeInteraction(selectInteraction.value)
-    selectInteraction.value = null
-    return
-  }
-
-  selectInteraction.value = new Select()
-  map.value.addInteraction(selectInteraction.value)
-}
-
-// 切换编辑模式
-const toggleModify = () => {
-  if (!map.value) return
-
-  if (modifyInteraction.value) {
-    map.value.removeInteraction(modifyInteraction.value)
-    modifyInteraction.value = null
-    return
-  }
-
-  modifyInteraction.value = new Modify({
-    source: vectorSource
-  })
-  map.value.addInteraction(modifyInteraction.value)
-}
-
-// 导出 GeoJSON
-const exportGeoJSON = () => {
-  const format = new GeoJSON()
-  const features = vectorSource.getFeatures()
-  const json = format.writeFeatures(features, {
-    dataProjection: 'EPSG:4326',
-    featureProjection: 'EPSG:3857'
-  })
-  const blob = new Blob([json], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = 'map-data.geojson'
-  a.click()
-  URL.revokeObjectURL(url)
-}
-
 // 获取点击坐标
 const handleClick = (event) => {
   // 如果正在绘制路线，不处理点击事件
@@ -265,8 +132,32 @@ const handleClick = (event) => {
     return
   }
 
+  // 直接在点击位置添加标记点
   const coords = event.coordinate
   const lonLat = toLonLat(coords)
+
+  const feature = new Feature({
+    geometry: new Point(coords)
+  })
+
+  feature.setStyle(new Style({
+    image: new Circle({
+      radius: 10,
+      fill: new Fill({ color: '#ff0000' }),
+      stroke: new Stroke({ color: '#fff', width: 3 })
+    }),
+    text: new Text({
+      text: `(${lonLat[0].toFixed(2)}, ${lonLat[1].toFixed(2)})`,
+      offsetY: -18,
+      fill: new Fill({ color: '#333' }),
+      stroke: new Stroke({ color: '#fff', width: 2 }),
+      font: '12px sans-serif'
+    })
+  }))
+
+  vectorSource.addFeature(feature)
+
+  // 同时更新显示坐标
   selectedMarker.value = {
     lon: lonLat[0].toFixed(4),
     lat: lonLat[1].toFixed(4)
@@ -594,30 +485,6 @@ onUnmounted(() => {
           >
             {{ marker.name }}
           </button>
-        </div>
-      </div>
-
-      <div class="panel-section">
-        <h3>✏️ 绘制工具</h3>
-        <div class="draw-tools">
-          <button
-            v-for="tool in drawTypes"
-            :key="tool.type"
-            :class="{ active: currentDrawType === tool.type }"
-            @click="startDraw(tool.type)"
-            :title="tool.name"
-          >
-            {{ tool.icon }}
-          </button>
-        </div>
-        <div class="action-buttons">
-          <button @click="toggleModify" title="编辑">🔧</button>
-          <button @click="toggleSelect" title="选择">👆</button>
-          <button @click="clearDrawings" title="清除">🗑️</button>
-          <button @click="exportGeoJSON" title="导出">📥</button>
-        </div>
-        <div v-if="measureResult" class="measure-result">
-          {{ measureResult }}
         </div>
       </div>
 
