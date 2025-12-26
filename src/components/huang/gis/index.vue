@@ -10,30 +10,31 @@ import XYZ from 'ol/source/XYZ'
 import OSM from 'ol/source/OSM'
 import { fromLonLat, toLonLat } from 'ol/proj'
 import { defaults as defaultControls } from 'ol/control'
-import { ScaleLine, FullScreen, MousePosition } from 'ol/control'
+import { ScaleLine, FullScreen } from 'ol/control'
 import { defaults as defaultInteractions, DoubleClickZoom } from 'ol/interaction'
 import { Style, Fill, Stroke, Circle, Text } from 'ol/style'
 import Feature from 'ol/Feature'
 import Point from 'ol/geom/Point'
 import LineString from 'ol/geom/LineString'
 import { getLength } from 'ol/sphere'
+import Select from 'ol/interaction/Select'
+import PointEditor from './PointEditor.vue'
+import PointList from './PointList.vue'
 
 // 地图容器
 const mapContainer = ref(null)
-// 地图实例（使用 shallowRef 避免深层响应式）
 const map = shallowRef(null)
-// 当前选中图层
 const currentLayerIndex = ref(0)
-// 矢量源
+
+// 矢量源和图层
 const vectorSource = new VectorSource()
 const vectorLayer = new VectorLayer({
   source: vectorSource,
   style: new Style({
-    fill: new Fill({ color: 'rgba(255, 255, 0, 0.2)' }),
-    stroke: new Stroke({ color: '#ff0000', width: 2 }),
     image: new Circle({
-      radius: 7,
-      fill: new Fill({ color: '#ff0000' })
+      radius: 10,
+      fill: new Fill({ color: '#ec4899' }),
+      stroke: new Stroke({ color: '#fff', width: 3 })
     })
   })
 })
@@ -44,23 +45,33 @@ const routeLayer = new VectorLayer({
   source: routeSource,
   style: new Style({
     stroke: new Stroke({
-      color: '#3b82f6',
+      color: '#f472b6',
       width: 4,
       lineDash: [10, 5]
     })
   }),
-  zIndex: 100  // 确保路线图层在最上层
+  zIndex: 100
 })
-// 路线列表
+
+// 记录点数据
+const recordPoints = ref([])
 const routes = ref([])
-// 当前路线名称
 const currentRouteName = ref('')
-// 是否正在绘制路线
 const isDrawingRoute = ref(false)
-// 临时路线点（绘制时收集）
 const tempRoutePoints = ref([])
-// 临时路线要素（显示正在绘制的线）
 const tempRouteFeature = ref(null)
+
+// 编辑器状态
+const showEditor = ref(false)
+const editingPoint = ref(null)
+const editorMode = ref('create') // 'create' | 'edit' | 'route'
+const editingRoute = ref(null)
+
+// 悬停的点
+const hoveredPointId = ref(null)
+
+// Select 交互
+const selectInteraction = ref(null)
 
 // 图层配置
 const layers = ref([
@@ -68,29 +79,9 @@ const layers = ref([
   { name: '高德地图', type: 'xyz', visible: false, url: 'https://webrd01.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}' }
 ])
 
-// 地图控件状态
-const showControls = ref({
-  scale: true,
-  fullscreen: true,
-  mousePosition: true
-})
-
-// 预设标记点
-const markers = ref([
-  { name: '北京', coords: [116.4074, 39.9042], desc: '中国首都' },
-  { name: '上海', coords: [121.4737, 31.2304], desc: '经济中心' },
-  { name: '广州', coords: [113.2644, 23.1291], desc: '南方门户' },
-  { name: '深圳', coords: [114.0579, 22.5431], desc: '科技之城' },
-  { name: '成都', coords: [104.0668, 30.5728], desc: '天府之国' }
-])
-
-// 当前选择的标记点
-const selectedMarker = ref(null)
-
 // 切换图层
 const switchLayer = (index) => {
   if (!map.value) return
-
   const tileLayers = map.value.getLayers().getArray().filter(l => l instanceof TileLayer)
   tileLayers.forEach((layer, i) => {
     layer.setVisible(i === index)
@@ -98,35 +89,59 @@ const switchLayer = (index) => {
   currentLayerIndex.value = index
 }
 
-// 添加标记点
-const addMarker = (marker) => {
+// 创建地图要素
+const createPointFeature = (point) => {
   const feature = new Feature({
-    geometry: new Point(fromLonLat(marker.coords)),
-    name: marker.name,
-    desc: marker.desc
+    geometry: new Point(fromLonLat([point.lon, point.lat])),
+    ...point
   })
-  feature.setStyle(new Style({
-    image: new Circle({
-      radius: 10,
-      fill: new Fill({ color: '#ff0000' }),
-      stroke: new Stroke({ color: '#fff', width: 2 })
-    })
-  }))
-  vectorSource.addFeature(feature)
+  feature.setId(point.id)
+  updatePointStyle(feature, false)
+  return feature
 }
 
-// 飞到指定位置
-const flyTo = (coords, zoom = 10) => {
+// 更新点样式
+const updatePointStyle = (feature, isHovered) => {
+  const point = feature.getProperties()
+  const radius = isHovered ? 16 : 12
+  const strokeWidth = isHovered ? 4 : 3
+
+  feature.setStyle(new Style({
+    image: new Circle({
+      radius: radius,
+      fill: new Fill({ color: '#ec4899' }),
+      stroke: new Stroke({ color: '#fff', width: strokeWidth })
+    }),
+    text: new Text({
+      text: point.title || '',
+      offsetY: -(radius + 8),
+      fill: new Fill({ color: '#ec4899' }),
+      stroke: new Stroke({ color: '#fff', width: 3 }),
+      font: 'bold 13px sans-serif'
+    })
+  }))
+}
+
+// 刷新地图上的点
+const refreshMapPoints = () => {
+  vectorSource.clear()
+  recordPoints.value.forEach(point => {
+    vectorSource.addFeature(createPointFeature(point))
+  })
+}
+
+// 定位到点
+const flyToPoint = (point) => {
   if (!map.value) return
   const view = map.value.getView()
   view.animate({
-    center: fromLonLat(coords),
-    zoom: zoom,
+    center: fromLonLat([point.lon, point.lat]),
+    zoom: 14,
     duration: 1000
   })
 }
 
-// 获取点击坐标
+// 点击地图处理
 const handleClick = (event) => {
   const coords = event.coordinate
   const lonLat = toLonLat(coords)
@@ -135,20 +150,18 @@ const handleClick = (event) => {
   if (isDrawingRoute.value) {
     tempRoutePoints.value.push(coords)
 
-    // 在点击位置添加临时标记点
     const pointFeature = new Feature({
       geometry: new Point(coords)
     })
     pointFeature.setStyle(new Style({
       image: new Circle({
         radius: 6,
-        fill: new Fill({ color: '#3b82f6' }),
+        fill: new Fill({ color: '#f472b6' }),
         stroke: new Stroke({ color: '#fff', width: 2 })
       })
     }))
     vectorSource.addFeature(pointFeature)
 
-    // 如果有多个点，更新临时路线
     if (tempRoutePoints.value.length > 1) {
       if (tempRouteFeature.value) {
         routeSource.removeFeature(tempRouteFeature.value)
@@ -160,7 +173,7 @@ const handleClick = (event) => {
       })
       tempRouteFeature.value.setStyle(new Style({
         stroke: new Stroke({
-          color: '#3b82f6',
+          color: '#f472b6',
           width: 4,
           lineDash: [10, 5]
         })
@@ -168,47 +181,57 @@ const handleClick = (event) => {
       routeSource.addFeature(tempRouteFeature.value)
     }
 
-    console.log('已添加点，当前点数:', tempRoutePoints.value.length)
     return
   }
 
-  // 正常模式：直接在点击位置添加标记点
-  const feature = new Feature({
-    geometry: new Point(coords)
-  })
-
-  feature.setStyle(new Style({
-    image: new Circle({
-      radius: 10,
-      fill: new Fill({ color: '#ff0000' }),
-      stroke: new Stroke({ color: '#fff', width: 3 })
-    }),
-    text: new Text({
-      text: `(${lonLat[0].toFixed(2)}, ${lonLat[1].toFixed(2)})`,
-      offsetY: -18,
-      fill: new Fill({ color: '#333' }),
-      stroke: new Stroke({ color: '#fff', width: 2 }),
-      font: '12px sans-serif'
-    })
-  }))
-
-  vectorSource.addFeature(feature)
-
-  // 同时更新显示坐标
-  selectedMarker.value = {
-    lon: lonLat[0].toFixed(4),
-    lat: lonLat[1].toFixed(4)
+  // 正常模式：打开编辑器添加新记录
+  editingPoint.value = {
+    lon: lonLat[0],
+    lat: lonLat[1],
+    time: new Date().toLocaleString('zh-CN')
   }
+  showEditor.value = true
 }
 
-// ========== 路线管理功能 ==========
+// 保存记录点
+const handleSavePoint = (data) => {
+  const point = {
+    id: editingPoint.value?.id || Date.now(),
+    lon: editingPoint.value.lon,
+    lat: editingPoint.value.lat,
+    time: editingPoint.value.time,
+    ...data
+  }
 
-// 获取地图所有交互
+  const existingIndex = recordPoints.value.findIndex(p => p.id === point.id)
+  if (existingIndex >= 0) {
+    recordPoints.value[existingIndex] = point
+  } else {
+    recordPoints.value.push(point)
+  }
+
+  refreshMapPoints()
+  showEditor.value = false
+  editingPoint.value = null
+}
+
+// 编辑记录点
+const handleEditPoint = (point) => {
+  editingPoint.value = { ...point }
+  showEditor.value = true
+}
+
+// 删除记录点
+const handleDeletePoint = (pointId) => {
+  recordPoints.value = recordPoints.value.filter(p => p.id !== pointId)
+  refreshMapPoints()
+}
+
+// 路线管理功能
 const getAllInteractions = () => {
   return map.value.getInteractions().getArray()
 }
 
-// 禁用双击缩放
 const disableDoubleClickZoom = () => {
   const interactions = getAllInteractions()
   interactions.forEach(interaction => {
@@ -218,7 +241,6 @@ const disableDoubleClickZoom = () => {
   })
 }
 
-// 启用双击缩放
 const enableDoubleClickZoom = () => {
   const interactions = getAllInteractions()
   interactions.forEach(interaction => {
@@ -228,7 +250,6 @@ const enableDoubleClickZoom = () => {
   })
 }
 
-// 格式化长度
 const formatLength = (length) => {
   if (length > 1000) {
     return (length / 1000).toFixed(2) + ' km'
@@ -236,7 +257,6 @@ const formatLength = (length) => {
   return Math.round(length) + ' m'
 }
 
-// 开始绘制路线
 const startDrawRoute = () => {
   if (!currentRouteName.value || !currentRouteName.value.trim()) {
     alert('请先输入路线名称')
@@ -244,35 +264,26 @@ const startDrawRoute = () => {
   }
 
   if (isDrawingRoute.value) {
-    // 完成绘制
     finishRoute()
     return
   }
 
-  console.log('开始绘制路线:', currentRouteName.value)
   isDrawingRoute.value = true
   tempRoutePoints.value = []
   tempRouteFeature.value = null
-
-  // 禁用双击缩放
   disableDoubleClickZoom()
 }
 
-// 完成路线绘制
 const finishRoute = () => {
   if (tempRoutePoints.value.length < 2) {
     alert('至少需要2个点才能创建路线')
     return
   }
 
-  console.log('完成路线绘制，点数:', tempRoutePoints.value.length)
-
-  // 移除临时路线要素
   if (tempRouteFeature.value) {
     routeSource.removeFeature(tempRouteFeature.value)
   }
 
-  // 创建最终路线
   const lineString = new LineString([...tempRoutePoints.value])
   const length = getLength(lineString, { projection: 'EPSG:3857' })
 
@@ -282,13 +293,13 @@ const finishRoute = () => {
 
   feature.setStyle(new Style({
     stroke: new Stroke({
-      color: '#3b82f6',
+      color: '#ec4899',
       width: 5
     }),
     text: new Text({
       text: currentRouteName.value,
       offsetY: -15,
-      fill: new Fill({ color: '#3b82f6' }),
+      fill: new Fill({ color: '#ec4899' }),
       stroke: new Stroke({ color: '#fff', width: 3 }),
       font: 'bold 14px sans-serif'
     })
@@ -296,45 +307,39 @@ const finishRoute = () => {
 
   routeSource.addFeature(feature)
 
-  // 保存路线
   const route = {
     id: Date.now(),
     name: currentRouteName.value,
     length: formatLength(length),
     coordinates: [...tempRoutePoints.value],
-    feature: feature
+    feature: feature,
+    time: new Date().toLocaleString('zh-CN')
   }
 
   routes.value.push(route)
-  console.log('路线已保存:', route)
 
-  // 重置状态
   currentRouteName.value = ''
   isDrawingRoute.value = false
   tempRoutePoints.value = []
   tempRouteFeature.value = null
-
-  // 恢复双击缩放
   enableDoubleClickZoom()
+
+  // 清除临时点
+  refreshMapPoints()
 }
 
-// 取消绘制路线
 const cancelDrawRoute = () => {
-  // 移除临时路线
   if (tempRouteFeature.value) {
     routeSource.removeFeature(tempRouteFeature.value)
   }
 
-  // 重置状态
   isDrawingRoute.value = false
   tempRoutePoints.value = []
   tempRouteFeature.value = null
-
-  // 恢复双击缩放
   enableDoubleClickZoom()
+  refreshMapPoints()
 }
 
-// 删除路线
 const deleteRoute = (routeId) => {
   const route = routes.value.find(r => r.id === routeId)
   if (route) {
@@ -343,7 +348,6 @@ const deleteRoute = (routeId) => {
   }
 }
 
-// 定位到路线
 const zoomToRoute = (routeId) => {
   const route = routes.value.find(r => r.id === routeId)
   if (route && route.feature) {
@@ -354,94 +358,8 @@ const zoomToRoute = (routeId) => {
   }
 }
 
-// 切换路线显示
-const toggleRouteVisibility = (routeId) => {
-  const route = routes.value.find(r => r.id === routeId)
-  if (route && route.feature) {
-    const currentStyle = route.feature.getStyle()
-    if (currentStyle) {
-      route.feature.setStyle(null)
-    } else {
-      route.feature.setStyle(new Style({
-        stroke: new Stroke({ color: '#3b82f6', width: 4 }),
-        text: new Text({
-          text: route.name,
-          offsetY: -15,
-          fill: new Fill({ color: '#3b82f6' }),
-          stroke: new Stroke({ color: '#fff', width: 3 }),
-          font: 'bold 14px sans-serif'
-        })
-      }))
-    }
-  }
-}
-
-// 测试功能：硬编码添加一条路线
-const testAddRoute = () => {
-  console.log('测试添加路线...')
-
-  // 创建坐标点（北京到上海）
-  const coordinates = [
-    fromLonLat([116.4074, 39.9042]),  // 北京
-    fromLonLat([117.2000, 39.1000]),  // 天津
-    fromLonLat([118.8000, 32.0000]),  // 南京
-    fromLonLat([121.4737, 31.2304])   // 上海
-  ]
-
-  // 创建线段几何
-  const lineString = new LineString(coordinates)
-
-  // 创建要素
-  const feature = new Feature({
-    geometry: lineString,
-    name: '测试路线-北京到上海'
-  })
-
-  // 设置样式
-  feature.setStyle(new Style({
-    stroke: new Stroke({
-      color: '#ff0000',
-      width: 6
-    }),
-    text: new Text({
-      text: '测试路线',
-      offsetY: -15,
-      fill: new Fill({ color: '#ff0000' }),
-      stroke: new Stroke({ color: '#fff', width: 3 }),
-      font: 'bold 16px sans-serif'
-    })
-  }))
-
-  // 计算长度
-  const length = getLength(lineString, { projection: 'EPSG:3857' })
-
-  // 添加到路线源
-  console.log('添加 feature 到 routeSource')
-  routeSource.addFeature(feature)
-  console.log('routeSource feature count:', routeSource.getFeatures().length)
-
-  // 保存到路线列表
-  const route = {
-    id: Date.now(),
-    name: '测试路线-北京到上海',
-    length: formatLength(length),
-    coordinates: coordinates,
-    feature: feature
-  }
-
-  routes.value.push(route)
-  console.log('路线已添加:', route)
-
-  // 定位到路线
-  setTimeout(() => {
-    const extent = lineString.getExtent()
-    const view = map.value.getView()
-    view.fit(extent, { padding: [50, 50, 50, 50], duration: 1000 })
-  }, 100)
-}
-
+// 初始化地图
 onMounted(() => {
-  // 创建图层
   const tileLayers = layers.value.map(layer => {
     let source
     if (layer.type === 'osm') {
@@ -455,7 +373,6 @@ onMounted(() => {
     })
   })
 
-  // 创建地图
   map.value = new Map({
     target: mapContainer.value,
     layers: [...tileLayers, vectorLayer, routeLayer],
@@ -467,22 +384,12 @@ onMounted(() => {
     }),
     controls: defaultControls().extend([
       new ScaleLine({ units: 'metric' }),
-      new FullScreen(),
-      new MousePosition({
-        projection: 'EPSG:4326',
-        coordinateFormat: (coords) => {
-          return coords.map(c => c.toFixed(4)).join(', ')
-        }
-      })
+      new FullScreen()
     ]),
     interactions: defaultInteractions()
   })
 
-  // 添加点击事件
   map.value.on('click', handleClick)
-
-  // 添加默认标记点
-  markers.value.forEach(marker => addMarker(marker))
 })
 
 onUnmounted(() => {
@@ -495,60 +402,45 @@ onUnmounted(() => {
 
 <template>
   <div class="gis-container">
-    <!-- 控制面板 -->
-    <div class="control-panel">
-      <div class="panel-section">
-        <h3>🗺️ 地图图层</h3>
-        <div class="layer-buttons">
-          <button
-            v-for="(layer, index) in layers"
-            :key="index"
-            :class="{ active: currentLayerIndex === index }"
-            @click="switchLayer(index)"
-          >
-            {{ layer.name }}
-          </button>
-        </div>
-      </div>
+    <!-- 左侧面板 -->
+    <div class="side-panel">
+      <!-- 记录点列表 -->
+      <PointList
+        :points="recordPoints"
+        @edit="handleEditPoint"
+        @delete="handleDeletePoint"
+        @select="flyToPoint"
+      />
 
+      <!-- 路线管理 -->
       <div class="panel-section">
-        <h3>📍 快速定位</h3>
-        <div class="marker-list">
-          <button
-            v-for="(marker, index) in markers"
-            :key="index"
-            @click="flyTo(marker.coords, 10)"
-          >
-            {{ marker.name }}
-          </button>
-        </div>
-      </div>
+        <h3>🛣️ 我的路线</h3>
 
-      <div class="panel-section">
-        <h3>🛣️ 路线管理</h3>
-        <div class="route-input">
+        <div v-if="!isDrawingRoute" class="route-input">
           <input
             v-model="currentRouteName"
             type="text"
-            placeholder="输入路线名称"
-            :disabled="isDrawingRoute"
+            placeholder="路线名称..."
+            class="input-field"
           />
-          <button
-            @click="startDrawRoute"
-            :class="{ active: isDrawingRoute }"
-          >
-            {{ isDrawingRoute ? '完成绘制' : '开始绘制' }}
+          <button @click="startDrawRoute" class="btn-primary">
+            ✏️ 绘制
           </button>
         </div>
-        <div v-if="isDrawingRoute" class="drawing-buttons">
-          <button @click="cancelDrawRoute" class="cancel-button">❌ 取消</button>
+
+        <div v-else class="route-actions">
+          <button @click="finishRoute" class="btn-success">
+            ✓ 完成绘制
+          </button>
+          <button @click="cancelDrawRoute" class="btn-cancel">
+            ✕ 取消
+          </button>
         </div>
+
         <div v-if="isDrawingRoute" class="drawing-hint">
-          💡 单击地图添加点（已添加 {{ tempRoutePoints.length }} 个点）
+          💡 已添加 {{ tempRoutePoints.length }} 个点
         </div>
-        <button @click="testAddRoute" class="test-button">
-          🧪 测试：添加预设路线
-        </button>
+
         <div v-if="routes.length > 0" class="route-list">
           <div
             v-for="route in routes"
@@ -561,26 +453,49 @@ onUnmounted(() => {
             </div>
             <div class="route-actions">
               <button @click="zoomToRoute(route.id)" title="定位">🎯</button>
-              <button @click="toggleRouteVisibility(route.id)" title="显示/隐藏">👁️</button>
               <button @click="deleteRoute(route.id)" title="删除">🗑️</button>
             </div>
           </div>
         </div>
-        <p v-else class="hint">暂无路线，请先绘制</p>
+
+        <p v-else class="empty-text">暂无路线记录</p>
       </div>
 
+      <!-- 图层切换 -->
       <div class="panel-section">
-        <h3>📍 当前位置</h3>
-        <div v-if="selectedMarker" class="current-position">
-          <p>经度: {{ selectedMarker.lon }}</p>
-          <p>纬度: {{ selectedMarker.lat }}</p>
+        <h3>🗺️ 地图图层</h3>
+        <div class="layer-buttons">
+          <button
+            v-for="(layer, index) in layers"
+            :key="index"
+            :class="{ active: currentLayerIndex === index }"
+            @click="switchLayer(index)"
+            class="layer-btn"
+          >
+            {{ layer.name }}
+          </button>
         </div>
-        <p v-else class="hint">点击地图获取坐标</p>
       </div>
     </div>
 
     <!-- 地图容器 -->
-    <div ref="mapContainer" class="map-container" :class="{ drawing: isDrawingRoute }"></div>
+    <div class="map-wrapper">
+      <div ref="mapContainer" class="map-container" :class="{ drawing: isDrawingRoute }"></div>
+
+      <!-- 添加提示 -->
+      <div v-if="recordPoints.length === 0 && !isDrawingRoute" class="welcome-tip">
+        <h3>✨ 欢迎使用旅行日记</h3>
+        <p>点击地图任意位置添加你的第一个记录吧~</p>
+      </div>
+    </div>
+
+    <!-- 点编辑器 -->
+    <PointEditor
+      :show="showEditor"
+      :point="editingPoint"
+      @close="showEditor = false"
+      @save="handleSavePoint"
+    />
   </div>
 </template>
 
@@ -588,308 +503,144 @@ onUnmounted(() => {
 .gis-container {
   display: flex;
   height: 100vh;
-  background: #1a1a1a;
+  background: #fdf2f8;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
-/* 控制面板 */
-.control-panel {
-  width: 280px;
-  min-width: 280px;
-  background: #252525;
-  padding: 16px;
+.side-panel {
+  width: 320px;
+  background: #fff;
+  padding: 20px;
   overflow-y: auto;
-  border-right: 1px solid #333;
+  border-right: 2px solid #fce7f3;
 }
 
-.control-panel::-webkit-scrollbar {
+.side-panel::-webkit-scrollbar {
   width: 6px;
 }
 
-.control-panel::-webkit-scrollbar-thumb {
-  background: #444;
+.side-panel::-webkit-scrollbar-thumb {
+  background: #fbcfe8;
   border-radius: 3px;
 }
 
 .panel-section {
-  background: #333;
-  border-radius: 10px;
-  padding: 14px;
-  margin-bottom: 14px;
+  margin-bottom: 24px;
 }
 
 .panel-section h3 {
-  margin: 0 0 12px 0;
-  font-size: 13px;
-  color: #fff;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-/* 图层按钮 */
-.layer-buttons {
-  display: grid;
-  gap: 6px;
-}
-
-.layer-buttons button {
-  background: #444;
-  border: 1px solid transparent;
-  color: #ccc;
-  padding: 10px 12px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 12px;
-  transition: all 0.2s;
-}
-
-.layer-buttons button:hover {
-  background: #505050;
-}
-
-.layer-buttons button.active {
-  background: #3b82f6;
-  border-color: #60a5fa;
-  color: white;
-}
-
-/* 标记列表 */
-.marker-list {
-  display: grid;
-  gap: 6px;
-}
-
-.marker-list button {
-  background: #444;
-  border: 1px solid transparent;
-  color: #ccc;
-  padding: 8px 12px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 12px;
-  text-align: left;
-  transition: all 0.2s;
-}
-
-.marker-list button:hover {
-  background: #505050;
-  border-color: #60a5fa;
-}
-
-/* 绘制工具 */
-.draw-tools {
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 4px;
-  margin-bottom: 8px;
-}
-
-.draw-tools button {
-  aspect-ratio: 1;
-  background: #444;
-  border: 1px solid transparent;
-  color: #fff;
-  border-radius: 6px;
-  cursor: pointer;
+  margin: 0 0 16px 0;
   font-size: 16px;
-  transition: all 0.2s;
+  color: #ec4899;
+  font-weight: 600;
 }
 
-.draw-tools button:hover {
-  background: #505050;
-}
-
-.draw-tools button.active {
-  background: #10b981;
-  border-color: #34d399;
-}
-
-.action-buttons {
-  display: flex;
-  gap: 6px;
-  margin-bottom: 8px;
-}
-
-.action-buttons button {
-  flex: 1;
-  background: #444;
-  border: 1px solid transparent;
-  color: #fff;
-  padding: 8px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: all 0.2s;
-}
-
-.action-buttons button:hover {
-  background: #505050;
-}
-
-.measure-result {
-  background: rgba(16, 185, 129, 0.2);
-  color: #10b981;
-  padding: 8px 10px;
-  border-radius: 6px;
-  font-size: 12px;
-  text-align: center;
-}
-
-/* 当前位置 */
-.current-position {
-  background: #444;
-  border-radius: 6px;
-  padding: 10px;
-}
-
-.current-position p {
-  margin: 4px 0;
-  font-size: 12px;
-  color: #e0e0e0;
-}
-
-.current-position p:first-child {
-  color: #3b82f6;
-}
-
-.hint {
-  font-size: 11px;
-  color: #888;
-  text-align: center;
-}
-
-/* 地图容器 */
-.map-container {
-  flex: 1;
-  background: #1a1a1a;
-}
-
-.map-container :deep(.ol-control) {
-  background: rgba(0, 0, 0, 0.7);
-}
-
-.map-container :deep(.ol-control button) {
-  background: transparent;
-  color: #fff;
-}
-
-.map-container :deep(.ol-scale-line) {
-  background: rgba(0, 0, 0, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-}
-
-.map-container :deep(.ol-scale-line-text) {
-  color: #fff;
-  font-size: 10px;
-}
-
-.map-container :deep(.ol-mouse-position) {
-  background: rgba(0, 0, 0, 0.7);
-  color: #fff;
-  font-size: 11px;
-  padding: 4px 8px;
-  border-radius: 4px;
-  top: 8px;
-  right: 8px;
-}
-
-/* 路线管理 */
 .route-input {
   display: flex;
   gap: 8px;
   margin-bottom: 12px;
 }
 
-.route-input input {
+.input-field {
   flex: 1;
-  padding: 8px 10px;
-  background: #444;
-  border: 1px solid #555;
-  border-radius: 6px;
-  color: #fff;
-  font-size: 12px;
+  padding: 12px;
+  border: 2px solid #fce7f3;
+  border-radius: 12px;
+  font-size: 14px;
+  transition: border-color 0.2s;
 }
 
-.route-input input:disabled {
-  opacity: 0.5;
+.input-field:focus {
+  outline: none;
+  border-color: #ec4899;
 }
 
-.route-input button {
-  padding: 8px 14px;
-  background: #3b82f6;
-  color: white;
+.input-field::placeholder {
+  color: #fbcfe8;
+}
+
+.btn-primary,
+.btn-success,
+.btn-cancel {
+  padding: 12px 20px;
   border: none;
-  border-radius: 6px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
-  font-size: 12px;
+  transition: all 0.2s;
   white-space: nowrap;
 }
 
-.route-input button.active {
-  background: #10b981;
+.btn-primary {
+  background: linear-gradient(135deg, #f472b6, #ec4899);
+  color: #fff;
 }
 
-.drawing-buttons {
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(236, 72, 153, 0.4);
+}
+
+.btn-success {
+  background: linear-gradient(135deg, #34d399, #10b981);
+  color: #fff;
+  flex: 1;
+}
+
+.btn-success:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+.btn-cancel {
+  background: #f3f4f6;
+  color: #6b7280;
+  flex: 1;
+}
+
+.btn-cancel:hover {
+  background: #e5e7eb;
+}
+
+.route-actions {
+  display: flex;
+  gap: 8px;
   margin-bottom: 12px;
 }
 
-.cancel-button {
-  width: 100%;
-  padding: 8px 14px;
-  background: #6b7280;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 12px;
-}
-
-.cancel-button:hover {
-  background: #9ca3af;
-}
-
-.test-button {
-  width: 100%;
-  padding: 8px 14px;
-  background: #f59e0b;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 12px;
+.drawing-hint {
+  background: #fce7f3;
+  color: #ec4899;
+  padding: 12px;
+  border-radius: 12px;
+  text-align: center;
+  font-size: 13px;
   margin-bottom: 12px;
+  animation: pulse 2s infinite;
 }
 
-.test-button:hover {
-  background: #fbbf24;
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
 }
 
 .route-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
   max-height: 200px;
   overflow-y: auto;
 }
 
-.route-list::-webkit-scrollbar {
-  width: 4px;
-}
-
-.route-list::-webkit-scrollbar-thumb {
-  background: #555;
-  border-radius: 2px;
-}
-
 .route-item {
-  background: #444;
-  border-radius: 8px;
-  padding: 10px 12px;
+  background: #fdf2f8;
+  border-radius: 12px;
+  padding: 12px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .route-info {
@@ -900,67 +651,128 @@ onUnmounted(() => {
 }
 
 .route-name {
-  font-size: 13px;
-  font-weight: 500;
-  color: #e0e0e0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
 }
 
 .route-length {
-  font-size: 11px;
-  color: #888;
+  font-size: 12px;
+  color: #9ca3af;
 }
 
 .route-actions {
   display: flex;
-  gap: 4px;
+  gap: 6px;
 }
 
 .route-actions button {
-  width: 28px;
-  height: 28px;
-  background: #555;
-  border: none;
-  border-radius: 4px;
+  width: 32px;
+  height: 32px;
+  background: #fff;
+  border: 2px solid #fce7f3;
+  border-radius: 8px;
   cursor: pointer;
-  font-size: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.2s;
+  font-size: 14px;
+  transition: all 0.2s;
 }
 
 .route-actions button:hover {
-  background: #666;
+  border-color: #ec4899;
+  transform: scale(1.1);
 }
 
-/* 绘制提示 */
-.drawing-hint {
-  background: rgba(59, 130, 246, 0.2);
-  border: 1px solid #3b82f6;
-  color: #60a5fa;
-  padding: 10px 12px;
-  border-radius: 6px;
-  font-size: 12px;
+.empty-text {
   text-align: center;
-  margin-bottom: 12px;
-  animation: pulse 2s infinite;
+  color: #d1d5db;
+  font-size: 13px;
+  padding: 20px 0;
 }
 
-@keyframes pulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.7;
-  }
+.layer-buttons {
+  display: grid;
+  gap: 8px;
 }
 
-/* 绘制状态下的地图光标 */
-.map-container.drawing :deep(.ol-unselectable) {
-  cursor: crosshair !important;
+.layer-btn {
+  padding: 12px;
+  background: #fdf2f8;
+  border: 2px solid #fce7f3;
+  border-radius: 12px;
+  color: #6b7280;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.layer-btn:hover {
+  border-color: #f9a8d4;
+  background: #fce7f3;
+}
+
+.layer-btn.active {
+  background: linear-gradient(135deg, #f472b6, #ec4899);
+  border-color: #ec4899;
+  color: #fff;
+}
+
+.map-wrapper {
+  flex: 1;
+  position: relative;
+  background: #fdf2f8;
+}
+
+.map-container {
+  width: 100%;
+  height: 100%;
+}
+
+.map-container :deep(.ol-control) {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.map-container :deep(.ol-control button) {
+  color: #ec4899;
+}
+
+.map-container :deep(.ol-scale-line) {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #fce7f3;
+}
+
+.map-container :deep(.ol-scale-line-text) {
+  color: #6b7280;
+  font-size: 10px;
 }
 
 .map-container.drawing {
   cursor: crosshair;
+}
+
+.welcome-tip {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  color: #ec4899;
+  animation: float 3s ease-in-out infinite;
+}
+
+.welcome-tip h3 {
+  font-size: 24px;
+  margin: 0 0 12px 0;
+}
+
+.welcome-tip p {
+  font-size: 14px;
+  color: #f472b6;
+  margin: 0;
+}
+
+@keyframes float {
+  0%, 100% { transform: translate(-50%, -50%) translateY(0); }
+  50% { transform: translate(-50%, -50%) translateY(-10px); }
 }
 </style>
