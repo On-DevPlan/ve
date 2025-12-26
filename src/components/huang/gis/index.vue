@@ -78,7 +78,8 @@ const selectInteraction = ref(null)
 const carOverlay = ref(null)  // 小车 overlay
 const animationProgress = ref(0)  // 动画进度 0-1
 const animationId = ref(null)  // 动画帧 ID
-const carImageUrl = '/map/test.gif'  // 小车动图 URL
+const carImageUrlRight = '/map/right.gif'  // 向右行驶的小车图片
+const carImageUrlLeft = '/map/left.gif'  // 向左行驶的小车图片
 
 // 图层配置
 const layers = ref([
@@ -580,7 +581,7 @@ const playRouteAnimation = (routeId) => {
   if (!carOverlay.value) {
     const carElement = document.createElement('div')
     carElement.className = 'car-marker'
-    carElement.innerHTML = `<img src="${carImageUrl}" alt="car" />`
+    carElement.innerHTML = `<img src="${carImageUrlRight}" alt="car" />`
 
     carOverlay.value = new Overlay({
       element: carElement,
@@ -619,18 +620,34 @@ const playRouteAnimation = (routeId) => {
     const x = startCoord[0] + (endCoord[0] - startCoord[0]) * segmentProgress
     const y = startCoord[1] + (endCoord[1] - startCoord[1]) * segmentProgress
 
-    // 计算小车旋转角度
+    // 计算方向角度
     const dx = endCoord[0] - startCoord[0]
     const dy = endCoord[1] - startCoord[1]
-    // atan2 在屏幕坐标系（x向右为正，y向下为正）中的返回值
-    // 上下相反，所以需要取反角度
-    const angle = -Math.atan2(dy, dx) * 180 / Math.PI
+    const angle = Math.atan2(dy, dx) * 180 / Math.PI
+
+    // 根据方向选择图片并设置旋转
+    const carElement = carOverlay.value.getElement()
+    const imgElement = carElement?.querySelector('img')
+
+    let rotationAngle
+    if (dx < 0) {
+      // 向左行驶：使用 left.gif，使用原始角度
+      if (imgElement && imgElement.src !== carImageUrlLeft) {
+        imgElement.src = carImageUrlLeft
+      }
+      rotationAngle = angle  // left.gif 朝左，不需要取反
+    } else {
+      // 向右行驶：使用 right.gif，取反角度
+      if (imgElement && imgElement.src !== carImageUrlRight) {
+        imgElement.src = carImageUrlRight
+      }
+      rotationAngle = -angle  // right.gif 朝右，需要取反
+    }
 
     // 更新小车位置和旋转
     carOverlay.value.setPosition([x, y])
-    const carElement = carOverlay.value.getElement()
     if (carElement) {
-      carElement.style.transform = `rotate(${angle}deg)`
+      carElement.style.transform = `rotate(${rotationAngle}deg)`
     }
 
     if (progress < 1) {
