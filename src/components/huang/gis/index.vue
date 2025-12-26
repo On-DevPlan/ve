@@ -12,7 +12,6 @@ import { fromLonLat, toLonLat } from 'ol/proj'
 import { defaults as defaultControls } from 'ol/control'
 import { ScaleLine, FullScreen, MousePosition } from 'ol/control'
 import { defaults as defaultInteractions, DoubleClickZoom } from 'ol/interaction'
-import Draw from 'ol/interaction/Draw'
 import { Style, Fill, Stroke, Circle, Text } from 'ol/style'
 import Feature from 'ol/Feature'
 import Point from 'ol/geom/Point'
@@ -58,8 +57,10 @@ const routes = ref([])
 const currentRouteName = ref('')
 // 是否正在绘制路线
 const isDrawingRoute = ref(false)
-// 路线绘制交互
-const routeDrawInteraction = ref(null)
+// 临时路线点（绘制时收集）
+const tempRoutePoints = ref([])
+// 临时路线要素（显示正在绘制的线）
+const tempRouteFeature = ref(null)
 
 // 图层配置
 const layers = ref([
@@ -127,15 +128,51 @@ const flyTo = (coords, zoom = 10) => {
 
 // 获取点击坐标
 const handleClick = (event) => {
-  // 如果正在绘制路线，不处理点击事件
-  if (isDrawingRoute.value) {
-    return
-  }
-
-  // 直接在点击位置添加标记点
   const coords = event.coordinate
   const lonLat = toLonLat(coords)
 
+  // 如果正在绘制路线，收集点
+  if (isDrawingRoute.value) {
+    tempRoutePoints.value.push(coords)
+
+    // 在点击位置添加临时标记点
+    const pointFeature = new Feature({
+      geometry: new Point(coords)
+    })
+    pointFeature.setStyle(new Style({
+      image: new Circle({
+        radius: 6,
+        fill: new Fill({ color: '#3b82f6' }),
+        stroke: new Stroke({ color: '#fff', width: 2 })
+      })
+    }))
+    vectorSource.addFeature(pointFeature)
+
+    // 如果有多个点，更新临时路线
+    if (tempRoutePoints.value.length > 1) {
+      if (tempRouteFeature.value) {
+        routeSource.removeFeature(tempRouteFeature.value)
+      }
+
+      const lineString = new LineString([...tempRoutePoints.value])
+      tempRouteFeature.value = new Feature({
+        geometry: lineString
+      })
+      tempRouteFeature.value.setStyle(new Style({
+        stroke: new Stroke({
+          color: '#3b82f6',
+          width: 4,
+          lineDash: [10, 5]
+        })
+      }))
+      routeSource.addFeature(tempRouteFeature.value)
+    }
+
+    console.log('已添加点，当前点数:', tempRoutePoints.value.length)
+    return
+  }
+
+  // 正常模式：直接在点击位置添加标记点
   const feature = new Feature({
     geometry: new Point(coords)
   })
@@ -191,108 +228,107 @@ const enableDoubleClickZoom = () => {
   })
 }
 
+// 格式化长度
+const formatLength = (length) => {
+  if (length > 1000) {
+    return (length / 1000).toFixed(2) + ' km'
+  }
+  return Math.round(length) + ' m'
+}
+
 // 开始绘制路线
 const startDrawRoute = () => {
-  if (!map.value) {
-    console.error('地图未初始化')
-    return
-  }
-
-  if (isDrawingRoute.value) {
-    // 取消绘制
-    cancelDrawRoute()
-    return
-  }
-
   if (!currentRouteName.value || !currentRouteName.value.trim()) {
     alert('请先输入路线名称')
     return
   }
 
+  if (isDrawingRoute.value) {
+    // 完成绘制
+    finishRoute()
+    return
+  }
+
   console.log('开始绘制路线:', currentRouteName.value)
   isDrawingRoute.value = true
-
-  // 先移除旧的绘制交互
-  if (routeDrawInteraction.value) {
-    map.value.removeInteraction(routeDrawInteraction.value)
-    routeDrawInteraction.value = null
-  }
+  tempRoutePoints.value = []
+  tempRouteFeature.value = null
 
   // 禁用双击缩放
   disableDoubleClickZoom()
-  console.log('双击缩放已禁用')
+}
 
-  routeDrawInteraction.value = new Draw({
-    source: routeSource,
-    type: 'LineString'
+// 完成路线绘制
+const finishRoute = () => {
+  if (tempRoutePoints.value.length < 2) {
+    alert('至少需要2个点才能创建路线')
+    return
+  }
+
+  console.log('完成路线绘制，点数:', tempRoutePoints.value.length)
+
+  // 移除临时路线要素
+  if (tempRouteFeature.value) {
+    routeSource.removeFeature(tempRouteFeature.value)
+  }
+
+  // 创建最终路线
+  const lineString = new LineString([...tempRoutePoints.value])
+  const length = getLength(lineString, { projection: 'EPSG:3857' })
+
+  const feature = new Feature({
+    geometry: lineString
   })
 
-  // 添加绘制事件监听
-  routeDrawInteraction.value.on('drawstart', (event) => {
-    console.log('开始绘制点', event.feature)
-  })
+  feature.setStyle(new Style({
+    stroke: new Stroke({
+      color: '#3b82f6',
+      width: 5
+    }),
+    text: new Text({
+      text: currentRouteName.value,
+      offsetY: -15,
+      fill: new Fill({ color: '#3b82f6' }),
+      stroke: new Stroke({ color: '#fff', width: 3 }),
+      font: 'bold 14px sans-serif'
+    })
+  }))
 
-  routeDrawInteraction.value.on('drawend', (event) => {
-    console.log('绘制完成')
-    const geometry = event.feature.getGeometry()
-    const coordinates = geometry.getCoordinates()
-    const length = getLength(geometry, { projection: 'EPSG:3857' })
-    console.log('坐标点数:', coordinates.length, '长度:', length)
+  routeSource.addFeature(feature)
 
-    // 保存路线信息
-    const route = {
-      id: Date.now(),
-      name: currentRouteName.value,
-      length: formatLength(length),
-      coordinates: coordinates,
-      feature: event.feature
-    }
+  // 保存路线
+  const route = {
+    id: Date.now(),
+    name: currentRouteName.value,
+    length: formatLength(length),
+    coordinates: [...tempRoutePoints.value],
+    feature: feature
+  }
 
-    routes.value.push(route)
-    console.log('路线已保存:', route)
+  routes.value.push(route)
+  console.log('路线已保存:', route)
 
-    // 设置路线样式（带标签）
-    event.feature.setStyle(new Style({
-      stroke: new Stroke({
-        color: '#3b82f6',
-        width: 5
-      }),
-      text: new Text({
-        text: currentRouteName.value,
-        offsetY: -15,
-        fill: new Fill({ color: '#3b82f6' }),
-        stroke: new Stroke({ color: '#fff', width: 3 }),
-        font: 'bold 14px sans-serif'
-      })
-    }))
+  // 重置状态
+  currentRouteName.value = ''
+  isDrawingRoute.value = false
+  tempRoutePoints.value = []
+  tempRouteFeature.value = null
 
-    // 重置状态并恢复交互
-    currentRouteName.value = ''
-    isDrawingRoute.value = false
-
-    // 恢复双击缩放
-    enableDoubleClickZoom()
-    console.log('双击缩放已恢复')
-
-    setTimeout(() => {
-      if (routeDrawInteraction.value) {
-        map.value.removeInteraction(routeDrawInteraction.value)
-        routeDrawInteraction.value = null
-      }
-    }, 100)
-  })
-
-  map.value.addInteraction(routeDrawInteraction.value)
-  console.log('绘制交互已添加，当前交互数量:', map.value.getInteractions().getLength())
+  // 恢复双击缩放
+  enableDoubleClickZoom()
 }
 
 // 取消绘制路线
 const cancelDrawRoute = () => {
-  if (routeDrawInteraction.value) {
-    map.value.removeInteraction(routeDrawInteraction.value)
-    routeDrawInteraction.value = null
+  // 移除临时路线
+  if (tempRouteFeature.value) {
+    routeSource.removeFeature(tempRouteFeature.value)
   }
+
+  // 重置状态
   isDrawingRoute.value = false
+  tempRoutePoints.value = []
+  tempRouteFeature.value = null
 
   // 恢复双击缩放
   enableDoubleClickZoom()
@@ -501,11 +537,14 @@ onUnmounted(() => {
             @click="startDrawRoute"
             :class="{ active: isDrawingRoute }"
           >
-            {{ isDrawingRoute ? '取消绘制' : '开始绘制' }}
+            {{ isDrawingRoute ? '完成绘制' : '开始绘制' }}
           </button>
         </div>
+        <div v-if="isDrawingRoute" class="drawing-buttons">
+          <button @click="cancelDrawRoute" class="cancel-button">❌ 取消</button>
+        </div>
         <div v-if="isDrawingRoute" class="drawing-hint">
-          💡 单击添加点，最后一点双击完成绘制
+          💡 单击地图添加点（已添加 {{ tempRoutePoints.length }} 个点）
         </div>
         <button @click="testAddRoute" class="test-button">
           🧪 测试：添加预设路线
@@ -788,7 +827,26 @@ onUnmounted(() => {
 }
 
 .route-input button.active {
-  background: #ef4444;
+  background: #10b981;
+}
+
+.drawing-buttons {
+  margin-bottom: 12px;
+}
+
+.cancel-button {
+  width: 100%;
+  padding: 8px 14px;
+  background: #6b7280;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.cancel-button:hover {
+  background: #9ca3af;
 }
 
 .test-button {
