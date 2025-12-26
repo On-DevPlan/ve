@@ -676,12 +676,6 @@ onUnmounted(() => {
     <!-- 地图容器 -->
     <div class="map-wrapper">
       <div ref="mapContainer" class="map-container" :class="{ drawing: isDrawingRoute }"></div>
-
-      <!-- 添加提示 -->
-      <div v-if="recordPoints.length === 0 && !isDrawingRoute" class="welcome-tip">
-        <h3>✨ 欢迎使用旅行日记</h3>
-        <p>点击地图任意位置添加你的第一个记录吧~</p>
-      </div>
     </div>
 
     <!-- 点编辑器 -->
@@ -946,31 +940,5 @@ onUnmounted(() => {
 
 .map-container.drawing {
   cursor: crosshair;
-}
-
-.welcome-tip {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  text-align: center;
-  color: #ec4899;
-  animation: float 3s ease-in-out infinite;
-}
-
-.welcome-tip h3 {
-  font-size: 24px;
-  margin: 0 0 12px 0;
-}
-
-.welcome-tip p {
-  font-size: 14px;
-  color: #f472b6;
-  margin: 0;
-}
-
-@keyframes float {
-  0%, 100% { transform: translate(-50%, -50%) translateY(0); }
-  50% { transform: translate(-50%, -50%) translateY(-10px); }
 }
 </style>
