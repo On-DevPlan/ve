@@ -1,0 +1,12 @@
+sha:        1623e1b278e49b2927a5f6578c3c6b7b8178f600
+short:      1623e1b
+author:     zlxmii <2096343460@qq.com>
+date:       2025-12-26T18:17:21+08:00
+subject:    fix
+
+--- body ---
+
+
+--- files (2) ---
+src/components/huang/gis/PointEditor.vue
+src/components/huang/gis/index.vue
