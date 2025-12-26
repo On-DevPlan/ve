@@ -607,8 +607,6 @@ onUnmounted(() => {
 }
 
 .route-input {
-  display: flex;
-  gap: 8px;
   margin-bottom: 12px;
 }
 
