@@ -499,7 +499,7 @@ onUnmounted(() => {
           </button>
         </div>
 
-        <div v-else class="route-actions">
+        <div v-else class="drawing-actions">
           <button @click="finishRoute" class="btn-success">
             ✓ 完成绘制
           </button>
@@ -676,7 +676,7 @@ onUnmounted(() => {
   background: #e5e7eb;
 }
 
-.route-actions {
+.drawing-actions {
   display: flex;
   gap: 8px;
   margin-bottom: 12px;
@@ -748,6 +748,7 @@ onUnmounted(() => {
   cursor: pointer;
   font-size: 14px;
   transition: all 0.2s;
+  color: #ec4899;
 }
 
 .route-actions button:hover {
