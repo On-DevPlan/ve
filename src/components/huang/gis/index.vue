@@ -22,7 +22,6 @@ import Point from 'ol/geom/Point'
 import LineString from 'ol/geom/LineString'
 import { GeoJSON } from 'ol/format'
 import { getArea, getLength } from 'ol/sphere'
-import { unByKey as observableUnByKey } from 'ol/Observable'
 
 // 地图容器
 const mapContainer = ref(null)
@@ -71,8 +70,6 @@ const currentRouteName = ref('')
 const isDrawingRoute = ref(false)
 // 路线绘制交互
 const routeDrawInteraction = ref(null)
-// 点击事件监听器 key
-const clickListenerKey = ref(null)
 
 // 图层配置
 const layers = ref([
@@ -263,6 +260,11 @@ const exportGeoJSON = () => {
 
 // 获取点击坐标
 const handleClick = (event) => {
+  // 如果正在绘制路线，不处理点击事件
+  if (isDrawingRoute.value) {
+    return
+  }
+
   const coords = event.coordinate
   const lonLat = toLonLat(coords)
   selectedMarker.value = {
@@ -325,32 +327,13 @@ const startDrawRoute = () => {
     routeDrawInteraction.value = null
   }
 
-  // 移除点击事件监听器（避免与绘制冲突）
-  if (clickListenerKey.value) {
-    console.log('移除点击事件监听器')
-    observableUnByKey(clickListenerKey.value)
-    clickListenerKey.value = null
-  }
-
   // 禁用双击缩放
   disableDoubleClickZoom()
   console.log('双击缩放已禁用')
 
   routeDrawInteraction.value = new Draw({
     source: routeSource,
-    type: 'LineString',
-    style: new Style({
-      stroke: new Stroke({
-        color: '#3b82f6',
-        width: 4,
-        lineDash: [5, 5]
-      }),
-      image: new Circle({
-        radius: 5,
-        fill: new Fill({ color: '#3b82f6' }),
-        stroke: new Stroke({ color: '#fff', width: 2 })
-      })
-    })
+    type: 'LineString'
   })
 
   // 添加绘制事件监听
@@ -400,10 +383,6 @@ const startDrawRoute = () => {
     enableDoubleClickZoom()
     console.log('双击缩放已恢复')
 
-    // 重新添加点击事件监听器
-    clickListenerKey.value = map.value.on('click', handleClick)
-    console.log('点击事件监听器已恢复')
-
     setTimeout(() => {
       if (routeDrawInteraction.value) {
         map.value.removeInteraction(routeDrawInteraction.value)
@@ -414,14 +393,6 @@ const startDrawRoute = () => {
 
   map.value.addInteraction(routeDrawInteraction.value)
   console.log('绘制交互已添加，当前交互数量:', map.value.getInteractions().getLength())
-  console.log('Draw interaction active:', routeDrawInteraction.value.getActive())
-
-  // 添加 pointerdrag 事件来调试（不影响绘制）
-  map.value.on('pointerdrag', (event) => {
-    if (isDrawingRoute.value) {
-      console.log('pointerdrag event')
-    }
-  })
 }
 
 // 取消绘制路线
@@ -434,11 +405,6 @@ const cancelDrawRoute = () => {
 
   // 恢复双击缩放
   enableDoubleClickZoom()
-
-  // 重新添加点击事件监听器
-  if (!clickListenerKey.value) {
-    clickListenerKey.value = map.value.on('click', handleClick)
-  }
 }
 
 // 删除路线
@@ -483,6 +449,70 @@ const toggleRouteVisibility = (routeId) => {
   }
 }
 
+// 测试功能：硬编码添加一条路线
+const testAddRoute = () => {
+  console.log('测试添加路线...')
+
+  // 创建坐标点（北京到上海）
+  const coordinates = [
+    fromLonLat([116.4074, 39.9042]),  // 北京
+    fromLonLat([117.2000, 39.1000]),  // 天津
+    fromLonLat([118.8000, 32.0000]),  // 南京
+    fromLonLat([121.4737, 31.2304])   // 上海
+  ]
+
+  // 创建线段几何
+  const lineString = new LineString(coordinates)
+
+  // 创建要素
+  const feature = new Feature({
+    geometry: lineString,
+    name: '测试路线-北京到上海'
+  })
+
+  // 设置样式
+  feature.setStyle(new Style({
+    stroke: new Stroke({
+      color: '#ff0000',
+      width: 6
+    }),
+    text: new Text({
+      text: '测试路线',
+      offsetY: -15,
+      fill: new Fill({ color: '#ff0000' }),
+      stroke: new Stroke({ color: '#fff', width: 3 }),
+      font: 'bold 16px sans-serif'
+    })
+  }))
+
+  // 计算长度
+  const length = getLength(lineString, { projection: 'EPSG:3857' })
+
+  // 添加到路线源
+  console.log('添加 feature 到 routeSource')
+  routeSource.addFeature(feature)
+  console.log('routeSource feature count:', routeSource.getFeatures().length)
+
+  // 保存到路线列表
+  const route = {
+    id: Date.now(),
+    name: '测试路线-北京到上海',
+    length: formatLength(length),
+    coordinates: coordinates,
+    feature: feature
+  }
+
+  routes.value.push(route)
+  console.log('路线已添加:', route)
+
+  // 定位到路线
+  setTimeout(() => {
+    const extent = lineString.getExtent()
+    const view = map.value.getView()
+    view.fit(extent, { padding: [50, 50, 50, 50], duration: 1000 })
+  }, 100)
+}
+
 onMounted(() => {
   // 创建图层
   const tileLayers = layers.value.map(layer => {
@@ -521,8 +551,8 @@ onMounted(() => {
     interactions: defaultInteractions()
   })
 
-  // 添加点击事件（保存 key 用于后续移除）
-  clickListenerKey.value = map.value.on('click', handleClick)
+  // 添加点击事件
+  map.value.on('click', handleClick)
 
   // 添加默认标记点
   markers.value.forEach(marker => addMarker(marker))
@@ -610,6 +640,9 @@ onUnmounted(() => {
         <div v-if="isDrawingRoute" class="drawing-hint">
           💡 单击添加点，最后一点双击完成绘制
         </div>
+        <button @click="testAddRoute" class="test-button">
+          🧪 测试：添加预设路线
+        </button>
         <div v-if="routes.length > 0" class="route-list">
           <div
             v-for="route in routes"
@@ -889,6 +922,22 @@ onUnmounted(() => {
 
 .route-input button.active {
   background: #ef4444;
+}
+
+.test-button {
+  width: 100%;
+  padding: 8px 14px;
+  background: #f59e0b;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  margin-bottom: 12px;
+}
+
+.test-button:hover {
+  background: #fbbf24;
 }
 
 .route-list {
