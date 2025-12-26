@@ -78,6 +78,10 @@ const selectInteraction = ref(null)
 const carOverlay = ref(null)  // 小车 overlay
 const animationProgress = ref(0)  // 动画进度 0-1
 const animationId = ref(null)  // 动画帧 ID
+
+// 图片预览
+const previewImage = ref(null)  // 当前预览的图片 URL
+const previewPosition = ref({ x: 0, y: 0 })  // 预览位置
 const carImageUrl = '/map/right.gif'  // 小车图片（只用一张）
 const animationRouteSource = new VectorSource()  // 动画路线源（显示已走过的部分）
 const animationRouteLayer = new VectorLayer({
@@ -548,6 +552,21 @@ const cancelDrawRoute = () => {
   refreshMapPoints()
 }
 
+// 图片预览处理
+const handleImagePreview = (imageUrl, event) => {
+  previewImage.value = imageUrl
+  // 计算预览位置（鼠标右下方）
+  const rect = event.target.getBoundingClientRect()
+  previewPosition.value = {
+    x: rect.right + 10,
+    y: rect.top
+  }
+}
+
+const closeImagePreview = () => {
+  previewImage.value = null
+}
+
 const deleteRoute = (routeId) => {
   const route = routes.value.find(r => r.id === routeId)
   if (route) {
@@ -780,6 +799,7 @@ onUnmounted(() => {
         @edit="handleEditPoint"
         @delete="handleDeletePoint"
         @select="flyToPoint"
+        @preview="handleImagePreview"
       />
 
       <!-- 路线管理 -->
@@ -854,7 +874,20 @@ onUnmounted(() => {
       :point="editingPoint"
       @close="showEditor = false"
       @save="handleSavePoint"
+      @preview="handleImagePreview"
     />
+
+    <!-- 图片预览 -->
+    <Transition name="preview-fade">
+      <div
+        v-if="previewImage"
+        class="image-preview-overlay"
+        :style="{ left: previewPosition.x + 'px', top: previewPosition.y + 'px' }"
+        @mouseenter="closeImagePreview"
+      >
+        <img :src="previewImage" alt="预览图片" />
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -1122,5 +1155,36 @@ onUnmounted(() => {
   width: 100%;
   height: 100%;
   object-fit: contain;
+}
+
+/* 图片预览 */
+.image-preview-overlay {
+  position: fixed;
+  z-index: 9999;
+  background: #fff;
+  border-radius: 12px;
+  padding: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  max-width: 400px;
+  max-height: 400px;
+  overflow: hidden;
+}
+
+.image-preview-overlay img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 8px;
+  display: block;
+}
+
+.preview-fade-enter-active,
+.preview-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.preview-fade-enter-from,
+.preview-fade-leave-to {
+  opacity: 0;
 }
 </style>

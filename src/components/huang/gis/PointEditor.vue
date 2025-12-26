@@ -16,7 +16,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['close', 'save'])
+const emit = defineEmits(['close', 'save', 'preview'])
 
 // 表单数据
 const formData = ref({
@@ -69,6 +69,15 @@ const handleImageUpload = (event) => {
 // 删除图片
 const removeImage = (index) => {
   formData.value.images.splice(index, 1)
+}
+
+// 图片预览
+const handleImagePreview = (imageUrl, event) => {
+  emit('preview', imageUrl, event)
+}
+
+const closeImagePreview = () => {
+  emit('preview', null)
 }
 
 // 保存
@@ -145,7 +154,12 @@ const handleClose = () => {
               :key="index"
               class="image-item"
             >
-              <img :src="img" alt="上传的图片" />
+              <img
+                :src="img"
+                alt="上传的图片"
+                @mouseenter="handleImagePreview(img, $event)"
+                @mouseleave="closeImagePreview"
+              />
               <button @click="removeImage(index)" class="remove-image">✕</button>
             </div>
           </div>
@@ -160,7 +174,12 @@ const handleClose = () => {
               :key="index"
               class="image-item"
             >
-              <img :src="img" alt="图片" />
+              <img
+                :src="img"
+                alt="图片"
+                @mouseenter="handleImagePreview(img, $event)"
+                @mouseleave="closeImagePreview"
+              />
             </div>
           </div>
         </div>

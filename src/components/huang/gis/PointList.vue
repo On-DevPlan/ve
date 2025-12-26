@@ -8,7 +8,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['edit', 'delete', 'select'])
+const emit = defineEmits(['edit', 'delete', 'select', 'preview'])
 
 const expandedPoints = ref(new Set())
 
@@ -36,6 +36,15 @@ const handleDelete = (pointId) => {
   if (confirm('确定要删除这个记录吗？')) {
     emit('delete', pointId)
   }
+}
+
+// 图片预览
+const handleImagePreview = (imageUrl, event) => {
+  emit('preview', imageUrl, event)
+}
+
+const closeImagePreview = () => {
+  emit('preview', null)
 }
 </script>
 
@@ -76,7 +85,8 @@ const handleDelete = (pointId) => {
               :key="index"
               :src="img"
               alt="记录图片"
-              @click="$emit('preview', img)"
+              @mouseenter="handleImagePreview(img, $event)"
+              @mouseleave="closeImagePreview"
             />
           </div>
 
