@@ -82,6 +82,9 @@ const animationId = ref(null)  // 动画帧 ID
 // 图片预览
 const previewImage = ref(null)  // 当前预览的图片 URL
 const previewPosition = ref({ x: 0, y: 0 })  // 预览位置
+
+// 地图点悬浮图片预览
+const pointImageOverlay = ref(null)  // 点的图片预览 overlay
 const carImageUrl = '/map/right.gif'  // 小车图片（只用一张）
 const animationRouteSource = new VectorSource()  // 动画路线源（显示已走过的部分）
 const animationRouteLayer = new VectorLayer({
@@ -319,6 +322,11 @@ const handlePointerMove = (event) => {
     }
     hoveredPointId.value = null
     mapContainer.value.style.cursor = 'default'
+
+    // 隐藏点图片预览
+    if (pointImageOverlay.value) {
+      pointImageOverlay.value.setPosition(undefined)
+    }
   }
 
   // 设置当前 hover 的点
@@ -341,13 +349,58 @@ const handlePointerMove = (event) => {
             font: 'bold 12px sans-serif'
           })
         }))
+
+        // 查找路线转折点的图片
+        if (props.images && props.images.length > 0) {
+          showPointImagePreview(event.coordinate, props.images[0])
+        } else {
+          // 从路线的 points 数组中查找
+          for (const route of routes.value) {
+            if (route.points) {
+              const routePoint = route.points.find(p => p.id === feature.getId())
+              if (routePoint && routePoint.images && routePoint.images.length > 0) {
+                showPointImagePreview(event.coordinate, routePoint.images[0])
+                break
+              }
+            }
+          }
+        }
       } else {
         updatePointStyle(feature, true)
+
+        // 显示普通记录点的图片预览
+        const point = recordPoints.value.find(p => p.id === feature.getId())
+        if (point && point.images && point.images.length > 0) {
+          showPointImagePreview(event.coordinate, point.images[0])
+        }
       }
       hoveredPointId.value = feature.getId()
       mapContainer.value.style.cursor = 'pointer'
     }
   }
+}
+
+// 显示点的图片预览
+const showPointImagePreview = (coordinate, imageUrl) => {
+  if (!pointImageOverlay.value) {
+    const imageElement = document.createElement('div')
+    imageElement.className = 'point-image-preview'
+    imageElement.innerHTML = `<img src="${imageUrl}" alt="预览" />`
+
+    pointImageOverlay.value = new Overlay({
+      element: imageElement,
+      positioning: 'bottom-left',
+      offset: [15, -15],
+      stopEvent: false
+    })
+
+    map.value.addOverlay(pointImageOverlay.value)
+  } else {
+    const element = pointImageOverlay.value.getElement()
+    element.innerHTML = `<img src="${imageUrl}" alt="预览" />`
+  }
+
+  pointImageOverlay.value.setPosition(coordinate)
 }
 
 // 保存记录点
@@ -780,6 +833,12 @@ onUnmounted(() => {
     animationId.value = null
   }
 
+  // 清理点图片预览 overlay
+  if (pointImageOverlay.value && map.value) {
+    map.value.removeOverlay(pointImageOverlay.value)
+    pointImageOverlay.value = null
+  }
+
   if (map.value) {
     map.value.setTarget(null)
     map.value = null
@@ -1155,6 +1214,23 @@ onUnmounted(() => {
   width: 100%;
   height: 100%;
   object-fit: contain;
+}
+
+/* 地图点图片预览 */
+.map-container :deep(.point-image-preview) {
+  background: #fff;
+  border-radius: 12px;
+  padding: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+}
+
+.map-container :deep(.point-image-preview img) {
+  width: 200px;
+  height: 200px;
+  object-fit: cover;
+  border-radius: 8px;
+  display: block;
 }
 
 /* 图片预览 */
