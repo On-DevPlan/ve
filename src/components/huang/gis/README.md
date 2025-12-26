@@ -116,15 +116,29 @@ const playRouteAnimation = (routeId) => {
     const x = startCoord[0] + (endCoord[0] - startCoord[0]) * segmentProgress
     const y = startCoord[1] + (endCoord[1] - startCoord[1]) * segmentProgress
 
-    // 计算旋转角度 (小车朝向)
-    const angle = Math.atan2(endCoord[1] - startCoord[1], endCoord[0] - startCoord[0]) * 180 / Math.PI
+    // 计算旋转角度（屏幕坐标系：x向右为正，y向下为正）
+    const dx = endCoord[0] - startCoord[0]
+    const dy = endCoord[1] - startCoord[1]
+    const angle = Math.atan2(dy, dx) * 180 / Math.PI
+
+    // 判断是否需要水平翻转：当向左行驶时（dx < 0）
+    const needsFlip = dx < 0
+    // scaleX(-1) 会反转旋转方向，所以翻转时需要取反角度
+    const rotationAngle = needsFlip ? -angle : angle
 
     // 更新小车
     carOverlay.value.setPosition([x, y])
-    carElement.style.transform = `rotate(${angle + 90}deg)`
+    carElement.style.transform = `rotate(${rotationAngle}deg) scaleX(${needsFlip ? -1 : 1})`
   }
 }
 ```
+
+**角度计算说明:**
+- 小车图片原始朝向：向右（水平）
+- 屏幕坐标系：x 向右为正，y 向下为正
+- `Math.atan2(dy, dx)` 返回从 x 轴正方向（向右）的角度
+- 向右/下/上行驶（dx >= 0）：`rotate(angle) scaleX(1)`
+- 向左行驶（dx < 0）：`rotate(-angle) scaleX(-1)` - 翻转并反转角度（因为 scaleX(-1) 会反转旋转方向）
 
 **小车图片路径:** `/public/map/test.gif`
 

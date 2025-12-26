@@ -620,13 +620,16 @@ const playRouteAnimation = (routeId) => {
     const y = startCoord[1] + (endCoord[1] - startCoord[1]) * segmentProgress
 
     // 计算小车旋转角度
-    const angle = Math.atan2(endCoord[1] - startCoord[1], endCoord[0] - startCoord[0]) * 180 / Math.PI
+    const dx = endCoord[0] - startCoord[0]
+    const dy = endCoord[1] - startCoord[1]
+    // atan2 在屏幕坐标系（x向右为正，y向下为正）中的返回值
+    const angle = Math.atan2(dy, dx) * 180 / Math.PI
 
     // 更新小车位置和旋转
     carOverlay.value.setPosition([x, y])
     const carElement = carOverlay.value.getElement()
     if (carElement) {
-      carElement.style.transform = `rotate(${angle + 90}deg)`
+      carElement.style.transform = `rotate(${angle}deg)`
     }
 
     if (progress < 1) {
