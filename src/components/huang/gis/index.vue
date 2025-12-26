@@ -56,7 +56,6 @@ const routeLayer = new VectorLayer({
 // 记录点数据
 const recordPoints = ref([])
 const routes = ref([])
-const currentRouteName = ref('')
 const isDrawingRoute = ref(false)
 const tempRoutePoints = ref([])
 const tempRouteFeature = ref(null)
@@ -184,35 +183,111 @@ const handleClick = (event) => {
     return
   }
 
-  // 正常模式：打开编辑器添加新记录
-  editingPoint.value = {
-    lon: lonLat[0],
-    lat: lonLat[1],
-    time: new Date().toLocaleString('zh-CN')
+  // 检查是否点击了已有的记录点
+  const feature = map.value.forEachFeatureAtPixel(event.pixel, (feature) => {
+    if (feature.getId()) {
+      return feature
+    }
+  }, { hitTolerance: 10 })
+
+  if (feature) {
+    // 点击了已有的点，查看详情
+    const point = recordPoints.value.find(p => p.id === feature.getId())
+    if (point) {
+      editingPoint.value = { ...point }
+      editorMode.value = 'view'
+      showEditor.value = true
+    }
+  } else {
+    // 正常模式：打开编辑器添加新记录
+    editingPoint.value = {
+      lon: lonLat[0],
+      lat: lonLat[1],
+      time: new Date().toLocaleString('zh-CN')
+    }
+    editorMode.value = 'create'
+    showEditor.value = true
   }
-  showEditor.value = true
+}
+
+// 处理鼠标移动（hover 效果）
+const handlePointerMove = (event) => {
+  if (isDrawingRoute.value) return
+
+  const feature = map.value.forEachFeatureAtPixel(event.pixel, (feature) => {
+    if (feature.getId()) {
+      return feature
+    }
+  }, { hitTolerance: 10 })
+
+  // 重置之前 hover 的点
+  if (hoveredPointId.value && (!feature || feature.getId() !== hoveredPointId.value)) {
+    const prevFeature = vectorSource.getFeatureById(hoveredPointId.value)
+    if (prevFeature) {
+      updatePointStyle(prevFeature, false)
+    }
+    hoveredPointId.value = null
+    mapContainer.value.style.cursor = 'default'
+  }
+
+  // 设置当前 hover 的点
+  if (feature && feature.getId()) {
+    if (hoveredPointId.value !== feature.getId()) {
+      updatePointStyle(feature, true)
+      hoveredPointId.value = feature.getId()
+      mapContainer.value.style.cursor = 'pointer'
+    }
+  }
 }
 
 // 保存记录点
 const handleSavePoint = (data) => {
-  const point = {
-    id: editingPoint.value?.id || Date.now(),
-    lon: editingPoint.value.lon,
-    lat: editingPoint.value.lat,
-    time: editingPoint.value.time,
-    ...data
-  }
+  if (editorMode.value === 'route') {
+    // 保存路线信息
+    if (editingRoute.value) {
+      editingRoute.value.title = data.title
+      editingRoute.value.description = data.description
+      editingRoute.value.images = data.images
 
-  const existingIndex = recordPoints.value.findIndex(p => p.id === point.id)
-  if (existingIndex >= 0) {
-    recordPoints.value[existingIndex] = point
+      // 更新路线样式
+      editingRoute.value.feature.setStyle(new Style({
+        stroke: new Stroke({
+          color: '#ec4899',
+          width: 5
+        }),
+        text: new Text({
+          text: data.title,
+          offsetY: -15,
+          fill: new Fill({ color: '#ec4899' }),
+          stroke: new Stroke({ color: '#fff', width: 3 }),
+          font: 'bold 14px sans-serif'
+        })
+      }))
+    }
   } else {
-    recordPoints.value.push(point)
+    // 保存记录点
+    const point = {
+      id: editingPoint.value?.id || Date.now(),
+      lon: editingPoint.value.lon,
+      lat: editingPoint.value.lat,
+      time: editingPoint.value.time,
+      ...data
+    }
+
+    const existingIndex = recordPoints.value.findIndex(p => p.id === point.id)
+    if (existingIndex >= 0) {
+      recordPoints.value[existingIndex] = point
+    } else {
+      recordPoints.value.push(point)
+    }
+
+    refreshMapPoints()
   }
 
-  refreshMapPoints()
   showEditor.value = false
   editingPoint.value = null
+  editingRoute.value = null
+  editorMode.value = 'create'
 }
 
 // 编辑记录点
@@ -258,11 +333,6 @@ const formatLength = (length) => {
 }
 
 const startDrawRoute = () => {
-  if (!currentRouteName.value || !currentRouteName.value.trim()) {
-    alert('请先输入路线名称')
-    return
-  }
-
   if (isDrawingRoute.value) {
     finishRoute()
     return
@@ -293,15 +363,9 @@ const finishRoute = () => {
 
   feature.setStyle(new Style({
     stroke: new Stroke({
-      color: '#ec4899',
-      width: 5
-    }),
-    text: new Text({
-      text: currentRouteName.value,
-      offsetY: -15,
-      fill: new Fill({ color: '#ec4899' }),
-      stroke: new Stroke({ color: '#fff', width: 3 }),
-      font: 'bold 14px sans-serif'
+      color: '#f472b6',
+      width: 4,
+      lineDash: [10, 5]
     })
   }))
 
@@ -309,7 +373,10 @@ const finishRoute = () => {
 
   const route = {
     id: Date.now(),
-    name: currentRouteName.value,
+    name: '',
+    title: '',
+    description: '',
+    images: [],
     length: formatLength(length),
     coordinates: [...tempRoutePoints.value],
     feature: feature,
@@ -318,7 +385,16 @@ const finishRoute = () => {
 
   routes.value.push(route)
 
-  currentRouteName.value = ''
+  // 打开编辑器添加路线信息
+  editingRoute.value = route
+  editingPoint.value = {
+    title: '',
+    description: '',
+    images: []
+  }
+  editorMode.value = 'route'
+  showEditor.value = true
+
   isDrawingRoute.value = false
   tempRoutePoints.value = []
   tempRouteFeature.value = null
@@ -390,6 +466,7 @@ onMounted(() => {
   })
 
   map.value.on('click', handleClick)
+  map.value.on('pointermove', handlePointerMove)
 })
 
 onUnmounted(() => {
@@ -417,14 +494,8 @@ onUnmounted(() => {
         <h3>🛣️ 我的路线</h3>
 
         <div v-if="!isDrawingRoute" class="route-input">
-          <input
-            v-model="currentRouteName"
-            type="text"
-            placeholder="路线名称..."
-            class="input-field"
-          />
-          <button @click="startDrawRoute" class="btn-primary">
-            ✏️ 绘制
+          <button @click="startDrawRoute" class="btn-primary full-width">
+            ✏️ 开始绘制路线
           </button>
         </div>
 
@@ -580,6 +651,10 @@ onUnmounted(() => {
 .btn-primary:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(236, 72, 153, 0.4);
+}
+
+.btn-primary.full-width {
+  width: 100%;
 }
 
 .btn-success {

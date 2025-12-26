@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 
 const props = defineProps({
   point: {
@@ -9,6 +9,10 @@ const props = defineProps({
   show: {
     type: Boolean,
     default: false
+  },
+  mode: {
+    type: String,
+    default: 'create' // 'create' | 'edit' | 'view' | 'route'
   }
 })
 
@@ -21,8 +25,16 @@ const formData = ref({
   images: []
 })
 
-// 图片预览
-const imagePreview = ref(null)
+// 计算对话框标题
+const dialogTitle = computed(() => {
+  if (props.mode === 'view') return '📍 查看记录'
+  if (props.mode === 'route') return '🛣️ 编辑路线'
+  if (props.point) return '✏️ 编辑记录'
+  return '📍 新建记录'
+})
+
+// 是否为只读模式
+const isReadOnly = computed(() => props.mode === 'view')
 
 // 监听 point 变化
 watch(() => props.point, (newPoint) => {
@@ -39,7 +51,6 @@ watch(() => props.point, (newPoint) => {
       images: []
     }
   }
-  imagePreview.value = null
 }, { immediate: true })
 
 // 处理图片上传
@@ -64,28 +75,40 @@ const handleSave = () => {
   emit('save', { ...formData.value })
 }
 
-// 取消
-const handleCancel = () => {
-  emit('close')
+// 关闭
+const handleClose = () => {
+  if (isReadOnly.value) {
+    emit('close')
+  } else {
+    emit('close')
+  }
 }
 </script>
 
 <template>
-  <div v-if="show" class="editor-overlay" @click.self="handleCancel">
+  <div v-if="show" class="editor-overlay" @click.self="handleClose">
     <div class="editor-dialog">
       <div class="editor-header">
-        <h3>{{ point ? '编辑记录点' : '新建记录点' }}</h3>
-        <button @click="handleCancel" class="close-btn">✕</button>
+        <h3>{{ dialogTitle }}</h3>
+        <button @click="handleClose" class="close-btn">✕</button>
       </div>
 
       <div class="editor-body">
+        <!-- 位置信息（只读模式显示） -->
+        <div v-if="point && point.lon" class="location-info">
+          <span class="location-label">📍 位置</span>
+          <span class="location-coords">{{ point.lat?.toFixed(4) }}, {{ point.lon?.toFixed(4) }}</span>
+          <span v-if="point.time" class="location-time">{{ point.time }}</span>
+        </div>
+
         <div class="form-group">
-          <label>标题</label>
+          <label>{{ isReadOnly ? '标题' : '标题' }}</label>
           <input
             v-model="formData.title"
             type="text"
             placeholder="给这个地点起个名字..."
             class="form-input"
+            :readonly="isReadOnly"
           />
         </div>
 
@@ -96,10 +119,11 @@ const handleCancel = () => {
             placeholder="记录下这里的故事..."
             class="form-textarea"
             rows="4"
+            :readonly="isReadOnly"
           ></textarea>
         </div>
 
-        <div class="form-group">
+        <div class="form-group" v-if="!isReadOnly">
           <label>图片</label>
           <div class="image-upload">
             <label class="upload-btn">
@@ -125,11 +149,27 @@ const handleCancel = () => {
             </div>
           </div>
         </div>
+
+        <!-- 只读模式显示图片 -->
+        <div v-if="isReadOnly && formData.images.length > 0" class="form-group">
+          <label>图片</label>
+          <div class="image-list">
+            <div
+              v-for="(img, index) in formData.images"
+              :key="index"
+              class="image-item"
+            >
+              <img :src="img" alt="图片" />
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="editor-footer">
-        <button @click="handleCancel" class="btn-cancel">取消</button>
-        <button @click="handleSave" class="btn-save">保存</button>
+        <button @click="handleClose" class="btn-cancel">
+          {{ isReadOnly ? '关闭' : '取消' }}
+        </button>
+        <button v-if="!isReadOnly" @click="handleSave" class="btn-save">保存</button>
       </div>
     </div>
   </div>
@@ -200,6 +240,35 @@ const handleCancel = () => {
   padding: 20px;
   overflow-y: auto;
   flex: 1;
+}
+
+.location-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: #fdf2f8;
+  border-radius: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.location-label {
+  color: #ec4899;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.location-coords {
+  color: #6b7280;
+  font-size: 13px;
+  font-family: monospace;
+}
+
+.location-time {
+  color: #9ca3af;
+  font-size: 12px;
+  margin-left: auto;
 }
 
 .form-group {
