@@ -78,8 +78,18 @@ const selectInteraction = ref(null)
 const carOverlay = ref(null)  // 小车 overlay
 const animationProgress = ref(0)  // 动画进度 0-1
 const animationId = ref(null)  // 动画帧 ID
-const carImageUrlRight = '/map/right.gif'  // 向右行驶的小车图片
-const carImageUrlLeft = '/map/left.gif'  // 向左行驶的小车图片
+const carImageUrl = '/map/right.gif'  // 小车图片（只用一张）
+const animationRouteSource = new VectorSource()  // 动画路线源（显示已走过的部分）
+const animationRouteLayer = new VectorLayer({
+  source: animationRouteSource,
+  style: new Style({
+    stroke: new Stroke({
+      color: '#ec4899',
+      width: 6
+    })
+  }),
+  zIndex: 101
+})
 
 // 图层配置
 const layers = ref([
@@ -577,11 +587,17 @@ const playRouteAnimation = (routeId) => {
     animationId.value = null
   }
 
+  // 清空动画路线
+  animationRouteSource.clear()
+
+  // 隐藏原始路线
+  route.feature.setStyle(undefined)
+
   // 创建小车 overlay
   if (!carOverlay.value) {
     const carElement = document.createElement('div')
     carElement.className = 'car-marker'
-    carElement.innerHTML = `<img src="${carImageUrlRight}" alt="car" />`
+    carElement.innerHTML = `<img src="${carImageUrl}" alt="car" />`
 
     carOverlay.value = new Overlay({
       element: carElement,
@@ -603,6 +619,8 @@ const playRouteAnimation = (routeId) => {
   const startTime = Date.now()
   animationProgress.value = 0
 
+  let animatedRouteFeature = null  // 动态路线 Feature（已走过的部分）
+
   const animate = () => {
     const elapsed = Date.now() - startTime
     const progress = Math.min(elapsed / duration, 1)
@@ -620,34 +638,59 @@ const playRouteAnimation = (routeId) => {
     const x = startCoord[0] + (endCoord[0] - startCoord[0]) * segmentProgress
     const y = startCoord[1] + (endCoord[1] - startCoord[1]) * segmentProgress
 
-    // 计算方向角度
+    // 计算方向角度（弧度）
     const dx = endCoord[0] - startCoord[0]
     const dy = endCoord[1] - startCoord[1]
-    const angle = Math.atan2(dy, dx) * 180 / Math.PI
+    const angleRad = Math.atan2(dy, dx)
 
-    // 根据方向选择图片并设置旋转
-    const carElement = carOverlay.value.getElement()
-    const imgElement = carElement?.querySelector('img')
+    // 参考 vector-move.html 的小车算法：
+    // 1. 先取反角度（修复上下翻转）
+    // 2. 如果向左（dx < 0），需要减去 π 然后水平翻转
+    let angle = -angleRad  // 先取反，修复上下翻转
+    let needsFlip = false
 
-    let rotationAngle
     if (dx < 0) {
-      // 向左行驶：使用 left.gif，使用原始角度
-      if (imgElement && imgElement.src !== carImageUrlLeft) {
-        imgElement.src = carImageUrlLeft
-      }
-      rotationAngle = angle  // left.gif 朝左，不需要取反
-    } else {
-      // 向右行驶：使用 right.gif，取反角度
-      if (imgElement && imgElement.src !== carImageUrlRight) {
-        imgElement.src = carImageUrlRight
-      }
-      rotationAngle = -angle  // right.gif 朝右，需要取反
+      // 向左行驶：减去 π，然后水平翻转
+      // 这样可以保持小车上下方向正确（人不会倒立）
+      angle = angle - Math.PI
+      needsFlip = true
     }
 
     // 更新小车位置和旋转
     carOverlay.value.setPosition([x, y])
+    const carElement = carOverlay.value.getElement()
     if (carElement) {
-      carElement.style.transform = `rotate(${rotationAngle}deg)`
+      const angleDeg = angle * 180 / Math.PI
+      carElement.style.transform = `rotate(${angleDeg}deg) scaleX(${needsFlip ? -1 : 1})`
+    }
+
+    // 计算已走过的路线坐标
+    const walkedCoords = []
+    for (let i = 0; i < currentSegment; i++) {
+      walkedCoords.push(coordinates[i])
+    }
+    walkedCoords.push(startCoord)
+    walkedCoords.push([x, y])
+
+    // 移除旧的动态路线
+    if (animatedRouteFeature) {
+      animationRouteSource.removeFeature(animatedRouteFeature)
+    }
+
+    // 绘制已走过的路线（实线）
+    if (walkedCoords.length >= 2) {
+      animatedRouteFeature = new Feature({
+        geometry: new LineString(walkedCoords)
+      })
+
+      animatedRouteFeature.setStyle(new Style({
+        stroke: new Stroke({
+          color: '#ec4899',
+          width: 6
+        })
+      }))
+
+      animationRouteSource.addFeature(animatedRouteFeature)
     }
 
     if (progress < 1) {
@@ -658,6 +701,17 @@ const playRouteAnimation = (routeId) => {
         if (carOverlay.value) {
           carOverlay.value.setPosition(undefined)
         }
+        // 保留完整路线一段时间后清除动画路线层
+        setTimeout(() => {
+          animationRouteSource.clear()
+          // 恢复原始路线的实线样式
+          route.feature.setStyle(new Style({
+            stroke: new Stroke({
+              color: '#ec4899',
+              width: 5
+            })
+          }))
+        }, 2000)
       }, 500)
     }
   }
@@ -682,7 +736,7 @@ onMounted(() => {
 
   map.value = new Map({
     target: mapContainer.value,
-    layers: [...tileLayers, vectorLayer, routeLayer],
+    layers: [...tileLayers, vectorLayer, routeLayer, animationRouteLayer],
     view: new View({
       center: fromLonLat([116.4074, 39.9042]),
       zoom: 4,

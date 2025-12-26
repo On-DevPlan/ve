@@ -100,7 +100,7 @@ gis/
 - 使用 OpenLas `Overlay` 显示小车图片
 - 使用 `requestAnimationFrame` 实现平滑动画
 - 固定 10 秒完成整条路线 (不随路线长度变化)
-- **根据行驶方向动态切换图片**：向右使用 `right.gif`，向左使用 `left.gif`
+- **只使用一张图片** `right.gif`，通过 CSS `scaleX(-1)` 实现左右翻转
 
 **关键代码:**
 ```javascript
@@ -117,47 +117,42 @@ const playRouteAnimation = (routeId) => {
     const x = startCoord[0] + (endCoord[0] - startCoord[0]) * segmentProgress
     const y = startCoord[1] + (endCoord[1] - startCoord[1]) * segmentProgress
 
-    // 计算方向角度（屏幕坐标系：x向右为正，y向下为正）
+    // 计算方向角度（弧度）
     const dx = endCoord[0] - startCoord[0]
     const dy = endCoord[1] - startCoord[1]
-    const angle = Math.atan2(dy, dx) * 180 / Math.PI
+    const angleRad = Math.atan2(dy, dx)
 
-    // 根据方向切换图片并计算旋转角度
-    const carElement = carOverlay.value.getElement()
-    const imgElement = carElement?.querySelector('img')
+    // 参考 vector-move.html 的小车算法：
+    // 1. 先取反角度（修复上下翻转）
+    // 2. 如果向左（dx < 0），需要减去 π 然后水平翻转
+    let angle = -angleRad  // 先取反，修复上下翻转
+    let needsFlip = false
 
-    let rotationAngle
     if (dx < 0) {
-      // 向左行驶：使用 left.gif，使用原始角度
-      if (imgElement && imgElement.src !== carImageUrlLeft) {
-        imgElement.src = carImageUrlLeft
-      }
-      rotationAngle = angle  // left.gif 朝左，不需要取反
-    } else {
-      // 向右行驶：使用 right.gif，取反角度
-      if (imgElement && imgElement.src !== carImageUrlRight) {
-        imgElement.src = carImageUrlRight
-      }
-      rotationAngle = -angle  // right.gif 朝右，需要取反
+      // 向左行驶：减去 π，然后水平翻转
+      // 这样可以保持小车上下方向正确（人不会倒立）
+      angle = angle - Math.PI
+      needsFlip = true
     }
 
     // 更新小车位置和旋转
     carOverlay.value.setPosition([x, y])
-    carElement.style.transform = `rotate(${rotationAngle}deg)`
+    const angleDeg = angle * 180 / Math.PI
+    carElement.style.transform = `rotate(${angleDeg}deg) scaleX(${needsFlip ? -1 : 1})`
   }
 }
 ```
 
 **角度计算说明:**
-- 小车图片：`right.gif` 朝右（0°），`left.gif` 朝左（180°），上面是人，下面是车
+- 小车图片：`right.gif` 朝右（0°），上面是人，下面是车
 - 屏幕坐标系：x 向右为正，y 向下为正
-- `Math.atan2(dy, dx)` 返回从 x 轴正方向（向右）的角度
-- **向右行驶（dx >= 0）**：使用 `right.gif` + `rotate(-angle)` - 取反角度修复上下反转
-- **向左行驶（dx < 0）**：使用 `left.gif` + `rotate(angle)` - 使用原始角度（因为 left.gif 已经是朝左的）
+- `Math.atan2(dy, dx)` 返回从 x 轴正方向（向右）的角度（弧度）
+- **所有方向先取反角度** `angle = -angleRad` 来修复上下反转问题
+- **向左行驶（dx < 0）**：再减去 π（或加 π）并使用 `scaleX(-1)` 水平翻转
+  - 这样小车始终保持上下方向正确，人不会倒立
+- **向右/上/下行驶（dx >= 0）**：直接使用取反后的角度，不翻转
 
-**小车图片路径:**
-- 向右：`/public/map/right.gif`
-- 向左：`/public/map/left.gif`
+**小车图片路径:** `/public/map/right.gif`
 
 ## 编辑器模式 (Editor Modes)
 
