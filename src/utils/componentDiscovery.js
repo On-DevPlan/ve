@@ -11,9 +11,9 @@ export class ComponentDiscovery {
     this.groups = ref({})
     this.loading = ref(false)
 
-    // 使用 Vite 的 glob 功能预先扫描所有 index.vue 文件
+    // 使用 Vite 的 glob 功能预先扫描所有 .vue 文件
     // 这样 Vite 在构建时就知道所有需要打包的组件
-    this.componentModules = import.meta.glob('../components/**/index.vue')
+    this.componentModules = import.meta.glob('../components/**/*.vue')
   }
 
   /**
@@ -38,8 +38,9 @@ export class ComponentDiscovery {
 
           // 验证配置
           if (this.validateConfig(componentConfig)) {
-            // 构建组件的 index.vue 路径
-            const componentModulePath = configPath.replace('/component.js', '/index.vue')
+            // 使用 component.js 中配置的 component 字段
+            const componentDir = configPath.replace('/component.js', '')
+            const componentModulePath = componentDir + '/' + componentConfig.component.replace('./', '')
 
             // 创建组件对象
             const component = {
