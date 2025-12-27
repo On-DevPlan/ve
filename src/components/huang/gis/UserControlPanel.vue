@@ -19,8 +19,18 @@ const emit = defineEmits([
   'viewPoint',
   'playRouteAnimation',
   'zoomToRoute',
-  'loadPresetData'
+  'loadPresetData',
+  'toggleRouteVisibility'
 ])
+
+// 是否显示路线连接线
+const showRouteLines = ref(true)
+
+// 切换路线显示
+const toggleRouteLines = () => {
+  showRouteLines.value = !showRouteLines.value
+  emit('toggleRouteVisibility', showRouteLines.value)
+}
 
 // 展开状态
 const expandedRoutes = ref(new Set())
@@ -74,7 +84,17 @@ onMounted(async () => {
   <div class="user-control-panel">
     <!-- 演唱会巡演路线 -->
     <div class="panel-section">
-      <h3>🎵 2025年宇宙无敌号演唱会</h3>
+      <div class="section-header">
+        <h3>🎵 2025年宇宙无敌号演唱会</h3>
+        <button
+          @click="toggleRouteLines"
+          class="toggle-lines-btn"
+          :class="{ active: showRouteLines }"
+          :title="showRouteLines ? '隐藏路线' : '显示路线'"
+        >
+          {{ showRouteLines ? '📍 隐藏路线' : '🛤️ 显示路线' }}
+        </button>
+      </div>
 
       <div v-if="routes.length > 0" class="route-detail">
         <div
@@ -157,8 +177,16 @@ onMounted(async () => {
   margin-bottom: 24px;
 }
 
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  gap: 12px;
+}
+
 .panel-section h3 {
-  margin: 0 0 20px 0;
+  margin: 0;
   font-size: 18px;
   color: #e94560;
   font-weight: 600;
@@ -337,6 +365,31 @@ onMounted(async () => {
 .zoom-btn:hover {
   background: linear-gradient(135deg, #0f3460, #16213e);
   border-color: #0f3460;
+}
+
+/* 路线切换按钮 */
+.toggle-lines-btn {
+  flex-shrink: 0;
+  padding: 8px 14px;
+  background: rgba(233, 69, 96, 0.2);
+  border: 2px solid #e94560;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.3s;
+  white-space: nowrap;
+}
+
+.toggle-lines-btn:hover {
+  background: rgba(233, 69, 96, 0.4);
+  transform: scale(1.05);
+}
+
+.toggle-lines-btn.active {
+  background: linear-gradient(135deg, #e94560, #ff6b6b);
+  border-color: #ff6b6b;
 }
 
 .empty-text {

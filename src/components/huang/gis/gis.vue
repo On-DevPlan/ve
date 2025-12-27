@@ -1089,6 +1089,17 @@ const togglePanelMode = () => {
   panelMode.value = panelMode.value === 'admin' ? 'user' : 'admin'
 }
 
+// 切换路线可见性
+const handleToggleRouteVisibility = (visible) => {
+  if (!map.value) return
+  const layers = map.value.getLayers().getArray()
+  layers.forEach(layer => {
+    if (layer === routeLayer) {
+      layer.setVisible(visible)
+    }
+  })
+}
+
 // 初始化地图
 onMounted(() => {
   const tileLayers = layers.value.map(layer => {
@@ -1184,6 +1195,7 @@ onUnmounted(() => {
       @change-view-mode="handleChangeViewMode"
       @toggle-auto-preview="handleToggleAutoPreview"
       @load-preset-data="handleLoadPresetData"
+      @toggle-route-visibility="handleToggleRouteVisibility"
     />
 
     <!-- 地图容器 -->
