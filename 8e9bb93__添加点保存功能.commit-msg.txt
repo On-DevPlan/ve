@@ -1,0 +1,15 @@
+sha:        8e9bb936f00a8694f11881009d9b0a6cec42953c
+short:      8e9bb93
+author:     zlxmii <2096343460@qq.com>
+date:       2025-12-27T17:51:27+08:00
+subject:    添加点保存功能
+
+--- body ---
+
+
+--- files (5) ---
+public/map/huang.json
+src/components/huang/gis/ControlPanel.vue
+src/components/huang/gis/README.md
+src/components/huang/gis/StorageManager.js
+src/components/huang/gis/gis.vue
