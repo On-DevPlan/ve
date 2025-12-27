@@ -21,11 +21,22 @@ import Overlay from 'ol/Overlay'
 import Select from 'ol/interaction/Select'
 import PointEditor from './PointEditor.vue'
 import ControlPanel from './ControlPanel.vue'
+import UserControlPanel from './UserControlPanel.vue'
+import { getPresetData, importFromJson } from './StorageManager.js'
 
 // 地图容器
 const mapContainer = ref(null)
 const map = shallowRef(null)
 const currentLayerIndex = ref(0)
+
+// 面板模式: 'admin' | 'user'
+const panelMode = ref('admin')
+
+// 视图模式 (用户面板): 'all' | 'points-only' | 'routes-only'
+const viewMode = ref('all')
+
+// 自动预览首图开关
+const autoPreviewEnabled = ref(false)
 
 // 矢量源和图层
 const vectorSource = new VectorSource()
@@ -130,24 +141,7 @@ const createPointFeature = (point) => {
 
 // 更新点样式
 const updatePointStyle = (feature, isHovered) => {
-  const point = feature.getProperties()
-  const radius = isHovered ? 16 : 12
-  const strokeWidth = isHovered ? 4 : 3
-
-  feature.setStyle(new Style({
-    image: new Circle({
-      radius: radius,
-      fill: new Fill({ color: '#ec4899' }),
-      stroke: new Stroke({ color: '#fff', width: strokeWidth })
-    }),
-    text: new Text({
-      text: point.title || '',
-      offsetY: -(radius + 8),
-      fill: new Fill({ color: '#ec4899' }),
-      stroke: new Stroke({ color: '#fff', width: 3 }),
-      font: 'bold 13px sans-serif'
-    })
-  }))
+  feature.setStyle(getPointStyle(feature, isHovered))
 }
 
 // 刷新地图上的点
@@ -242,13 +236,7 @@ const handleClick = (event) => {
       routePointIndex: tempRoutePoints.value.length
     })
     pointFeature.setId(pointId)
-    pointFeature.setStyle(new Style({
-      image: new Circle({
-        radius: 8,
-        fill: new Fill({ color: '#f472b6' }),
-        stroke: new Stroke({ color: '#fff', width: 2 })
-      })
-    }))
+    pointFeature.setStyle(getRoutePointStyle())
 
     routePoint.feature = pointFeature
     tempRoutePoints.value.push(routePoint)
@@ -355,13 +343,7 @@ const handlePointerMove = (event) => {
       const props = prevFeature.getProperties()
       if (props.isRoutePoint) {
         // 恢复路线转折点样式
-        prevFeature.setStyle(new Style({
-          image: new Circle({
-            radius: 8,
-            fill: new Fill({ color: '#f472b6' }),
-            stroke: new Stroke({ color: '#fff', width: 2 })
-          })
-        }))
+        prevFeature.setStyle(getRoutePointStyle())
       } else {
         updatePointStyle(prevFeature, false)
       }
@@ -381,20 +363,7 @@ const handlePointerMove = (event) => {
       const props = feature.getProperties()
       if (props.isRoutePoint) {
         // 路线转折点 hover 效果
-        feature.setStyle(new Style({
-          image: new Circle({
-            radius: 12,
-            fill: new Fill({ color: '#f472b6' }),
-            stroke: new Stroke({ color: '#fff', width: 3 })
-          }),
-          text: new Text({
-            text: props.title || '',
-            offsetY: -18,
-            fill: new Fill({ color: '#f472b6' }),
-            stroke: new Stroke({ color: '#fff', width: 3 }),
-            font: 'bold 12px sans-serif'
-          })
-        }))
+        feature.setStyle(getRoutePointHoverStyle(feature))
 
         // 查找路线转折点的图片
         if (props.images && props.images.length > 0) {
@@ -891,13 +860,7 @@ const handleImportData = (data) => {
           routePointIndex: index
         })
         pointFeature.setId(point.id)
-        pointFeature.setStyle(new Style({
-          image: new Circle({
-            radius: 8,
-            fill: new Fill({ color: '#f472b6' }),
-            stroke: new Stroke({ color: '#fff', width: 2 })
-          })
-        }))
+        pointFeature.setStyle(getRoutePointStyle())
         vectorSource.addFeature(pointFeature)
       })
     }
@@ -907,6 +870,203 @@ const handleImportData = (data) => {
   const pointsCount = recordPoints.value.length
   const routesCount = routes.value.length
   alert(`导入成功！\n\n记录点: ${pointsCount} 个\n路线: ${routesCount} 条`)
+}
+
+// ==================== 用户面板相关功能 ====================
+
+// 加载预设数据
+const handleLoadPresetData = async (presetData) => {
+  const imported = importFromJson(presetData)
+  handleImportData(imported)
+}
+
+// 切换视图模式
+const handleChangeViewMode = (mode) => {
+  viewMode.value = mode
+
+  // 始终保持 vectorLayer 可见，通过控制 Feature 级别可见性
+  vectorLayer.setVisible(true)
+
+  // 根据视图模式控制路线图层可见性
+  if (mode === 'points-only') {
+    routeLayer.setVisible(false)
+  } else {
+    routeLayer.setVisible(true)
+  }
+
+  // 控制 vectorLayer 中每个 Feature 的可见性
+  vectorSource.getFeatures().forEach(feature => {
+    const props = feature.getProperties()
+    const isRoutePoint = props.isRoutePoint
+
+    if (mode === 'points-only') {
+      // 仅显示点：显示普通记录点，隐藏路线转折点
+      feature.setStyle(isRoutePoint ? null : getPointStyle(feature, false))
+    } else if (mode === 'routes-only') {
+      // 仅显示路线：隐藏普通记录点，显示路线转折点
+      feature.setStyle(isRoutePoint ? getRoutePointStyle() : null)
+    } else {
+      // 显示全部：显示所有点
+      if (isRoutePoint) {
+        feature.setStyle(getRoutePointStyle())
+      } else {
+        feature.setStyle(getPointStyle(feature, false))
+      }
+    }
+  })
+}
+
+// 获取普通记录点样式
+const getPointStyle = (feature, isHovered) => {
+  const point = feature.getProperties()
+  const radius = isHovered ? 16 : 12
+  const strokeWidth = isHovered ? 4 : 3
+
+  return new Style({
+    image: new Circle({
+      radius: radius,
+      fill: new Fill({ color: '#ec4899' }),
+      stroke: new Stroke({ color: '#fff', width: strokeWidth })
+    }),
+    text: new Text({
+      text: point.title || '',
+      offsetY: -(radius + 8),
+      fill: new Fill({ color: '#ec4899' }),
+      stroke: new Stroke({ color: '#fff', width: 3 }),
+      font: 'bold 13px sans-serif'
+    })
+  })
+}
+
+// 获取路线转折点样式
+const getRoutePointStyle = () => {
+  return new Style({
+    image: new Circle({
+      radius: 8,
+      fill: new Fill({ color: '#f472b6' }),
+      stroke: new Stroke({ color: '#fff', width: 2 })
+    })
+  })
+}
+
+// 获取路线转折点悬停样式
+const getRoutePointHoverStyle = (feature) => {
+  const props = feature.getProperties()
+  return new Style({
+    image: new Circle({
+      radius: 12,
+      fill: new Fill({ color: '#f472b6' }),
+      stroke: new Stroke({ color: '#fff', width: 3 })
+    }),
+    text: new Text({
+      text: props.title || '',
+      offsetY: -18,
+      fill: new Fill({ color: '#f472b6' }),
+      stroke: new Stroke({ color: '#fff', width: 3 }),
+      font: 'bold 12px sans-serif'
+    })
+  })
+}
+
+// 切换自动预览
+const handleToggleAutoPreview = (enabled) => {
+  autoPreviewEnabled.value = enabled
+
+  if (enabled) {
+    // 自动显示所有点的第一张图片
+    showAllPointImages()
+  } else {
+    // 隐藏所有自动预览
+    hideAllPointImages()
+  }
+}
+
+// 显示所有点的首图预览
+const showAllPointImages = () => {
+  if (!map.value) return
+
+  // 为每个有图片的点创建 overlay
+  vectorSource.getFeatures().forEach(feature => {
+    const props = feature.getProperties()
+    let imageUrl = null
+
+    // 从记录点获取图片
+    const point = recordPoints.value.find(p => p.id === feature.getId())
+    if (point && point.images && point.images.length > 0) {
+      imageUrl = point.images[0]
+    }
+
+    // 如果没有，从路线转折点获取
+    if (!imageUrl && props.isRoutePoint) {
+      for (const route of routes.value) {
+        if (route.points) {
+          const routePoint = route.points.find(p => p.id === feature.getId())
+          if (routePoint && routePoint.images && routePoint.images.length > 0) {
+            imageUrl = routePoint.images[0]
+            break
+          }
+        }
+      }
+    }
+
+    if (imageUrl) {
+      const geometry = feature.getGeometry()
+      if (geometry) {
+        const coordinate = geometry.getCoordinates()
+        createPersistentImageOverlay(feature.getId(), coordinate, imageUrl)
+      }
+    }
+  })
+}
+
+// 隐藏所有自动预览
+const hideAllPointImages = () => {
+  // 移除所有持久化的图片 overlay
+  const overlays = map.value.getOverlays().getArray()
+  overlays.forEach(overlay => {
+    const element = overlay.getElement()
+    if (element && element.classList.contains('auto-point-image')) {
+      map.value.removeOverlay(overlay)
+    }
+  })
+}
+
+// 创建持久化的图片 overlay
+const imageOverlays = new Map() // 存储每个点的图片 overlay
+
+const createPersistentImageOverlay = (pointId, coordinate, imageUrl) => {
+  // 如果已存在，先移除
+  if (imageOverlays.has(pointId)) {
+    const existing = imageOverlays.get(pointId)
+    map.value.removeOverlay(existing)
+  }
+
+  const imageElement = document.createElement('div')
+  imageElement.className = 'auto-point-image point-image-preview'
+  imageElement.innerHTML = `<img src="${imageUrl}" alt="预览" />`
+
+  const overlay = new Overlay({
+    element: imageElement,
+    positioning: 'bottom-left',
+    offset: [15, -15],
+    stopEvent: false
+  })
+
+  map.value.addOverlay(overlay)
+  overlay.setPosition(coordinate)
+  imageOverlays.set(pointId, overlay)
+}
+
+// 查看点详情（用户面板）
+const handleViewPoint = (point) => {
+  editingPoint.value = { ...point }
+  editorMode.value = 'view'
+  showEditor.value = true
+}
+
+// 切换面板模式（开发调试用）
+const togglePanelMode = () => {
+  panelMode.value = panelMode.value === 'admin' ? 'user' : 'admin'
 }
 
 // 初始化地图
@@ -964,11 +1124,12 @@ onUnmounted(() => {
 })
 </script>
 
-<template>  
+<template>
 
   <div class="gis-container">
     <!-- 左侧控制面板 -->
     <ControlPanel
+      v-if="panelMode === 'admin'"
       :record-points="recordPoints"
       :routes="routes"
       :layers="layers"
@@ -990,9 +1151,29 @@ onUnmounted(() => {
       @import-data="handleImportData"
     />
 
+    <UserControlPanel
+      v-else
+      :record-points="recordPoints"
+      :routes="routes"
+      :layers="layers"
+      :current-layer-index="currentLayerIndex"
+      @switch-layer="switchLayer"
+      @view-point="handleViewPoint"
+      @play-route-animation="playRouteAnimation"
+      @zoom-to-route="zoomToRoute"
+      @change-view-mode="handleChangeViewMode"
+      @toggle-auto-preview="handleToggleAutoPreview"
+      @load-preset-data="handleLoadPresetData"
+    />
+
     <!-- 地图容器 -->
     <div class="map-wrapper">
-      <div ref="mapContainer" class="map-container" :class="{ drawing: isDrawingRoute }"></div>
+      <div ref="mapContainer" class="map-container" :class="{ drawing: isDrawingRoute }">
+        <!-- 面板切换按钮（开发调试用） -->
+        <button @click="togglePanelMode" class="panel-toggle-btn" title="切换面板模式">
+          {{ panelMode === 'admin' ? '👤 用户面板' : '⚙️ 管理面板' }}
+        </button>
+      </div>
     </div>
 
     <!-- 点编辑器 -->
@@ -1086,6 +1267,30 @@ onUnmounted(() => {
   object-fit: cover;
   border-radius: 8px;
   display: block;
+}
+
+/* 面板切换按钮 */
+.panel-toggle-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1000;
+  padding: 10px 16px;
+  background: rgba(255, 255, 255, 0.95);
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.panel-toggle-btn:hover {
+  background: #fff;
+  border-color: #94a3b8;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 /* 图片预览 */
