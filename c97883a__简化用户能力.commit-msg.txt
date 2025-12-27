@@ -1,0 +1,11 @@
+sha:        c97883a549755950e69efaeb996d9a3df4d83696
+short:      c97883a
+author:     zlxmii <2096343460@qq.com>
+date:       2025-12-27T19:22:14+08:00
+subject:    简化用户能力
+
+--- body ---
+
+
+--- files (1) ---
+src/components/huang/gis/UserControlPanel.vue
