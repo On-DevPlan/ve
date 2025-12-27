@@ -327,14 +327,17 @@ const handleClick = (event) => {
     }
   }
 
-  // 点击空白区域：添加新记录点
-  editingPoint.value = {
-    lon: lonLat[0],
-    lat: lonLat[1],
-    time: new Date().toLocaleString('zh-CN')
+  // 点击空白区域：添加新记录点（仅管理模式）
+  if (panelMode.value === 'admin') {
+    editingPoint.value = {
+      lon: lonLat[0],
+      lat: lonLat[1],
+      time: new Date().toLocaleString('zh-CN')
+    }
+    editorMode.value = 'create'
+    showEditor.value = true
   }
-  editorMode.value = 'create'
-  showEditor.value = true
+  // 用户模式下点击空白区域不做任何操作
 }
 
 // 处理鼠标移动（hover 效果）
