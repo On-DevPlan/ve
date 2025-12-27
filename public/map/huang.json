@@ -27,7 +27,16 @@
             "lat": 39.911102,
             "title": "北京演唱会",
             "description": "第一站1111",
-            "images": []
+            "images": [
+              "/map/concert/beijing/beijing_duojiwei.jpg",
+              "/map/concert/beijing/beijing_gedan1.jpg",
+              "/map/concert/beijing/beijing_gedan2.jpg",
+              "/map/concert/beijing/beijing_vlog.jpg",
+              "/map/concert/beijing/with_linzhixuan.jpg",
+              "/map/concert/beijing/beijing-day2_duojiwei.jpg",
+              "/map/concert/beijing/beijing-day2_duojiwei2.jpg",
+              "/map/concert/beijing/with_duizhang.jpg"
+            ]
           },
           {
             "id": "route-2025001-1",
@@ -35,7 +44,19 @@
             "lat": 23.17702,
             "title": "广州演唱会",
             "description": "第二站",
-            "images": []
+            "images": [
+              "/map/concert/guangzhou/guangzhou_duojiwei.jpg",
+              "/map/concert/guangzhou/guangzhou_gedan.jpg",
+              "/map/concert/guangzhou/guangzhou_vlog1.jpg",
+              "/map/concert/guangzhou/guangzhou_vlog2.jpg",
+              "/map/concert/guangzhou/guangzhou_vlog3.jpg",
+              "/map/concert/guangzhou/with_luoyunxi.jpg",
+              "/map/concert/guangzhou_open/guangzhou_day1_8k.jpg",
+              "/map/concert/guangzhou_open/guangzhou_day1_gedan.jpg",
+              "/map/concert/guangzhou_open/guangzhou_day2_8k.jpg",
+              "/map/concert/guangzhou_open/guangzhou_day2_gedan.jpg",
+              "/map/concert/guangzhou_open/guangzhou_open_vlog.jpg"
+            ]
           },
           {
             "id": "route-2025001-2",
@@ -43,7 +64,17 @@
             "lat": 30.60043799999997,
             "title": "成都演唱会",
             "description": "第三站",
-            "images": []
+            "images": [
+              "/map/concert/chengdu/chengdu_duojiwei.jpg",
+              "/map/concert/chengdu/chengdu_duojiwei2.jpg",
+              "/map/concert/chengdu/chengdu_gedan1.jpg",
+              "/map/concert/chengdu/chengdu_gedan.jpg",
+              "/map/concert/chengdu/chengdu_vlog1.jpg",
+              "/map/concert/chengdu/chengdu_vlog2.jpg",
+              "/map/concert/chengdu/vlog_54.jpg",
+              "/map/concert/chengdu/guangzhiliming_guanshe.jpg",
+              "/map/concert/chengdu/with_sunnan.jpg"
+            ]
           },
           {
             "id": "route-2025001-3",
@@ -51,7 +82,16 @@
             "lat": 31.188553298916716,
             "title": "上海演唱会",
             "description": "第四站",
-            "images": []
+            "images": [
+              "/map/concert/shanghai/shanghai_vlog2.jpg",
+              "/map/concert/shanghai/gedan2.jpg",
+              "/map/concert/shanghai/shanghai_dianying.jpg",
+              "/map/concert/shanghai/gedan.jpg",
+              "/map/concert/shanghai/with_liuyu.jpg",
+              "/map/concert/shanghai/shanghai_vlog1.jpg",
+              "/map/concert/shanghai/meiyu_guanshe.jpg",
+              "/map/concert/shanghai/mangxuan_guanshe.jpg"
+            ]
           },
           {
             "id": "route-2025001-4",
@@ -59,7 +99,13 @@
             "lat": 29.931535765679683,
             "title": "宁波演唱会",
             "description": "第五站",
-            "images": []
+            "images": [
+              "/map/concert/ningbo/ningbo_dianying.jpg",
+              "/map/concert/ningbo/ningbo_vlog2.jpg",
+              "/map/concert/ningbo/ningbo_gedan.jpg",
+              "/map/concert/ningbo/ningbo_vlog1.jpg",
+              "/map/concert/ningbo/with_zhelainv.jpg"
+            ]
           },
           {
             "id": "route-2025001-5",
@@ -67,7 +113,10 @@
             "lat": 39.07747237015576,
             "title": "天津演唱会",
             "description": "第六站",
-            "images": []
+            "images": [
+              "/map/concert/tianjin/tianjin_gedan.jpg",
+              "/map/concert/tianjin/tianjin_fanpai.jpg"
+            ]
           }
         ],
         "time": "2025/12/27 17:33:06"
