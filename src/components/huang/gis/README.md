@@ -1,13 +1,13 @@
 # GIS 旅行日记组件 - AI Agent 记忆文档
 
-> 基于 Vue 3 + OpenLayers 的旅行日记应用。**Agent 请注意**: 主入口文件是 `index.vue`，不是 `gis.vue`
+> 基于 Vue 3 + OpenLayers 的旅行日记应用。**Agent 请注意**: 主入口文件是 `gis.vue`
 
 ---
 
 ## 快速导航
 
 - [组件架构总览](#组件架构总览)
-- [index.vue - 地图核心](#indexvue---地图核心组件)
+- [gis.vue - 地图核心](#gisvue---地图核心组件)
 - [ControlPanel.vue - 控制面板](#controlpanelvue---控制面板组件)
 - [PointEditor.vue - 编辑器](#pointeditorvue---编辑器对话框)
 - [PointList.vue - 列表组件](#pointlistvue---记录列表组件)
@@ -23,7 +23,7 @@
 ```
 gis/
 ├── component.js       # 组件元数据（自动发现系统）
-├── index.vue          # 主地图组件 ⭐ 核心逻辑层
+├── gis.vue            # 主地图组件 ⭐ 核心逻辑层
 ├── ControlPanel.vue   # 左侧控制面板（UI 层）
 ├── PointEditor.vue    # 编辑器对话框（表单层）
 ├── PointList.vue      # 记录点列表（展示层）
@@ -34,7 +34,7 @@ gis/
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                        index.vue ⭐                         │
+│                        gis.vue ⭐                           │
 │                   （地图核心 + 数据状态）                    │
 │  • OpenLayers Map 初始化和管理                               │
 │  • 数据状态: recordPoints, routes, tempRoutePoints          │
@@ -73,7 +73,7 @@ gis/
 ### 数据流向
 
 ```
-用户操作 → ControlPanel.vue → emit事件 → index.vue → 处理逻辑
+用户操作 → ControlPanel.vue → emit事件 → gis.vue → 处理逻辑
                                                     ↓
                                               更新数据状态
                                                     ↓
@@ -82,9 +82,9 @@ gis/
 
 ## 组件职责划分
 
-### index.vue - 地图核心组件 ⭐
+### gis.vue - 地图核心组件 ⭐
 
-**文件路径**: `src/components/huang/gis/index.vue`
+**文件路径**: `src/components/huang/gis/gis.vue`
 
 **职责**: OpenLayers 地图的初始化和核心交互逻辑
 
@@ -413,7 +413,7 @@ const cancelDrawRoute = () => {
 ### 添加新的记录字段
 
 1. 更新 `PointEditor.vue` 中的表单
-2. 更新 `index.vue` 中 `handleSavePoint` 的保存逻辑
+2. 更新 `gis.vue` 中 `handleSavePoint` 的保存逻辑
 3. 更新 `PointList.vue` 的显示模板
 
 ### 修改控制面板 UI
@@ -426,7 +426,7 @@ const cancelDrawRoute = () => {
 
 替换以下文件中的颜色值:
 
-- `index.vue` 中的地图相关样式
+- `gis.vue` 中的地图相关样式
 - `ControlPanel.vue` 中的控制面板样式
 - `PointEditor.vue` 中的编辑器样式
 - `PointList.vue` 中的列表样式
@@ -434,14 +434,14 @@ const cancelDrawRoute = () => {
 ### 调整动画速度
 
 ```javascript
-// index.vue line ~692
+// gis.vue line ~692
 const duration = 10000 // 修改此值 (毫秒)
 ```
 
 ### 添加新的地图图层
 
 ```javascript
-// index.vue 中的 layers 配置
+// gis.vue 中的 layers 配置
 const layers = ref([
   { name: '图层名称', type: 'xyz', visible: false, url: 'https://...' }
 ])
@@ -449,9 +449,9 @@ const layers = ref([
 
 ---
 
-## index.vue - 地图核心组件
+## gis.vue - 地图核心组件
 
-> **文件路径**: `src/components/huang/gis/index.vue` ⭐
+> **文件路径**: `src/components/huang/gis/gis.vue` ⭐
 
 ### 关键函数索引（Agent 快速查找）
 
@@ -641,7 +641,7 @@ animationRouteSource + animationRouteLayer
 
 ## 小车动画核心算法
 
-> **位置**: `index.vue` line ~655-795
+> **位置**: `gis.vue` line ~655-795
 
 ### 位置计算（线性插值）
 
