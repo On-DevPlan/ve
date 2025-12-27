@@ -1,0 +1,16 @@
+sha:        d1c78938e318f63cfe88e44fba0fd801edc6de3a
+short:      d1c7893
+author:     zlxmii <2096343460@qq.com>
+date:       2025-12-27T19:22:14+08:00
+subject:    replay: snapshot of commit c97883a
+
+--- body ---
+replay: snapshot of commit c97883a
+
+original-subject: 简化用户能力
+original-author:  zlxmii <2096343460@qq.com>
+original-date:    2025-12-27T19:22:14+08:00
+files:            1
+
+--- files (1) ---
+".commit-msgs/c97883a__\347\256\200\345\214\226\347\224\250\346\210\267\350\203\275\345\212\233.commit-msg.txt"
