@@ -12,31 +12,18 @@ const props = defineProps({
   routes: {
     type: Array,
     default: () => []
-  },
-  // 图层数据
-  layers: {
-    type: Array,
-    default: () => []
-  },
-  // 当前图层索引
-  currentLayerIndex: {
-    type: Number,
-    default: 0
   }
 })
 
 const emit = defineEmits([
-  'switchLayer',
   'viewPoint',
   'playRouteAnimation',
   'zoomToRoute',
-  'changeViewMode',
-  'toggleAutoPreview'
+  'loadPresetData'
 ])
 
-// 视图模式: 'all' | 'points-only' | 'routes-only'
-const viewMode = ref('all')
-const autoPreview = ref(false) // 自动预览首图开关
+// 视图模式: 'points-only' | 'routes-only'
+const viewMode = ref('points-only')
 
 // 计算可见的点和路线
 const visiblePoints = computed(() => {
@@ -49,26 +36,27 @@ const visibleRoutes = computed(() => {
   return props.routes
 })
 
-// 切换视图模式
-const setViewMode = (mode) => {
-  viewMode.value = mode
-  emit('changeViewMode', mode)
+// 切换到路线模式并播放动画
+const handleShowRoutes = (routeId) => {
+  viewMode.value = 'routes-only'
+  emit('playRouteAnimation', routeId)
 }
 
-// 切换自动预览
-const toggleAutoPreview = () => {
-  autoPreview.value = !autoPreview.value
-  emit('toggleAutoPreview', autoPreview.value)
+// 切换到点模式
+const handleShowPoints = () => {
+  viewMode.value = 'points-only'
+}
+
+// 切换到路线模式并播放第一条路线
+const handleShowFirstRoute = () => {
+  if (props.routes.length > 0) {
+    handleShowRoutes(props.routes[0].id)
+  }
 }
 
 // 查看点详情
 const handleViewPoint = (point) => {
   emit('viewPoint', point)
-}
-
-// 播放路线动画
-const handlePlayAnimation = (routeId) => {
-  emit('playRouteAnimation', routeId)
 }
 
 // 定位到路线
@@ -88,37 +76,22 @@ onMounted(async () => {
     console.error('加载预设数据失败:', error)
   }
 })
-
-// 视图模式配置
-const viewModes = [
-  { id: 'all', label: '显示全部', icon: '🌏' },
-  { id: 'points-only', label: '仅显示点', icon: '📍' },
-  { id: 'routes-only', label: '仅显示路线', icon: '🛣️' }
-]
 </script>
 
 <template>
   <div class="user-control-panel">
-    <!-- 视图控制 -->
-    <div class="panel-section">
-      <h3>👁️ 视图模式</h3>
-      <div class="view-mode-buttons">
+    <!-- 记录点列表 -->
+    <div class="panel-section" v-show="viewMode === 'points-only'">
+      <div class="section-header">
+        <h3>📍 旅行足迹 ({{ recordPoints.length }})</h3>
         <button
-          v-for="mode in viewModes"
-          :key="mode.id"
-          :class="{ active: viewMode === mode.id }"
-          @click="setViewMode(mode.id)"
-          class="view-mode-btn"
+          v-if="routes.length > 0"
+          @click="handleShowFirstRoute"
+          class="show-routes-btn"
         >
-          <span class="mode-icon">{{ mode.icon }}</span>
-          <span class="mode-label">{{ mode.label }}</span>
+          🛣️ 显示路线
         </button>
       </div>
-    </div>
-
-    <!-- 记录点列表 -->
-    <div class="panel-section" v-show="viewMode !== 'routes-only'">
-      <h3>📍 旅行足迹 ({{ recordPoints.length }})</h3>
       <div v-if="visiblePoints.length > 0" class="point-list">
         <div
           v-for="point in visiblePoints"
@@ -141,17 +114,23 @@ const viewModes = [
           </div>
         </div>
       </div>
-      <p v-else class="empty-text">当前视图模式下无记录点</p>
+      <p v-else class="empty-text">暂无记录点</p>
     </div>
 
     <!-- 路线列表 -->
-    <div class="panel-section" v-show="viewMode !== 'points-only'">
-      <h3>🛣️ 旅行路线 ({{ routes.length }})</h3>
+    <div class="panel-section" v-show="viewMode === 'routes-only'">
+      <div class="section-header">
+        <h3>🛣️ 旅行路线 ({{ routes.length }})</h3>
+        <button @click="handleShowPoints" class="back-btn">
+          📍 返回足迹
+        </button>
+      </div>
       <div v-if="visibleRoutes.length > 0" class="route-list">
         <div
           v-for="route in visibleRoutes"
           :key="route.id"
           class="route-item"
+          @click="handleShowRoutes(route.id)"
         >
           <div class="route-info">
             <span class="route-name">{{ route.name || route.title || '未命名路线' }}</span>
@@ -159,50 +138,14 @@ const viewModes = [
             <span class="route-description" v-if="route.description">{{ route.description }}</span>
           </div>
           <div class="route-actions">
-            <button @click.stop="handlePlayAnimation(route.id)" title="播放动画" class="action-btn play-btn">
-              🚗 播放
-            </button>
+            <span class="route-hint">点击播放动画</span>
             <button @click.stop="handleZoomToRoute(route.id)" title="定位" class="action-btn zoom-btn">
-              🎯 定位
+              🎯
             </button>
           </div>
         </div>
       </div>
-      <p v-else class="empty-text">当前视图模式下无路线</p>
-    </div>
-
-    <!-- 自动预览开关 -->
-    <div class="panel-section">
-      <h3>🖼️ 预览设置</h3>
-      <div class="toggle-container">
-        <label class="toggle-label">
-          <input
-            type="checkbox"
-            :checked="autoPreview"
-            @change="toggleAutoPreview"
-            class="toggle-checkbox"
-          />
-          <span class="toggle-slider"></span>
-          <span class="toggle-text">自动预览首图</span>
-        </label>
-        <p class="toggle-hint">开启后，地图上的点将自动显示第一张图片</p>
-      </div>
-    </div>
-
-    <!-- 图层切换 -->
-    <div class="panel-section">
-      <h3>🗺️ 地图图层</h3>
-      <div class="layer-buttons">
-        <button
-          v-for="(layer, index) in layers"
-          :key="index"
-          :class="{ active: currentLayerIndex === index }"
-          @click="emit('switchLayer', index)"
-          class="layer-btn"
-        >
-          {{ layer.name }}
-        </button>
-      </div>
+      <p v-else class="empty-text">暂无路线</p>
     </div>
   </div>
 </template>
@@ -237,46 +180,47 @@ const viewModes = [
   font-weight: 600;
 }
 
-/* 视图模式按钮 */
-.view-mode-buttons {
+/* Section header with button */
+.section-header {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.view-mode-btn {
-  padding: 14px 16px;
-  background: #eff6ff;
-  border: 2px solid #dbeafe;
-  border-radius: 12px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 600;
-  transition: all 0.2s;
-  display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 10px;
-  color: #64748b;
+  margin-bottom: 16px;
 }
 
-.view-mode-btn:hover {
-  border-color: #93c5fd;
-  background: #dbeafe;
+.section-header h3 {
+  margin: 0;
+  font-size: 16px;
+  color: #3b82f6;
+  font-weight: 600;
 }
 
-.view-mode-btn.active {
+.show-routes-btn,
+.back-btn {
+  padding: 8px 14px;
   background: linear-gradient(135deg, #60a5fa, #3b82f6);
-  border-color: #3b82f6;
+  border: none;
+  border-radius: 8px;
   color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
 }
 
-.mode-icon {
-  font-size: 18px;
+.show-routes-btn:hover,
+.back-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
 }
 
-.mode-label {
-  flex: 1;
-  text-align: left;
+.back-btn {
+  background: linear-gradient(135deg, #34d399, #10b981);
+}
+
+.back-btn:hover {
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
 }
 
 /* 记录点列表 */
@@ -284,7 +228,7 @@ const viewModes = [
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-height: 300px;
+  max-height: 400px;
   overflow-y: auto;
 }
 
@@ -359,7 +303,7 @@ const viewModes = [
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-height: 250px;
+  max-height: 350px;
   overflow-y: auto;
 }
 
@@ -368,7 +312,14 @@ const viewModes = [
   border: 2px solid #dbeafe;
   border-radius: 12px;
   padding: 12px;
+  cursor: pointer;
   transition: all 0.2s;
+}
+
+.route-item:hover {
+  border-color: #93c5fd;
+  background: #dbeafe;
+  transform: translateX(4px);
 }
 
 .route-info {
@@ -401,133 +352,40 @@ const viewModes = [
 
 .route-actions {
   display: flex;
+  justify-content: space-between;
+  align-items: center;
   gap: 8px;
 }
 
+.route-hint {
+  font-size: 11px;
+  color: #64748b;
+  font-style: italic;
+}
+
 .action-btn {
-  flex: 1;
-  padding: 8px 12px;
+  padding: 6px 10px;
   background: #fff;
   border: 2px solid #dbeafe;
   border-radius: 8px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   transition: all 0.2s;
   color: #3b82f6;
+  flex-shrink: 0;
 }
 
 .action-btn:hover {
   border-color: #3b82f6;
   background: #eff6ff;
-}
-
-.play-btn:hover {
-  background: linear-gradient(135deg, #60a5fa, #3b82f6);
-  color: #fff;
-  border-color: #3b82f6;
+  transform: scale(1.1);
 }
 
 .zoom-btn:hover {
   background: linear-gradient(135deg, #34d399, #10b981);
   color: #fff;
   border-color: #10b981;
-}
-
-/* 自动预览开关 */
-.toggle-container {
-  background: #eff6ff;
-  border-radius: 12px;
-  padding: 16px;
-}
-
-.toggle-label {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  cursor: pointer;
-  position: relative;
-}
-
-.toggle-checkbox {
-  position: absolute;
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.toggle-slider {
-  position: relative;
-  width: 48px;
-  height: 26px;
-  background: #cbd5e1;
-  border-radius: 13px;
-  transition: all 0.3s;
-  flex-shrink: 0;
-}
-
-.toggle-slider::before {
-  content: '';
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 20px;
-  height: 20px;
-  background: #fff;
-  border-radius: 50%;
-  transition: all 0.3s;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-}
-
-.toggle-checkbox:checked + .toggle-slider {
-  background: linear-gradient(135deg, #60a5fa, #3b82f6);
-}
-
-.toggle-checkbox:checked + .toggle-slider::before {
-  left: 25px;
-}
-
-.toggle-text {
-  font-size: 14px;
-  font-weight: 600;
-  color: #1e40af;
-}
-
-.toggle-hint {
-  margin: 10px 0 0 0;
-  font-size: 11px;
-  color: #64748b;
-  line-height: 1.4;
-  padding-left: 60px;
-}
-
-/* 图层按钮 */
-.layer-buttons {
-  display: grid;
-  gap: 8px;
-}
-
-.layer-btn {
-  padding: 12px;
-  background: #eff6ff;
-  border: 2px solid #dbeafe;
-  border-radius: 12px;
-  color: #64748b;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 600;
-  transition: all 0.2s;
-}
-
-.layer-btn:hover {
-  border-color: #93c5fd;
-  background: #dbeafe;
-}
-
-.layer-btn.active {
-  background: linear-gradient(135deg, #60a5fa, #3b82f6);
-  border-color: #3b82f6;
-  color: #fff;
 }
 
 .empty-text {
