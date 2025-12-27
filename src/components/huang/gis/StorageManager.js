@@ -49,9 +49,6 @@ export function exportToJson(recordPoints, routes, options = {}) {
       description: route.description || '',
       images: includeImages ? (route.images || []) : [],
       length: route.length || '',
-      // 坐标使用 EPSG:3857 格式存储
-      coordinates: route.coordinates || [],
-      // 转折点数据
       points: processedRoutePoints,
       time: route.time || new Date().toLocaleString('zh-CN')
     }
@@ -116,7 +113,6 @@ export function importFromJson(jsonData) {
         description: route.description || '',
         images: route.images || [],
         length: route.length || '',
-        coordinates: route.coordinates || [],
         points: [],
         time: route.time || new Date().toLocaleString('zh-CN'),
         feature: null  // 将由 gis.vue 创建
@@ -191,11 +187,11 @@ function validateJsonData(data) {
   if (data.data.routes) {
     data.data.routes.forEach((route, index) => {
       if (!route.id) throw new Error(`路线 ${index + 1} 缺少 id`)
-      if (!Array.isArray(route.coordinates)) {
-        throw new Error(`路线 ${index + 1} 缺少坐标数组`)
-      }
-      if (route.points && !Array.isArray(route.points)) {
+      if (!route.points || !Array.isArray(route.points)) {
         throw new Error(`路线 ${index + 1} 的 points 必须是数组`)
+      }
+      if (route.points.length < 2) {
+        throw new Error(`路线 ${index + 1} 至少需要2个点`)
       }
     })
   }

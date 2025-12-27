@@ -549,10 +549,11 @@ const finishRoute = () => {
     routeSource.removeFeature(tempRouteFeature.value)
   }
 
-  // 提取坐标和转折点数据
-  const coordinates = tempRoutePoints.value.map(p => p.coordinate)
+  // 提取转折点数据
   const points = tempRoutePoints.value.map(p => p.data)
 
+  // 从 points 计算 EPSG:3857 坐标
+  const coordinates = points.map(p => fromLonLat([p.lon, p.lat]))
   const lineString = new LineString(coordinates)
   const length = getLength(lineString, { projection: 'EPSG:3857' })
 
@@ -577,7 +578,6 @@ const finishRoute = () => {
     description: '',
     images: [],
     length: formatLength(length),
-    coordinates: coordinates,
     points: points,
     feature: feature,
     time: new Date().toLocaleString('zh-CN')
@@ -696,9 +696,9 @@ const playRouteAnimation = (routeId) => {
     map.value.addOverlay(carOverlay.value)
   }
 
-  // 获取路线坐标
-  const coordinates = route.coordinates
-  if (!coordinates || coordinates.length < 2) return
+  // 从 points 计算路线坐标
+  const coordinates = route.points ? route.points.map(p => fromLonLat([p.lon, p.lat])) : []
+  if (coordinates.length < 2) return
 
   // 固定10秒完成整条路线
   const duration = 10000 // 固定10秒
@@ -820,8 +820,9 @@ const handleImportData = (data) => {
 
   // 处理路线数据
   routes.value = (data.routes || []).map(route => {
-    // 创建路线 Feature
-    const lineString = new LineString(route.coordinates)
+    // 从 points 计算 EPSG:3857 坐标
+    const coordinates = route.points ? route.points.map(p => fromLonLat([p.lon, p.lat])) : []
+    const lineString = new LineString(coordinates)
     const feature = new Feature({
       geometry: lineString
     })
