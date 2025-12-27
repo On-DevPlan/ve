@@ -1,0 +1,13 @@
+sha:        65bcdded9c94a4030a6afe5904a3e4245f72b838
+short:      65bcdde
+author:     zlxmii <2096343460@qq.com>
+date:       2025-12-27T17:24:52+08:00
+subject:    添加搜索功能
+
+--- body ---
+
+
+--- files (3) ---
+src/components/huang/gis/ControlPanel.vue
+src/components/huang/gis/LocationSearch.vue
+src/components/huang/gis/gis.vue
