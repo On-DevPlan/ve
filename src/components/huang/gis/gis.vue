@@ -85,7 +85,7 @@ const previewPosition = ref({ x: 0, y: 0 })  // 预览位置
 
 // 地图点悬浮图片预览
 const pointImageOverlay = ref(null)  // 点的图片预览 overlay
-const carImageUrl = '/map/right.gif'  // 小车图片（只用一张）
+const carImageUrl = '/map/img.png'  // 小车图片（只用一张）
 
 // 计算临时路线点数量（传递给 ControlPanel）
 const tempRoutePointsCount = computed(() => tempRoutePoints.value.length)
@@ -862,7 +862,7 @@ onUnmounted(() => {
       :temp-route-points-count="tempRoutePointsCount"
       @switch-layer="switchLayer"
       @start-draw-route="startDrawRoute"
-      @routefinish-="finishRoute"
+      @finish-route="finishRoute"
       @cancel-draw-route="cancelDrawRoute"
       @play-route-animation="playRouteAnimation"
       @zoom-to-route="zoomToRoute"
