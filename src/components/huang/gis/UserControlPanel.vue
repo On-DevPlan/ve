@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { getPresetData } from './StorageManager.js'
 
 const props = defineProps({
@@ -22,41 +22,29 @@ const emit = defineEmits([
   'loadPresetData'
 ])
 
-// 视图模式: 'points-only' | 'routes-only'
-const viewMode = ref('points-only')
+// 展开状态
+const expandedRoutes = ref(new Set())
 
-// 计算可见的点和路线
-const visiblePoints = computed(() => {
-  if (viewMode.value === 'routes-only') return []
-  return props.recordPoints
-})
-
-const visibleRoutes = computed(() => {
-  if (viewMode.value === 'points-only') return []
-  return props.routes
-})
-
-// 切换到路线模式并播放动画
-const handleShowRoutes = (routeId) => {
-  viewMode.value = 'routes-only'
-  emit('playRouteAnimation', routeId)
-}
-
-// 切换到点模式
-const handleShowPoints = () => {
-  viewMode.value = 'points-only'
-}
-
-// 切换到路线模式并播放第一条路线
-const handleShowFirstRoute = () => {
-  if (props.routes.length > 0) {
-    handleShowRoutes(props.routes[0].id)
+// 切换展开/收起
+const toggleRoute = (routeId) => {
+  if (expandedRoutes.value.has(routeId)) {
+    expandedRoutes.value.delete(routeId)
+  } else {
+    expandedRoutes.value.add(routeId)
   }
 }
+
+// 判断是否展开
+const isExpanded = (routeId) => expandedRoutes.value.has(routeId)
 
 // 查看点详情
 const handleViewPoint = (point) => {
   emit('viewPoint', point)
+}
+
+// 播放路线动画
+const handlePlayAnimation = (routeId) => {
+  emit('playRouteAnimation', routeId)
 }
 
 // 定位到路线
@@ -64,13 +52,17 @@ const handleZoomToRoute = (routeId) => {
   emit('zoomToRoute', routeId)
 }
 
-// 组件挂载时自动加载预设数据
+// 组件挂载时自动加载预设数据并展开第一条路线
 onMounted(async () => {
   try {
     const presetData = await getPresetData()
     if (presetData.data) {
       // 通过父组件加载数据
       emit('loadPresetData', presetData)
+      // 自动展开第一条路线
+      if (props.routes.length > 0) {
+        expandedRoutes.value.add(props.routes[0].id)
+      }
     }
   } catch (error) {
     console.error('加载预设数据失败:', error)
@@ -80,72 +72,63 @@ onMounted(async () => {
 
 <template>
   <div class="user-control-panel">
-    <!-- 记录点列表 -->
-    <div class="panel-section" v-show="viewMode === 'points-only'">
-      <div class="section-header">
-        <h3>📍 旅行足迹 ({{ recordPoints.length }})</h3>
-        <button
-          v-if="routes.length > 0"
-          @click="handleShowFirstRoute"
-          class="show-routes-btn"
-        >
-          🛣️ 显示路线
-        </button>
-      </div>
-      <div v-if="visiblePoints.length > 0" class="point-list">
-        <div
-          v-for="point in visiblePoints"
-          :key="point.id"
-          class="point-item"
-          @click="handleViewPoint(point)"
-        >
-          <div class="point-header">
-            <span class="point-title">{{ point.title || '未命名地点' }}</span>
-            <span class="point-time">{{ point.time }}</span>
-          </div>
-          <div class="point-location">
-            <span class="coord">{{ point.lat.toFixed(4) }}°N, {{ point.lon.toFixed(4) }}°E</span>
-          </div>
-          <div class="point-description" v-if="point.description">
-            {{ point.description }}
-          </div>
-          <div class="point-images" v-if="point.images && point.images.length > 0">
-            <span class="image-count">🖼️ {{ point.images.length }} 张图片</span>
-          </div>
-        </div>
-      </div>
-      <p v-else class="empty-text">暂无记录点</p>
-    </div>
+    <!-- 演唱会巡演路线 -->
+    <div class="panel-section">
+      <h3>🎵 2025年宇宙无敌号演唱会</h3>
 
-    <!-- 路线列表 -->
-    <div class="panel-section" v-show="viewMode === 'routes-only'">
-      <div class="section-header">
-        <h3>🛣️ 旅行路线 ({{ routes.length }})</h3>
-        <button @click="handleShowPoints" class="back-btn">
-          📍 返回足迹
-        </button>
-      </div>
-      <div v-if="visibleRoutes.length > 0" class="route-list">
+      <div v-if="routes.length > 0" class="route-detail">
         <div
-          v-for="route in visibleRoutes"
+          v-for="route in routes"
           :key="route.id"
-          class="route-item"
-          @click="handleShowRoutes(route.id)"
+          class="concert-route"
         >
-          <div class="route-info">
-            <span class="route-name">{{ route.name || route.title || '未命名路线' }}</span>
-            <span class="route-length">{{ route.length }}</span>
-            <span class="route-description" v-if="route.description">{{ route.description }}</span>
+          <div class="route-header">
+            <span class="route-title">{{ route.name || route.title }}</span>
+            <span class="route-length">📏 {{ route.length }}</span>
           </div>
+
+          <p v-if="route.description" class="route-description">{{ route.description }}</p>
+
+          <!-- 城市站点列表 -->
+          <div v-if="route.points && route.points.length > 0" class="city-stations">
+            <h4>🎤 演出站点 ({{ route.points.length }})</h4>
+            <div class="stations-list">
+              <div
+                v-for="(point, index) in route.points"
+                :key="point.id"
+                class="station-item"
+                @click="handleViewPoint(point)"
+              >
+                <div class="station-number">{{ index + 1 }}</div>
+                <div class="station-info">
+                  <div class="station-name">{{ point.title || '未命名站点' }}</div>
+                  <div class="station-coord">
+                    {{ point.lat.toFixed(2) }}°N, {{ point.lon.toFixed(2) }}°E
+                  </div>
+                  <div v-if="point.description" class="station-desc">
+                    {{ point.description }}
+                  </div>
+                  <div v-if="point.images && point.images.length > 0" class="station-images">
+                    📷 {{ point.images.length }} 张照片
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 操作按钮 -->
           <div class="route-actions">
-            <span class="route-hint">点击播放动画</span>
-            <button @click.stop="handleZoomToRoute(route.id)" title="定位" class="action-btn zoom-btn">
-              🎯
+            <button @click="handlePlayAnimation(route.id)" class="action-btn play-btn">
+              🚀 播放巡演路线
+            </button>
+            <button @click="handleZoomToRoute(route.id)" class="action-btn zoom-btn">
+              🎯 定位路线
             </button>
           </div>
         </div>
       </div>
-      <p v-else class="empty-text">暂无路线</p>
+
+      <p v-else class="empty-text">暂无演唱会路线</p>
     </div>
   </div>
 </template>
@@ -153,11 +136,12 @@ onMounted(async () => {
 <style scoped>
 .user-control-panel {
   width: 320px;
-  background: #fff;
+  background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
   padding: 20px;
   overflow-y: auto;
-  border-right: 2px solid #dbeafe;
+  border-right: 2px solid #e94560;
   height: 100%;
+  color: #fff;
 }
 
 .user-control-panel::-webkit-scrollbar {
@@ -165,7 +149,7 @@ onMounted(async () => {
 }
 
 .user-control-panel::-webkit-scrollbar-thumb {
-  background: #bfdbfe;
+  background: #e94560;
   border-radius: 3px;
 }
 
@@ -174,224 +158,192 @@ onMounted(async () => {
 }
 
 .panel-section h3 {
-  margin: 0 0 16px 0;
-  font-size: 16px;
-  color: #3b82f6;
+  margin: 0 0 20px 0;
+  font-size: 18px;
+  color: #e94560;
   font-weight: 600;
+  text-shadow: 0 0 10px rgba(233, 69, 96, 0.5);
 }
 
-/* Section header with button */
-.section-header {
+/* 演唱会路线卡片 */
+.route-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.concert-route {
+  background: rgba(233, 69, 96, 0.1);
+  border: 2px solid #e94560;
+  border-radius: 16px;
+  padding: 16px;
+  backdrop-filter: blur(10px);
+}
+
+.route-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
-.section-header h3 {
-  margin: 0;
+.route-title {
   font-size: 16px;
-  color: #3b82f6;
-  font-weight: 600;
-}
-
-.show-routes-btn,
-.back-btn {
-  padding: 8px 14px;
-  background: linear-gradient(135deg, #60a5fa, #3b82f6);
-  border: none;
-  border-radius: 8px;
+  font-weight: 700;
   color: #fff;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  white-space: nowrap;
-}
-
-.show-routes-btn:hover,
-.back-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
-}
-
-.back-btn {
-  background: linear-gradient(135deg, #34d399, #10b981);
-}
-
-.back-btn:hover {
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
-}
-
-/* 记录点列表 */
-.point-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  max-height: 400px;
-  overflow-y: auto;
-}
-
-.point-item {
-  background: #eff6ff;
-  border: 2px solid #dbeafe;
-  border-radius: 12px;
-  padding: 12px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.point-item:hover {
-  border-color: #93c5fd;
-  background: #dbeafe;
-  transform: translateX(4px);
-}
-
-.point-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 6px;
-}
-
-.point-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #1e40af;
-}
-
-.point-time {
-  font-size: 11px;
-  color: #94a3b8;
-}
-
-.point-location {
-  margin-bottom: 6px;
-}
-
-.coord {
-  font-size: 11px;
-  color: #64748b;
-  font-family: 'SF Mono', Consolas, monospace;
-}
-
-.point-description {
-  font-size: 12px;
-  color: #475569;
-  margin-top: 6px;
-  line-height: 1.4;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.point-images {
-  margin-top: 8px;
-}
-
-.image-count {
-  font-size: 11px;
-  color: #3b82f6;
-  background: #dbeafe;
-  padding: 4px 8px;
-  border-radius: 6px;
-}
-
-/* 路线列表 */
-.route-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  max-height: 350px;
-  overflow-y: auto;
-}
-
-.route-item {
-  background: #eff6ff;
-  border: 2px solid #dbeafe;
-  border-radius: 12px;
-  padding: 12px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.route-item:hover {
-  border-color: #93c5fd;
-  background: #dbeafe;
-  transform: translateX(4px);
-}
-
-.route-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-bottom: 10px;
-}
-
-.route-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: #1e40af;
+  text-shadow: 0 0 10px rgba(233, 69, 96, 0.5);
 }
 
 .route-length {
   font-size: 12px;
-  color: #64748b;
+  color: #e94560;
+  background: rgba(233, 69, 96, 0.2);
+  padding: 4px 10px;
+  border-radius: 20px;
 }
 
 .route-description {
-  font-size: 11px;
-  color: #94a3b8;
-  margin-top: 4px;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  font-size: 13px;
+  color: #b8c1ec;
+  margin: 8px 0 16px 0;
+  line-height: 1.5;
 }
 
+/* 城市站点列表 */
+.city-stations {
+  margin-bottom: 16px;
+}
+
+.city-stations h4 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  color: #e94560;
+  font-weight: 600;
+}
+
+.stations-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.stations-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.stations-list::-webkit-scrollbar-thumb {
+  background: #e94560;
+  border-radius: 2px;
+}
+
+.station-item {
+  display: flex;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(233, 69, 96, 0.3);
+  border-radius: 12px;
+  padding: 12px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.station-item:hover {
+  background: rgba(233, 69, 96, 0.2);
+  border-color: #e94560;
+  transform: translateX(4px);
+  box-shadow: 0 4px 12px rgba(233, 69, 96, 0.3);
+}
+
+.station-number {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  background: linear-gradient(135deg, #e94560, #ff6b6b);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.station-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.station-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.station-coord {
+  font-size: 11px;
+  color: #b8c1ec;
+  font-family: 'SF Mono', Consolas, monospace;
+}
+
+.station-desc {
+  font-size: 12px;
+  color: #b8c1ec;
+  line-height: 1.4;
+}
+
+.station-images {
+  font-size: 11px;
+  color: #e94560;
+  background: rgba(233, 69, 96, 0.2);
+  padding: 3px 8px;
+  border-radius: 6px;
+  align-self: flex-start;
+}
+
+/* 路线操作按钮 */
 .route-actions {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
   gap: 8px;
 }
 
-.route-hint {
-  font-size: 11px;
-  color: #64748b;
-  font-style: italic;
-}
-
 .action-btn {
-  padding: 6px 10px;
-  background: #fff;
-  border: 2px solid #dbeafe;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 14px;
+  flex: 1;
+  padding: 12px 16px;
+  border: 2px solid #e94560;
+  border-radius: 10px;
+  font-size: 13px;
   font-weight: 600;
-  transition: all 0.2s;
-  color: #3b82f6;
-  flex-shrink: 0;
+  cursor: pointer;
+  transition: all 0.3s;
+  color: #fff;
+  background: rgba(233, 69, 96, 0.2);
 }
 
 .action-btn:hover {
-  border-color: #3b82f6;
-  background: #eff6ff;
-  transform: scale(1.1);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(233, 69, 96, 0.4);
+}
+
+.play-btn:hover {
+  background: linear-gradient(135deg, #e94560, #ff6b6b);
+  border-color: #ff6b6b;
 }
 
 .zoom-btn:hover {
-  background: linear-gradient(135deg, #34d399, #10b981);
-  color: #fff;
-  border-color: #10b981;
+  background: linear-gradient(135deg, #0f3460, #16213e);
+  border-color: #0f3460;
 }
 
 .empty-text {
   text-align: center;
-  color: #cbd5e1;
+  color: #b8c1ec;
   font-size: 13px;
-  padding: 20px 0;
+  padding: 40px 20px;
+  font-style: italic;
 }
 </style>
