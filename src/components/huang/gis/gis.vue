@@ -20,6 +20,7 @@ import { getLength } from 'ol/sphere'
 import Overlay from 'ol/Overlay'
 import Select from 'ol/interaction/Select'
 import PointEditor from './PointEditor.vue'
+import PointDetail from './PointDetail.vue'
 import ControlPanel from './ControlPanel.vue'
 import UserControlPanel from './UserControlPanel.vue'
 import { getPresetData, importFromJson } from './StorageManager.js'
@@ -74,7 +75,9 @@ const tempRouteFeature = ref(null)
 
 // 编辑器状态
 const showEditor = ref(false)
+const showPointDetail = ref(false)  // 用户详情弹窗
 const editingPoint = ref(null)
+const viewingPoint = ref(null)      // 正在查看的点
 const editorMode = ref('create') // 'create' | 'edit' | 'view' | 'route' | 'route-point'
 const editingRoute = ref(null)
 const editingRoutePointIndex = ref(null)  // 正在编辑的路线转折点索引
@@ -280,8 +283,8 @@ const handleClick = (event) => {
       let targetRoute = null
       let pointIndex = props.routePointIndex
 
-      // 检查是否是正在绘制的临时路线
-      if (isDrawingRoute.value) {
+      // 检查是否是正在绘制的临时路线（仅管理模式）
+      if (isDrawingRoute.value && panelMode.value === 'admin') {
         editingPoint.value = { ...tempRoutePoints.value[pointIndex].data }
         editingRoutePointIndex.value = pointIndex
         editorMode.value = 'route-point'
@@ -296,11 +299,18 @@ const handleClick = (event) => {
         }
 
         if (targetRoute) {
-          editingRoute.value = targetRoute
-          editingPoint.value = { ...targetRoute.points[pointIndex] }
-          editingRoutePointIndex.value = pointIndex
-          editorMode.value = 'route-point'
-          showEditor.value = true
+          const routePoint = targetRoute.points[pointIndex]
+          if (panelMode.value === 'user') {
+            // 用户模式：显示详情弹窗
+            handleViewPoint(routePoint)
+          } else {
+            // 管理模式：打开编辑器
+            editingRoute.value = targetRoute
+            editingPoint.value = { ...routePoint }
+            editingRoutePointIndex.value = pointIndex
+            editorMode.value = 'route-point'
+            showEditor.value = true
+          }
         }
       }
       return
@@ -310,9 +320,8 @@ const handleClick = (event) => {
     if (feature.getId()) {
       const point = recordPoints.value.find(p => p.id === feature.getId())
       if (point) {
-        editingPoint.value = { ...point }
-        editorMode.value = 'view'
-        showEditor.value = true
+        // 根据面板模式决定操作
+        handleViewPoint(point)
         return
       }
     }
@@ -1060,9 +1069,16 @@ const createPersistentImageOverlay = (pointId, coordinate, imageUrl) => {
 
 // 查看点详情（用户面板）
 const handleViewPoint = (point) => {
-  editingPoint.value = { ...point }
-  editorMode.value = 'view'
-  showEditor.value = true
+  if (panelMode.value === 'user') {
+    // 用户模式：显示详情弹窗
+    viewingPoint.value = { ...point }
+    showPointDetail.value = true
+  } else {
+    // 管理模式：显示编辑器
+    editingPoint.value = { ...point }
+    editorMode.value = 'view'
+    showEditor.value = true
+  }
 }
 
 // 切换面板模式（开发调试用）
@@ -1184,6 +1200,14 @@ onUnmounted(() => {
       @close="showEditor = false"
       @save="handleSavePoint"
       @preview="handleImagePreview"
+    />
+
+    <!-- 用户详情弹窗 -->
+    <PointDetail
+      :show="showPointDetail"
+      :point="viewingPoint"
+      @close="showPointDetail = false"
+      @view-image="handleImagePreview"
     />
 
     <!-- 图片预览 -->
