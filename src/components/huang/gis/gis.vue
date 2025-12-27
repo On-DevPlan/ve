@@ -169,6 +169,49 @@ const flyToPoint = (point) => {
   })
 }
 
+// 搜索地点处理
+const handleSearchLocation = (place) => {
+  if (!map.value) return
+  // 飞到搜索到的地点
+  const view = map.value.getView()
+  view.animate({
+    center: fromLonLat([place.lon, place.lat]),
+    zoom: 15,
+    duration: 1000
+  })
+
+  // 可以在此添加临时标记点
+  const searchMarker = new Feature({
+    geometry: new Point(fromLonLat([place.lon, place.lat])),
+    name: place.name,
+    address: place.address,
+    isSearchMarker: true
+  })
+
+  // 创建搜索标记样式（特殊颜色）
+  searchMarker.setStyle(new Style({
+    image: new Circle({
+      radius: 14,
+      fill: new Fill({ color: '#f59e0b' }),
+      stroke: new Stroke({ color: '#fff', width: 3 })
+    }),
+    text: new Text({
+      text: place.name,
+      offsetY: -20,
+      fill: new Fill({ color: '#f59e0b' }),
+      stroke: new Stroke({ color: '#fff', width: 3 }),
+      font: 'bold 14px sans-serif'
+    })
+  }))
+
+  vectorSource.addFeature(searchMarker)
+
+  // 5秒后移除搜索标记
+  setTimeout(() => {
+    vectorSource.removeFeature(searchMarker)
+  }, 5000)
+}
+
 // 点击地图处理
 const handleClick = (event) => {
   const coords = event.coordinate
@@ -871,6 +914,7 @@ onUnmounted(() => {
       @delete-point="handleDeletePoint"
       @select-point="flyToPoint"
       @preview-image="handleImagePreview"
+      @search-location="handleSearchLocation"
     />
 
     <!-- 地图容器 -->

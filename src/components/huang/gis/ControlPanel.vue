@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import PointList from './PointList.vue'
+import LocationSearch from './LocationSearch.vue'
 
 const props = defineProps({
   // 记录点数据
@@ -46,8 +47,14 @@ const emit = defineEmits([
   'editPoint',
   'deletePoint',
   'selectPoint',
-  'previewImage'
+  'previewImage',
+  'searchLocation'
 ])
+
+// 搜索地点
+const handleSearchLocation = (place) => {
+  emit('searchLocation', place)
+}
 
 // 编辑点
 const handleEditPoint = (point) => {
@@ -72,6 +79,12 @@ const handlePreviewImage = (imageUrl, event) => {
 
 <template>
   <div class="control-panel">
+    <!-- 地点搜索 -->
+    <div class="panel-section">
+      <h3>🔍 搜索地点</h3>
+      <LocationSearch @select="handleSearchLocation" />
+    </div>
+
     <!-- 记录点列表 -->
     <PointList
       :points="recordPoints"
