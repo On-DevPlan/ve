@@ -9,6 +9,8 @@
 - [组件架构总览](#组件架构总览)
 - [gis.vue - 地图核心](#gisvue---地图核心组件)
 - [ControlPanel.vue - 控制面板](#controlpanelvue---控制面板组件)
+- [LocationSearch.vue - 地点搜索](#locationsearchvue---地点搜索组件)
+- [StorageManager.js - 存储管理](#storagemanagerjs---存储管理器)
 - [PointEditor.vue - 编辑器](#pointeditorvue---编辑器对话框)
 - [PointList.vue - 列表组件](#pointlistvue---记录列表组件)
 - [小车动画算法](#小车动画核心算法)
@@ -27,6 +29,8 @@ gis/
 ├── ControlPanel.vue   # 左侧控制面板（UI 层）
 ├── PointEditor.vue    # 编辑器对话框（表单层）
 ├── PointList.vue      # 记录点列表（展示层）
+├── LocationSearch.vue # 地点搜索组件（高德地图 API）
+├── StorageManager.js  # 数据存储管理器（JSON 导入导出）
 └── README.md          # 本文档
 ```
 
@@ -270,6 +274,83 @@ const playRouteAnimation = (routeId) => {
 - **向右/上/下行驶（dx >= 0）**：直接使用取反后的角度，不翻转
 
 **小车图片路径:** `/public/map/right.gif`
+
+### 5. 数据存储与导入导出 (Storage)
+
+**功能：**
+
+- **导出数据**：将当前记录点和路线导出为 JSON 文件
+- **导入预设**：加载内置的示例数据（北京旅行路线）
+- **导入文件**：从 JSON 文件导入数据
+
+**JSON 数据格式：**
+
+```json
+{
+  "version": "2.0.0",
+  "format": "gis-travel-diary",
+  "title": "旅行日记数据",
+  "description": "导出的旅行记录",
+  "exportedAt": "2025-12-27T10:00:00.000Z",
+  "statistics": {
+    "totalPoints": 5,
+    "totalRoutes": 2,
+    "totalImages": 0
+  },
+  "data": {
+    "points": [
+      {
+        "id": 1234567890,
+        "lon": 116.4074,
+        "lat": 39.9042,
+        "title": "天安门",
+        "description": "北京市中心",
+        "images": ["data:image/jpeg;base64,..."],
+        "time": "2025-12-27 10:00:00"
+      }
+    ],
+    "routes": [
+      {
+        "id": 1234567891,
+        "name": "北京一日游",
+        "title": "北京一日游",
+        "description": "经典路线",
+        "images": [],
+        "length": "5.23 km",
+        "coordinates": [[x1, y1], [x2, y2], ...],
+        "points": [
+          {
+            "id": "route-point-1",
+            "lon": 116.397128,
+            "lat": 39.916527,
+            "title": "起点",
+            "description": "",
+            "images": []
+          }
+        ],
+        "time": "2025-12-27 10:00:00"
+      }
+    ]
+  }
+}
+```
+
+**存储管理器 API：**
+
+| 函数 | 说明 |
+|------|------|
+| `exportToJson(points, routes, options)` | 导出为 JSON 对象 |
+| `downloadJsonFile(jsonData, filename)` | 下载 JSON 文件 |
+| `readJsonFile(file)` | 读取 JSON 文件 |
+| `importFromJson(jsonData)` | 从 JSON 导入数据 |
+| `getPresetData()` | 获取预设示例数据 |
+| `mergeData(existing, imported, options)` | 合并数据 |
+
+**坐标说明：**
+
+- `lon`/`lat`: 经纬度坐标 (EPSG:4326)，用于存储和显示
+- `coordinates`: EPSG:3857 (Web Mercator) 格式，OpenLayers 内部使用
+- 导入时会自动转换坐标系统
 
 ## 编辑器模式 (Editor Modes)
 
@@ -563,12 +644,17 @@ animationRouteSource + animationRouteLayer
 'deletePoint'         // 删除点 (pointId)
 'selectPoint'         // 定位点 (point)
 'previewImage'        // 预览图片 (url, event)
+'searchLocation'      // 搜索地点 (place)
+'importData'          // 导入数据 ({points, routes})
 ```
 
 ### UI 结构
 
 ```
 ┌─────────────────────────────────┐
+│  🔍 搜索地点                    │
+│  [搜索框]                       │
+│                                 │
 │  📝 我的记录 (PointList)        │
 │  ┌───────────────────────────┐  │
 │  │ - 点1                      │  │
@@ -585,8 +671,89 @@ animationRouteSource + animationRouteLayer
 │  🗺️ 地图图层                    │
 │  [OpenStreetMap]                │
 │  [高德地图]                      │
+│                                 │
+│  💾 数据管理                    │
+│  [📤 导出数据]                  │
+│  [📦 加载预设]                  │
+│  [📥 导入文件]                  │
 └─────────────────────────────────┘
 ```
+
+---
+
+## LocationSearch.vue - 地点搜索组件
+
+> **文件路径**: `src/components/huang/gis/LocationSearch.vue`
+
+**职责**: 使用高德地图 API 搜索地点
+
+- 输入关键词搜索地点
+- 显示搜索结果（名称、地址、类型）
+- 500ms 防抖优化
+- 发出 `select` 事件
+
+### Props
+
+```javascript
+{
+  show: Boolean,      // 是否显示
+  placeholder: String, // 占位符
+  minLength: Number   // 最小输入长度（默认2）
+}
+```
+
+### Events
+
+```javascript
+'select'  // 选择地点 (place)
+```
+
+### Place 数据结构
+
+```javascript
+{
+  id: string,          // 地点ID
+  name: string,        // 名称
+  address: string,     // 地址
+  lon: number,         // 经度
+  lat: number,         // 纬度
+  type: string         // 类型
+}
+```
+
+### API Key
+
+高德地图 API Key 已内置：`973b435c91011c1b33b8c633c6c9eb56`
+
+---
+
+## StorageManager.js - 存储管理器
+
+> **文件路径**: `src/components/huang/gis/StorageManager.js`
+
+**职责**: JSON 数据的导出、导入和验证
+
+### 导出函数
+
+| 函数 | 说明 |
+|------|------|
+| `exportToJson(points, routes, options)` | 导出为 JSON 对象 |
+| `downloadJsonFile(jsonData, filename)` | 下载 JSON 文件 |
+
+### 导入函数
+
+| 函数 | 说明 |
+|------|------|
+| `readJsonFile(file)` | 读取 JSON 文件 |
+| `importFromJson(jsonData)` | 从 JSON 导入数据 |
+| `getPresetData()` | 获取预设示例数据 |
+| `mergeData(existing, imported, options)` | 合并数据 |
+
+### 验证函数
+
+| 函数 | 说明 |
+|------|------|
+| `validateJsonData(data)` | 验证 JSON 数据格式 |
 
 ---
 

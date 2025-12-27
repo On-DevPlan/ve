@@ -837,6 +837,78 @@ const playRouteAnimation = (routeId) => {
   animate()
 }
 
+// 导入数据处理
+const handleImportData = (data) => {
+  // 清除现有数据
+  vectorSource.clear()
+  routeSource.clear()
+
+  // 更新记录点
+  recordPoints.value = data.points || []
+
+  // 刷新地图上的点
+  refreshMapPoints()
+
+  // 处理路线数据
+  routes.value = (data.routes || []).map(route => {
+    // 创建路线 Feature
+    const lineString = new LineString(route.coordinates)
+    const feature = new Feature({
+      geometry: lineString
+    })
+
+    feature.setStyle(new Style({
+      stroke: new Stroke({
+        color: '#ec4899',
+        width: 5
+      }),
+      text: new Text({
+        text: route.name || route.title || '',
+        offsetY: -15,
+        fill: new Fill({ color: '#ec4899' }),
+        stroke: new Stroke({ color: '#fff', width: 3 }),
+        font: 'bold 14px sans-serif'
+      })
+    }))
+
+    routeSource.addFeature(feature)
+
+    // 返回路线对象（包含 feature 引用）
+    return {
+      ...route,
+      feature: feature
+    }
+  })
+
+  // 如果有路线转折点，也添加到地图上
+  routes.value.forEach(route => {
+    if (route.points) {
+      route.points.forEach((point, index) => {
+        const pointFeature = new Feature({
+          geometry: new Point(fromLonLat([point.lon, point.lat])),
+          ...point,
+          isRoutePoint: true,
+          routePointIndex: index
+        })
+        pointFeature.setId(point.id)
+        pointFeature.setStyle(new Style({
+          image: new Circle({
+            radius: 8,
+            fill: new Fill({ color: '#f472b6' }),
+            stroke: new Stroke({ color: '#fff', width: 2 })
+          })
+        }))
+        vectorSource.addFeature(pointFeature)
+      })
+    }
+  })
+
+  // 提示用户
+  const pointsCount = recordPoints.value.length
+  const routesCount = routes.value.length
+  alert(`导入成功！\n\n记录点: ${pointsCount} 个\n路线: ${routesCount} 条`)
+}
+
 // 初始化地图
 onMounted(() => {
   const tileLayers = layers.value.map(layer => {
@@ -915,6 +987,7 @@ onUnmounted(() => {
       @select-point="flyToPoint"
       @preview-image="handleImagePreview"
       @search-location="handleSearchLocation"
+      @import-data="handleImportData"
     />
 
     <!-- 地图容器 -->
