@@ -34,7 +34,7 @@ const vectorLayer = new VectorLayer({
   style: new Style({
     image: new Circle({
       radius: 10,
-      fill: new Fill({ color: '#ec4899' }),
+      fill: new Fill({ color: '#4da4ff' }),
       stroke: new Stroke({ color: '#fff', width: 3 })
     })
   })
@@ -46,7 +46,7 @@ const routeLayer = new VectorLayer({
   source: routeSource,
   style: new Style({
     stroke: new Stroke({
-      color: '#f472b6',
+      color: '#77a4ff',
       width: 4,
       lineDash: [10, 5]
     })
@@ -84,7 +84,7 @@ const animationRouteLayer = new VectorLayer({
   source: animationRouteSource,
   style: new Style({
     stroke: new Stroke({
-      color: '#ec4899',
+      color: '#4da4ff',
       width: 6
     })
   }),
@@ -401,7 +401,7 @@ const playRouteAnimation = (routeId) => {
 
       animatedRouteFeature.setStyle(new Style({
         stroke: new Stroke({
-          color: '#ec4899',
+          color: '#4da4ff',
           width: 6
         })
       }))
@@ -422,7 +422,7 @@ const playRouteAnimation = (routeId) => {
           // 恢复原始路线的实线样式
           route.feature.setStyle(new Style({
             stroke: new Stroke({
-              color: '#ec4899',
+              color: '#4da4ff',
               width: 5
             })
           }))
@@ -456,13 +456,13 @@ const handleImportData = (data) => {
 
     feature.setStyle(new Style({
       stroke: new Stroke({
-        color: '#ec4899',
+        color: '#4da4ff',
         width: 5
       }),
       text: new Text({
         text: route.name || route.title || '',
         offsetY: -15,
-        fill: new Fill({ color: '#ec4899' }),
+        fill: new Fill({ color: '#4da4ff' }),
         stroke: new Stroke({ color: '#fff', width: 3 }),
         font: 'bold 14px sans-serif'
       })
@@ -526,13 +526,13 @@ const getPointStyle = (feature, isHovered) => {
   return new Style({
     image: new Circle({
       radius: radius,
-      fill: new Fill({ color: '#ec4899' }),
+      fill: new Fill({ color: '#4da4ff' }),
       stroke: new Stroke({ color: '#fff', width: strokeWidth })
     }),
     text: new Text({
       text: point.title || '',
       offsetY: -(radius + 8),
-      fill: new Fill({ color: '#ec4899' }),
+      fill: new Fill({ color: '#4da4ff' }),
       stroke: new Stroke({ color: '#fff', width: 3 }),
       font: 'bold 13px sans-serif'
     })
@@ -544,7 +544,7 @@ const getRoutePointStyle = () => {
   return new Style({
     image: new Circle({
       radius: 8,
-      fill: new Fill({ color: '#f472b6' }),
+      fill: new Fill({ color: '#77a4ff' }),
       stroke: new Stroke({ color: '#fff', width: 2 })
     })
   })
@@ -556,13 +556,13 @@ const getRoutePointHoverStyle = (feature) => {
   return new Style({
     image: new Circle({
       radius: 12,
-      fill: new Fill({ color: '#f472b6' }),
+      fill: new Fill({ color: '#77a4ff' }),
       stroke: new Stroke({ color: '#fff', width: 3 })
     }),
     text: new Text({
       text: props.title || '',
       offsetY: -18,
-      fill: new Fill({ color: '#f472b6' }),
+      fill: new Fill({ color: '#77a4ff' }),
       stroke: new Stroke({ color: '#fff', width: 3 }),
       font: 'bold 12px sans-serif'
     })
@@ -667,14 +667,15 @@ onUnmounted(() => {
 .gis-user-container {
   display: flex;
   height: 100vh;
-  background: #fdf2f8;
+  background: #f0f4ff;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
 .map-wrapper {
   flex: 1;
   position: relative;
-  background: #fdf2f8;
+  background: #f0f4ff;
+  border-left: 2px solid #4da4ff;
 }
 
 .map-container {
@@ -687,12 +688,12 @@ onUnmounted(() => {
 }
 
 .map-container :deep(.ol-control button) {
-  color: #ec4899;
+  color: #4da4ff;
 }
 
 .map-container :deep(.ol-scale-line) {
   background: rgba(255, 255, 255, 0.9);
-  border: 1px solid #fce7f3;
+  border: 1px solid #dbeafe;
 }
 
 .map-container :deep(.ol-scale-line-text) {
