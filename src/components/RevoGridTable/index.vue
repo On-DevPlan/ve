@@ -32,7 +32,6 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import '@revolist/revogrid/revogrid.css'
 
 // 生成示例数据
 const generateData = (count) => {
@@ -247,12 +246,26 @@ onMounted(() => {
 :deep(revo-grid) {
   height: 100%;
   font-size: 13px;
+  --rg-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --rg-header-color: #f7f7f5;
+  --rg-header-text-color: #787774;
+  --rg-border-color: #e8e8e8;
+  --rg-hover-color: #f7f7f5;
+  --rg-focus-border: #2383e2;
+}
+
+:deep(.rgRoot) {
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  overflow: hidden;
 }
 
 :deep(.rgHeaderCell) {
   background: #f7f7f5 !important;
   color: #787774 !important;
   font-weight: 500;
+  border-right: 1px solid #e8e8e8;
+  border-bottom: 1px solid #e8e8e8;
 }
 
 :deep(.rgRow) {
@@ -265,6 +278,7 @@ onMounted(() => {
 
 :deep(.rgCell) {
   padding: 0 8px;
+  border-right: 1px solid #f0f0f0;
 }
 
 :deep(.rgCell:focus) {
@@ -274,5 +288,9 @@ onMounted(() => {
 
 :deep(.rgSelection) {
   background: rgba(35, 131, 226, 0.1) !important;
+}
+
+:deep(.rgViewport) {
+  background: #ffffff;
 }
 </style>

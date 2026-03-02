@@ -1,16 +1,16 @@
 export default {
   name: 'JspreadsheetTable',
-  title: 'Jspreadsheet 表格',
+  title: 'Excel 电子表格',
   description: 'Excel 风格的电子表格，支持公式、合并单元格、复制粘贴',
-  version: '1.0.0',
+  version: '2.0.0',
   group: 'DataTable',
   category: 'Spreadsheet',
-  tags: ['spreadsheet', 'excel', 'formula', 'jspreadsheet'],
+  tags: ['spreadsheet', 'excel', 'formula', 'cell-editor'],
   component: './index.vue',
   route: {
     path: '/jspreadsheet',
-    meta: { title: 'Jspreadsheet 表格', icon: '📊' }
+    meta: { title: 'Excel 表格', icon: '📊' }
   },
   fullscreen: true,
-  dependencies: ['jspreadsheet-ce', 'jexcel']
+  dependencies: []
 }
