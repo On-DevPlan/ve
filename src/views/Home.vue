@@ -568,7 +568,7 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px 30px;
+  padding: 12px 30px;
   background: #ffffff;
   border-bottom: 1px solid #e8e8e8;
 }
@@ -576,35 +576,35 @@ onMounted(() => {
 .header-left {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
 }
 
 .logo {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .logo-icon {
-  font-size: 40px;
+  font-size: 28px;
 }
 
 .logo-text h1 {
   margin: 0;
-  font-size: 24px;
+  font-size: 18px;
   font-weight: 700;
   color: #1a1a1a;
 }
 
 .tagline {
   margin: 0;
-  font-size: 13px;
-  color: #666;
+  font-size: 12px;
+  color: #888;
 }
 
 .header-stats {
   display: flex;
-  gap: 24px;
+  gap: 20px;
 }
 
 .header-stat {
@@ -613,19 +613,19 @@ onMounted(() => {
 
 .stat-number {
   display: block;
-  font-size: 24px;
+  font-size: 18px;
   font-weight: 700;
   color: #2383e2;
 }
 
 .stat-label {
-  font-size: 12px;
+  font-size: 11px;
   color: #666;
 }
 
 /* 筛选区域 */
 .filters-section {
-  padding: 16px 30px;
+  padding: 12px 30px;
   background: #ffffff;
   border-bottom: 1px solid #e8e8e8;
 }
@@ -634,7 +634,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 16px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .search-box {
@@ -752,7 +752,7 @@ onMounted(() => {
 .main-content {
   display: flex;
   gap: 20px;
-  padding: 20px 30px;
+  padding: 12px 30px;
 }
 
 .component-area {
@@ -804,6 +804,7 @@ onMounted(() => {
 .component-grid {
   display: grid;
   gap: 20px;
+  padding: 4px;
 }
 
 .view-grid {
@@ -982,6 +983,7 @@ onMounted(() => {
 /* 侧边栏 */
 .sidebar {
   width: 280px;
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -1247,5 +1249,23 @@ onMounted(() => {
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+}
+
+/* 自定义滚动条样式 */
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #aaa;
 }
 </style>
