@@ -1,6 +1,6 @@
 export default {
   name: 'gis',
-  title: '旅行日记',
+  title: '开发侧-演唱会地图',
   description: '记录你的旅行足迹，支持添加照片、描述，绘制旅行路线',
   version: '2.0.0',
   group: 'Huang',
