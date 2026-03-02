@@ -1,0 +1,12 @@
+sha:        01803c90e46ad47175ffb07382450521b1bed6be
+short:      01803c9
+author:     zhaoliuxue <zhaoliuxue@xiaoduotech.com>
+date:       2026-03-02T13:11:53+08:00
+subject:    fix
+
+--- body ---
+
+
+--- files (2) ---
+src/components/RevoGridTable/component.js
+src/components/RevoGridTable/index.vue
