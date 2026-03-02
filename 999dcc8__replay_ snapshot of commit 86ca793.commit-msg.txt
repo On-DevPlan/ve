@@ -1,0 +1,16 @@
+sha:        999dcc844586231cbf25bafd640278c881bd3c83
+short:      999dcc8
+author:     zhaoliuxue <zhaoliuxue@xiaoduotech.com>
+date:       2026-03-02T13:30:01+08:00
+subject:    replay: snapshot of commit 86ca793
+
+--- body ---
+replay: snapshot of commit 86ca793
+
+original-subject: fix: 上下滚动
+original-author:  zhaoliuxue <zhaoliuxue@xiaoduotech.com>
+original-date:    2026-03-02T13:30:01+08:00
+files:            3
+
+--- files (1) ---
+".commit-msgs/86ca793__fix_ \344\270\212\344\270\213\346\273\232\345\212\250.commit-msg.txt"
