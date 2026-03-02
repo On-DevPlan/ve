@@ -1,16 +1,16 @@
 export default {
   name: 'RevoGridTable',
-  title: 'RevoGrid 高性能表格',
+  title: '高性能虚拟表格',
   description: '虚拟滚动高性能表格，支持百万行数据、Excel导航、自定义单元格',
-  version: '1.0.0',
+  version: '2.0.0',
   group: 'DataTable',
   category: 'Spreadsheet',
-  tags: ['spreadsheet', 'virtual-scroll', 'performance', 'revogrid'],
+  tags: ['virtual-scroll', 'performance', 'large-data', 'excel-nav'],
   component: './index.vue',
   route: {
     path: '/revogrid',
-    meta: { title: 'RevoGrid 表格', icon: '⚡' }
+    meta: { title: '高性能表格', icon: '⚡' }
   },
   fullscreen: true,
-  dependencies: ['@revolist/revogrid']
+  dependencies: []
 }
