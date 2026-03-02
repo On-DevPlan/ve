@@ -1,0 +1,16 @@
+sha:        a8523c8c43ae3fd064a4af11e045ead049533065
+short:      a8523c8
+author:     zhaoliuxue <zhaoliuxue@xiaoduotech.com>
+date:       2026-03-02T13:18:21+08:00
+subject:    replay: snapshot of commit c1a31aa
+
+--- body ---
+replay: snapshot of commit c1a31aa
+
+original-subject: 1
+original-author:  zhaoliuxue <zhaoliuxue@xiaoduotech.com>
+original-date:    2026-03-02T13:18:21+08:00
+files:            1
+
+--- files (1) ---
+.commit-msgs/c1a31aa__1.commit-msg.txt
