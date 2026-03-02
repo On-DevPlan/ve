@@ -1,0 +1,16 @@
+sha:        a85719d74bf4993b0210941176e24bcdbec72b1b
+short:      a85719d
+author:     zhaoliuxue <zhaoliuxue@xiaoduotech.com>
+date:       2026-03-02T12:47:08+08:00
+subject:    replay: snapshot of commit c752149
+
+--- body ---
+replay: snapshot of commit c752149
+
+original-subject: 表单视图
+original-author:  zhaoliuxue <zhaoliuxue@xiaoduotech.com>
+original-date:    2026-03-02T12:47:08+08:00
+files:            9
+
+--- files (1) ---
+".commit-msgs/c752149__\350\241\250\345\215\225\350\247\206\345\233\276.commit-msg.txt"
