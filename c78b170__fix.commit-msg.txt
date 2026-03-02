@@ -1,0 +1,13 @@
+sha:        c78b170f6b3c98a419be5c22b417c639a3605316
+short:      c78b170
+author:     zhaoliuxue <zhaoliuxue@xiaoduotech.com>
+date:       2026-03-02T13:05:35+08:00
+subject:    fix
+
+--- body ---
+
+
+--- files (3) ---
+src/components/JspreadsheetTable/component.js
+src/components/JspreadsheetTable/index.vue
+src/components/RevoGridTable/index.vue
