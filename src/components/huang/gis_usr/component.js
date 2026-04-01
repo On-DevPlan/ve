@@ -6,7 +6,7 @@ export default {
   version: '1.0.0',
 
   // === Grouping & Tags ===
-  group: 'GIS',
+  group: 'Huang',
   category: '旅行日记',
   tags: ['gis', 'map', 'travel', 'concert', '用户展示', '演唱会'],
 
