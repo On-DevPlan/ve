@@ -1,5 +1,5 @@
 {
-  "name": "three_vue",
+  "name": "ve",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -24,6 +24,7 @@
     "ol": "^10.7.0",
     "three": "^0.182.0",
     "vue": "^3.5.24",
+    "vue-excalidraw": "^0.1.0",
     "vue-router": "^4.6.4",
     "vxe-table": "^4.17.49"
   },

@@ -1,50 +1,50 @@
 <script setup>
-import { ref, onMounted, onUnmounted, shallowRef } from 'vue'
-import G6 from '@antv/g6'
+import { ref, onMounted, onUnmounted } from 'vue'
+import { Graph } from '@antv/g6'
 
 // 示例数据 - 人物关系图谱
 const sampleData = {
   nodes: [
-    { id: 'node1', label: '张三', type: 'person', group: '技术部' },
-    { id: 'node2', label: '李四', type: 'person', group: '产品部' },
-    { id: 'node3', label: '王五', type: 'person', group: '设计部' },
-    { id: 'node4', label: '赵六', type: 'person', group: '技术部' },
-    { id: 'node5', label: '前端组', type: 'team', group: '技术部' },
-    { id: 'node6', label: '后端组', type: 'team', group: '技术部' },
-    { id: 'node7', label: '产品组', type: 'team', group: '产品部' },
-    { id: 'node8', label: 'UI设计', type: 'team', group: '设计部' },
-    { id: 'node9', label: '项目经理', type: 'role', group: '管理层' },
-    { id: 'node10', label: '技术总监', type: 'role', group: '管理层' }
+    { id: 'node1', data: { label: '张三', type: 'person', group: '技术部' } },
+    { id: 'node2', data: { label: '李四', type: 'person', group: '产品部' } },
+    { id: 'node3', data: { label: '王五', type: 'person', group: '设计部' } },
+    { id: 'node4', data: { label: '赵六', type: 'person', group: '技术部' } },
+    { id: 'node5', data: { label: '前端组', type: 'team', group: '技术部' } },
+    { id: 'node6', data: { label: '后端组', type: 'team', group: '技术部' } },
+    { id: 'node7', data: { label: '产品组', type: 'team', group: '产品部' } },
+    { id: 'node8', data: { label: 'UI设计', type: 'team', group: '设计部' } },
+    { id: 'node9', data: { label: '项目经理', type: 'role', group: '管理层' } },
+    { id: 'node10', data: { label: '技术总监', type: 'role', group: '管理层' } }
   ],
   edges: [
-    { source: 'node1', target: 'node5', label: '属于' },
-    { source: 'node4', target: 'node5', label: '属于' },
-    { source: 'node2', target: 'node7', label: '属于' },
-    { source: 'node3', target: 'node8', label: '属于' },
-    { source: 'node1', target: 'node2', label: '同事' },
-    { source: 'node1', target: 'node3', label: '协作' },
-    { source: 'node2', target: 'node3', label: '协作' },
-    { source: 'node5', target: 'node6', label: '对接' },
-    { source: 'node5', target: 'node7', label: '协作' },
-    { source: 'node7', target: 'node8', label: '协作' },
-    { source: 'node9', target: 'node2', label: '管理' },
-    { source: 'node9', target: 'node3', label: '管理' },
-    { source: 'node10', target: 'node1', label: '管理' },
-    { source: 'node10', target: 'node4', label: '管理' },
-    { source: 'node9', target: 'node10', label: '汇报' }
+    { source: 'node1', target: 'node5', data: { label: '属于' } },
+    { source: 'node4', target: 'node5', data: { label: '属于' } },
+    { source: 'node2', target: 'node7', data: { label: '属于' } },
+    { source: 'node3', target: 'node8', data: { label: '属于' } },
+    { source: 'node1', target: 'node2', data: { label: '同事' } },
+    { source: 'node1', target: 'node3', data: { label: '协作' } },
+    { source: 'node2', target: 'node3', data: { label: '协作' } },
+    { source: 'node5', target: 'node6', data: { label: '对接' } },
+    { source: 'node5', target: 'node7', data: { label: '协作' } },
+    { source: 'node7', target: 'node8', data: { label: '协作' } },
+    { source: 'node9', target: 'node2', data: { label: '管理' } },
+    { source: 'node9', target: 'node3', data: { label: '管理' } },
+    { source: 'node10', target: 'node1', data: { label: '管理' } },
+    { source: 'node10', target: 'node4', data: { label: '管理' } },
+    { source: 'node9', target: 'node10', data: { label: '汇报' } }
   ]
 }
 
 // 布局类型
 const layoutTypes = [
   { value: 'force', label: '力导布局' },
-  { value: 'circle', label: '环形布局' },
+  { value: 'circular', label: '环形布局' },
   { value: 'dagre', label: '层次布局' }
 ]
 
 const currentLayout = ref('force')
 const graphContainer = ref(null)
-const graph = shallowRef(null)
+const graph = ref(null)
 const selectedNode = ref(null)
 const searchQuery = ref('')
 const filterType = ref('all')
@@ -58,7 +58,7 @@ const nodeColors = {
 }
 
 // 初始化图谱
-function initGraph() {
+async function initGraph() {
   if (!graphContainer.value) return
 
   // 销毁旧图
@@ -66,112 +66,96 @@ function initGraph() {
     graph.value.destroy()
   }
 
-  const width = graphContainer.value.offsetWidth
-  const height = graphContainer.value.offsetHeight
+  const container = graphContainer.value
+  const width = container.offsetWidth
+  const height = container.offsetHeight
 
-  graph.value = new G6.Graph({
-    container: graphContainer.value,
+  // G6 5.x 使用 createGraph
+  graph.value = new Graph({
+    container,
     width,
     height,
-    modes: {
-      default: ['drag-canvas', 'zoom-canvas', 'drag-node']
-    },
+    data: { ...sampleData },
     layout: {
-      type: currentLayout.value,
-      preventOverlap: true,
-      nodeSize: 40,
-      ...(currentLayout.value === 'force' && {
-        forceSimulation: {
-          linkDistance: 150,
-          nodeStrength: -400,
-          edgeStrength: 0.5
-        }
-      })
+      type: currentLayout.value
     },
-    defaultNode: {
-      size: 50,
+    node: {
       style: {
+        size: 40,
         fill: '#fff',
         stroke: '#3b82f6',
-        lineWidth: 2
+        lineWidth: 2,
+        labelText: (d) => d.data?.label || '',
+        labelFill: '#333',
+        labelFontSize: 12
       },
-      labelCfg: {
-        style: {
-          fill: '#333',
-          fontSize: 12
+      state: {
+        hover: {
+          stroke: '#3b82f6',
+          lineWidth: 3
+        },
+        selected: {
+          stroke: '#f59e0b',
+          lineWidth: 3
         }
       }
     },
-    defaultEdge: {
-      size: 1.5,
+    edge: {
       style: {
         stroke: '#ccc',
-        endArrow: {
-          path: G6.Arrow.triangle(6, 8, 0),
-          fill: '#ccc'
-        }
-      },
-      labelCfg: {
-        autoRotate: true,
-        style: {
-          fill: '#666',
-          fontSize: 10
-        }
+        lineWidth: 1.5,
+        endArrow: true
       }
     },
-    nodeStateStyles: {
-      hover: {
-        stroke: '#3b82f6',
-        lineWidth: 3
-      },
-      selected: {
-        stroke: '#f59e0b',
-        lineWidth: 3
-      }
-    },
-    edgeStateStyles: {
-      hover: {
-        stroke: '#3b82f6',
-        lineWidth: 2
-      }
-    }
+    behaviors: ['drag-canvas', 'zoom-canvas', 'drag-node']
   })
 
+  await graph.value.render()
+
   // 绑定事件
-  graph.value.on('node:mouseenter', (e) => {
-    graph.value.setItemState(e.item, 'hover', true)
-    // 高亮邻居
-    highlightNeighbors(e.item)
+  graph.value.on('node:mouseenter', (evt) => {
+    graph.value.setElementState({ [evt.model.id]: ['hover'] })
   })
 
   graph.value.on('node:mouseleave', () => {
-    clearAllStates()
+    graph.value.setElementState({})
   })
 
-  graph.value.on('node:click', (e) => {
-    selectedNode.value = e.item.getModel()
-    graph.value.setItemState(e.item, 'selected', true)
+  graph.value.on('node:click', (evt) => {
+    selectedNode.value = evt.model
+    graph.value.setElementState({ [evt.model.id]: ['selected'] })
   })
 
-  graph.value.on('canvas:click', () => {
-    selectedNode.value = null
-    clearAllStates()
+  graph.value.on('node:drag', (evt) => {
+    // 节点拖拽处理
   })
-
-  // 渲染数据
-  renderData()
 }
 
-// 渲染数据
-function renderData() {
+// 适应画布
+function fitView() {
+  if (graph.value) {
+    graph.value.fitView()
+  }
+}
+
+// 切换布局
+async function changeLayout() {
+  if (graph.value) {
+    graph.value.setLayout({ type: currentLayout.value })
+    await graph.value.render()
+  }
+}
+
+// 筛选和搜索
+async function filterGraph() {
   if (!graph.value) return
 
-  // 应用过滤
   let nodes = [...sampleData.nodes]
   let edges = [...sampleData.edges]
 
+  // 应用过滤
   if (filterType.value !== 'all') {
-    nodes = nodes.filter(n => n.type === filterType.value)
+    nodes = nodes.filter(n => n.data.type === filterType.value)
     const nodeIds = new Set(nodes.map(n => n.id))
     edges = edges.filter(e => nodeIds.has(e.source) && nodeIds.has(e.target))
   }
@@ -179,79 +163,13 @@ function renderData() {
   // 应用搜索
   if (searchQuery.value) {
     const q = searchQuery.value.toLowerCase()
-    nodes = nodes.filter(n => n.label.toLowerCase().includes(q))
+    nodes = nodes.filter(n => n.data.label.toLowerCase().includes(q))
     const nodeIds = new Set(nodes.map(n => n.id))
     edges = edges.filter(e => nodeIds.has(e.source) && nodeIds.has(e.target))
   }
 
-  // 更新节点样式
-  nodes = nodes.map(node => ({
-    ...node,
-    type: 'circle',
-    size: node.type === 'team' ? 60 : 50,
-    style: {
-      fill: '#fff',
-      stroke: nodeColors[node.type] || nodeColors.default,
-      lineWidth: 2
-    },
-    label: node.label
-  }))
-
-  graph.value.data({ nodes, edges })
-  graph.value.render()
-}
-
-// 高亮邻居节点
-function highlightNeighbors(node) {
-  if (!graph.value) return
-
-  const model = node.getModel()
-  const neighbors = graph.value.getNeighbors(node)
-
-  neighbors.forEach(neighbor => {
-    graph.value.setItemState(neighbor, 'hover', true)
-  })
-
-  // 高亮连接的边
-  const edges = graph.value.getEdges()
-  edges.forEach(edge => {
-    const source = edge.getModel().source
-    const target = edge.getModel().target
-    if (source === model.id || target === model.id) {
-      edge.update({ style: { stroke: '#3b82f6', lineWidth: 2 } })
-    }
-  })
-}
-
-// 清除所有状态
-function clearAllStates() {
-  if (!graph.value) return
-
-  const nodes = graph.value.getNodes()
-  const edges = graph.value.getEdges()
-
-  nodes.forEach(node => {
-    graph.value.clearItemStates(node)
-  })
-
-  edges.forEach(edge => {
-    edge.update({ style: { stroke: '#ccc', lineWidth: 1.5 } })
-  })
-}
-
-// 切换布局
-function changeLayout() {
-  if (graph.value) {
-    graph.value.updateLayout({ type: currentLayout.value })
-    graph.value.render()
-  }
-}
-
-// 适应画布
-function fitView() {
-  if (graph.value) {
-    graph.value.fitView(20)
-  }
+  await graph.value.setData({ nodes, edges })
+  await graph.value.render()
 }
 
 onMounted(() => {
@@ -281,7 +199,7 @@ onUnmounted(() => {
       </div>
       <div class="toolbar-section">
         <span class="toolbar-label">筛选:</span>
-        <select v-model="filterType" class="toolbar-select" @change="renderData">
+        <select v-model="filterType" class="toolbar-select" @change="filterGraph">
           <option value="all">全部</option>
           <option value="person">人员</option>
           <option value="team">团队</option>
@@ -294,7 +212,7 @@ onUnmounted(() => {
           type="text"
           placeholder="搜索节点..."
           class="search-input"
-          @input="renderData"
+          @input="filterGraph"
         />
       </div>
       <div class="toolbar-section">
@@ -316,17 +234,17 @@ onUnmounted(() => {
       <div class="panel-content">
         <div class="info-item">
           <label>名称:</label>
-          <span>{{ selectedNode.label }}</span>
+          <span>{{ selectedNode.data?.label }}</span>
         </div>
         <div class="info-item">
           <label>类型:</label>
-          <span class="type-badge" :style="{ background: nodeColors[selectedNode.type] }">
-            {{ selectedNode.type === 'person' ? '人员' : selectedNode.type === 'team' ? '团队' : '角色' }}
+          <span class="type-badge" :style="{ background: nodeColors[selectedNode.data?.type] }">
+            {{ selectedNode.data?.type === 'person' ? '人员' : selectedNode.data?.type === 'team' ? '团队' : '角色' }}
           </span>
         </div>
         <div class="info-item">
           <label>部门:</label>
-          <span>{{ selectedNode.group }}</span>
+          <span>{{ selectedNode.data?.group }}</span>
         </div>
         <div class="info-item">
           <label>ID:</label>

@@ -5,9 +5,10 @@ import { setupComponentRoutes } from './router'
 
 const route = useRoute()
 
-// 初始化组件路由
+// 初始化组件路由 - 必须等待完成
 onMounted(async () => {
   await setupComponentRoutes()
+  console.log('Component routes initialized')
 })
 </script>
 

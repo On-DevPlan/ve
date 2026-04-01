@@ -70,8 +70,8 @@ export async function setupComponentRoutes() {
 
   // 添加新的组件路由
   componentDiscovery.components.value.forEach(component => {
-    if (component.config?.route) {
-      const routeConfig = component.config.route
+    if (component.route) {
+      const routeConfig = component.route
 
       // 动态路由配置
       const route = {
