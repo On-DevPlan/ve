@@ -1,0 +1,16 @@
+sha:        97bca9f69b8db6c2c95396586ecb4810afaa78da
+short:      97bca9f
+author:     zhaoliuxue <2096343460@qq.com>
+date:       2026-04-01T10:34:20+08:00
+subject:    replay: snapshot of commit 90b1a89
+
+--- body ---
+replay: snapshot of commit 90b1a89
+
+original-subject: chore: update deploy workflow naming convention
+original-author:  zhaoliuxue <2096343460@qq.com>
+original-date:    2026-04-01T10:34:20+08:00
+files:            1
+
+--- files (1) ---
+.commit-msgs/90b1a89__chore_ update deploy workflow naming convention.commit-msg.txt
