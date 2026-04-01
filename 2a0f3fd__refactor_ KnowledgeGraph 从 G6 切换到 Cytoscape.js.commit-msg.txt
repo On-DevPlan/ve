@@ -1,0 +1,22 @@
+sha:        2a0f3fd293a15ec9753a9de79a0de9e1dde31ba2
+short:      2a0f3fd
+author:     zhaoliuxue <2096343460@qq.com>
+date:       2026-04-01T13:02:05+08:00
+subject:    refactor: KnowledgeGraph 从 G6 切换到 Cytoscape.js
+
+--- body ---
+refactor: KnowledgeGraph 从 G6 切换到 Cytoscape.js
+
+- 替换 @antv/g6 为 cytoscape
+- 使用 Cytoscape.js 5.x API 重写图谱组件
+- 支持力导/环形/层次/网格布局
+- 支持邻居高亮和搜索过滤
+- 更新组件描述和依赖
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+
+--- files (4) ---
+package-lock.json
+package.json
+src/components/canvas/KnowledgeGraph/component.js
+src/components/canvas/KnowledgeGraph/index.vue
