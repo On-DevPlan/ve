@@ -11,9 +11,14 @@ const { components, loading } = useComponentDiscovery()
 const selectedComponent = ref(null)
 const showInfoModal = ref(false)
 
-// 搜索状态
+// 搜索状态 - 从 localStorage 恢复
 const searchQuery = ref('')
-const selectedGroup = ref('all')
+const selectedGroup = ref(localStorage.getItem('selectedGroup') || 'all')
+
+// 持久化分组选择
+watch(selectedGroup, (val) => {
+  localStorage.setItem('selectedGroup', val)
+})
 
 // 计算属性 - 过滤后的组件
 const filteredComponents = computed(() => {
@@ -76,7 +81,7 @@ function getGroupIcon(group) {
 }
 
 const navigateToComponent = (component) => {
-  router.push(component.config?.route?.path || `/components/${component.id}`)
+  router.push(component.route?.path || `/components/${component.id}`)
 }
 
 const showComponentInfo = (component, event) => {
@@ -148,7 +153,7 @@ const closeInfoModal = () => {
           @click="navigateToComponent(comp)"
         >
           <div class="card-top">
-            <span class="card-icon">{{ comp.config?.route?.meta?.icon || '📦' }}</span>
+            <span class="card-icon">{{ comp.route?.meta?.icon || '📦' }}</span>
             <span class="card-group">{{ comp.group }}</span>
           </div>
           <h3 class="card-title">{{ comp.title }}</h3>
