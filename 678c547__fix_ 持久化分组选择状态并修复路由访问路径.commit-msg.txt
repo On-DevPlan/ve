@@ -1,0 +1,17 @@
+sha:        678c5477ef953dd2f2e93971fe5e51186e1ffffc
+short:      678c547
+author:     zhaoliuxue <2096343460@qq.com>
+date:       2026-04-01T13:50:08+08:00
+subject:    fix: 持久化分组选择状态并修复路由访问路径
+
+--- body ---
+fix: 持久化分组选择状态并修复路由访问路径
+
+- selectedGroup 从 localStorage 恢复，切换分组自动保存
+- navigateToComponent: component.config.route → component.route
+- card icon: comp.config.route.meta.icon → comp.route.meta.icon
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+
+--- files (1) ---
+src/views/Home.vue
