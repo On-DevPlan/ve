@@ -1,0 +1,16 @@
+sha:        7ba5026832e91744e84524e8041a057dba4ce075
+short:      7ba5026
+author:     zhaoliuxue <2096343460@qq.com>
+date:       2026-04-01T13:50:08+08:00
+subject:    replay: snapshot of commit 678c547
+
+--- body ---
+replay: snapshot of commit 678c547
+
+original-subject: fix: 持久化分组选择状态并修复路由访问路径
+original-author:  zhaoliuxue <2096343460@qq.com>
+original-date:    2026-04-01T13:50:08+08:00
+files:            1
+
+--- files (1) ---
+".commit-msgs/678c547__fix_ \346\214\201\344\271\205\345\214\226\345\210\206\347\273\204\351\200\211\346\213\251\347\212\266\346\200\201\345\271\266\344\277\256\345\244\215\350\267\257\347\224\261\350\256\277\351\227\256\350\267\257\345\276\204.commit-msg.txt"
