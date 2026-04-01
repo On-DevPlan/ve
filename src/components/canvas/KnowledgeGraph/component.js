@@ -1,7 +1,7 @@
 export default {
   name: 'KnowledgeGraph',
   title: '知识图谱探索',
-  description: '力导/层次布局、邻居高亮、过滤、聚合(Cluster)、渐进加载 - 基于 AntV G6',
+  description: '力导/层次布局、邻居高亮、过滤 - 基于 Cytoscape.js',
   version: '1.0.0',
   group: 'Canvas',
   category: 'Graph',
@@ -15,5 +15,5 @@ export default {
     }
   },
   fullscreen: true,
-  dependencies: ['@antv/g6']
+  dependencies: ['cytoscape']
 }

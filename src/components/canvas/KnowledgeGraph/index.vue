@@ -1,50 +1,51 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
-import { Graph } from '@antv/g6'
+import cytoscape from 'cytoscape'
 
 // 示例数据 - 人物关系图谱
 const sampleData = {
   nodes: [
-    { id: 'node1', data: { label: '张三', type: 'person', group: '技术部' } },
-    { id: 'node2', data: { label: '李四', type: 'person', group: '产品部' } },
-    { id: 'node3', data: { label: '王五', type: 'person', group: '设计部' } },
-    { id: 'node4', data: { label: '赵六', type: 'person', group: '技术部' } },
-    { id: 'node5', data: { label: '前端组', type: 'team', group: '技术部' } },
-    { id: 'node6', data: { label: '后端组', type: 'team', group: '技术部' } },
-    { id: 'node7', data: { label: '产品组', type: 'team', group: '产品部' } },
-    { id: 'node8', data: { label: 'UI设计', type: 'team', group: '设计部' } },
-    { id: 'node9', data: { label: '项目经理', type: 'role', group: '管理层' } },
-    { id: 'node10', data: { label: '技术总监', type: 'role', group: '管理层' } }
+    { id: 'node1', label: '张三', type: 'person', group: '技术部' },
+    { id: 'node2', label: '李四', type: 'person', group: '产品部' },
+    { id: 'node3', label: '王五', type: 'person', group: '设计部' },
+    { id: 'node4', label: '赵六', type: 'person', group: '技术部' },
+    { id: 'node5', label: '前端组', type: 'team', group: '技术部' },
+    { id: 'node6', label: '后端组', type: 'team', group: '技术部' },
+    { id: 'node7', label: '产品组', type: 'team', group: '产品部' },
+    { id: 'node8', label: 'UI设计', type: 'team', group: '设计部' },
+    { id: 'node9', label: '项目经理', type: 'role', group: '管理层' },
+    { id: 'node10', label: '技术总监', type: 'role', group: '管理层' }
   ],
   edges: [
-    { source: 'node1', target: 'node5', data: { label: '属于' } },
-    { source: 'node4', target: 'node5', data: { label: '属于' } },
-    { source: 'node2', target: 'node7', data: { label: '属于' } },
-    { source: 'node3', target: 'node8', data: { label: '属于' } },
-    { source: 'node1', target: 'node2', data: { label: '同事' } },
-    { source: 'node1', target: 'node3', data: { label: '协作' } },
-    { source: 'node2', target: 'node3', data: { label: '协作' } },
-    { source: 'node5', target: 'node6', data: { label: '对接' } },
-    { source: 'node5', target: 'node7', data: { label: '协作' } },
-    { source: 'node7', target: 'node8', data: { label: '协作' } },
-    { source: 'node9', target: 'node2', data: { label: '管理' } },
-    { source: 'node9', target: 'node3', data: { label: '管理' } },
-    { source: 'node10', target: 'node1', data: { label: '管理' } },
-    { source: 'node10', target: 'node4', data: { label: '管理' } },
-    { source: 'node9', target: 'node10', data: { label: '汇报' } }
+    { source: 'node1', target: 'node5', label: '属于' },
+    { source: 'node4', target: 'node5', label: '属于' },
+    { source: 'node2', target: 'node7', label: '属于' },
+    { source: 'node3', target: 'node8', label: '属于' },
+    { source: 'node1', target: 'node2', label: '同事' },
+    { source: 'node1', target: 'node3', label: '协作' },
+    { source: 'node2', target: 'node3', label: '协作' },
+    { source: 'node5', target: 'node6', label: '对接' },
+    { source: 'node5', target: 'node7', label: '协作' },
+    { source: 'node7', target: 'node8', label: '协作' },
+    { source: 'node9', target: 'node2', label: '管理' },
+    { source: 'node9', target: 'node3', label: '管理' },
+    { source: 'node10', target: 'node1', label: '管理' },
+    { source: 'node10', target: 'node4', label: '管理' },
+    { source: 'node9', target: 'node10', label: '汇报' }
   ]
 }
 
 // 布局类型
 const layoutTypes = [
-  { value: 'force', label: '力导布局' },
-  { value: 'circular', label: '环形布局' },
-  { value: 'dagre', label: '层次布局' }
+  { value: 'circle', label: '环形布局' },
+  { value: 'cose', label: '力导布局' },
+  { value: 'breadthfirst', label: '层次布局' },
+  { value: 'grid', label: '网格布局' }
 ]
 
-const currentLayout = ref('force')
+const currentLayout = ref('cose')
 const graphContainer = ref(null)
-const graph = ref(null)
+const cy = ref(null)
 const selectedNode = ref(null)
 const searchQuery = ref('')
 const filterType = ref('all')
@@ -58,118 +59,214 @@ const nodeColors = {
 }
 
 // 初始化图谱
-async function initGraph() {
+function initGraph() {
   if (!graphContainer.value) return
 
   // 销毁旧图
-  if (graph.value) {
-    graph.value.destroy()
+  if (cy.value) {
+    cy.value.destroy()
   }
 
   const container = graphContainer.value
-  const width = container.offsetWidth
-  const height = container.offsetHeight
 
-  // G6 5.x 使用 createGraph
-  graph.value = new Graph({
+  // 构建 Cytoscape 元素
+  const elements = [
+    ...sampleData.nodes.map(n => ({
+      data: {
+        id: n.id,
+        label: n.label,
+        type: n.type,
+        group: n.group
+      }
+    })),
+    ...sampleData.edges.map(e => ({
+      data: {
+        id: `${e.source}-${e.target}`,
+        source: e.source,
+        target: e.target,
+        label: e.label
+      }
+    }))
+  ]
+
+  cy.value = cytoscape({
     container,
-    width,
-    height,
-    data: { ...sampleData },
-    layout: {
-      type: currentLayout.value
-    },
-    node: {
-      style: {
-        size: 40,
-        fill: '#fff',
-        stroke: '#3b82f6',
-        lineWidth: 2,
-        labelText: (d) => d.data?.label || '',
-        labelFill: '#333',
-        labelFontSize: 12
+    elements,
+    style: [
+      {
+        selector: 'node',
+        style: {
+          'background-color': '#fff',
+          'border-width': 2,
+          'border-color': '#3b82f6',
+          'label': 'data(label)',
+          'color': '#333',
+          'font-size': 12,
+          'text-valign': 'bottom',
+          'text-margin-y': 8,
+          'width': 40,
+          'height': 40,
+          'text-background-color': '#fff',
+          'text-background-opacity': 1,
+          'text-background-padding': 3
+        }
       },
-      state: {
-        hover: {
-          stroke: '#3b82f6',
-          lineWidth: 3
-        },
-        selected: {
-          stroke: '#f59e0b',
-          lineWidth: 3
+      {
+        selector: 'node[type = "person"]',
+        style: {
+          'border-color': nodeColors.person,
+          'background-color': '#fff'
+        }
+      },
+      {
+        selector: 'node[type = "team"]',
+        style: {
+          'border-color': nodeColors.team,
+          'background-color': '#fff'
+        }
+      },
+      {
+        selector: 'node[type = "role"]',
+        style: {
+          'border-color': nodeColors.role,
+          'background-color': '#fff'
+        }
+      },
+      {
+        selector: 'edge',
+        style: {
+          'width': 1.5,
+          'line-color': '#ccc',
+          'target-arrow-color': '#ccc',
+          'target-arrow-shape': 'triangle',
+          'curve-style': 'bezier',
+          'label': 'data(label)',
+          'font-size': 10,
+          'text-background-color': '#f5f5f5',
+          'text-background-opacity': 1,
+          'text-background-padding': 2
+        }
+      },
+      {
+        selector: 'node:selected',
+        style: {
+          'border-width': 3,
+          'border-color': '#f59e0b'
+        }
+      },
+      {
+        selector: 'node.highlighted',
+        style: {
+          'border-width': 3,
+          'border-color': '#f59e0b'
+        }
+      },
+      {
+        selector: 'node.faded',
+        style: {
+          'opacity': 0.3
+        }
+      },
+      {
+        selector: 'edge.faded',
+        style: {
+          'opacity': 0.2
         }
       }
-    },
-    edge: {
-      style: {
-        stroke: '#ccc',
-        lineWidth: 1.5,
-        endArrow: true
-      }
-    },
-    behaviors: ['drag-canvas', 'zoom-canvas', 'drag-node']
+    ],
+    layout: getLayout()
   })
-
-  await graph.value.render()
 
   // 绑定事件
-  graph.value.on('node:mouseenter', (evt) => {
-    graph.value.setElementState({ [evt.model.id]: ['hover'] })
+  cy.value.on('tap', 'node', (evt) => {
+    const node = evt.target
+    selectedNode.value = {
+      id: node.id(),
+      data: node.data()
+    }
+    highlightNeighborhood(node.id())
   })
 
-  graph.value.on('node:mouseleave', () => {
-    graph.value.setElementState({})
+  cy.value.on('tap', (evt) => {
+    if (evt.target === cy.value) {
+      selectedNode.value = null
+      clearHighlight()
+    }
   })
+}
 
-  graph.value.on('node:click', (evt) => {
-    selectedNode.value = evt.model
-    graph.value.setElementState({ [evt.model.id]: ['selected'] })
-  })
+// 获取布局配置
+function getLayout() {
+  const layouts = {
+    'circle': { name: 'circle', padding: 30 },
+    'cose': {
+      name: 'cose',
+      animate: false,
+      nodeRepulsion: () => 8000,
+      idealEdgeLength: () => 80,
+      edgeElasticity: () => 100
+    },
+    'breadthfirst': { name: 'breadthfirst', directed: false, padding: 30 },
+    'grid': { name: 'grid', padding: 30 }
+  }
+  return layouts[currentLayout.value] || layouts.cose
+}
 
-  graph.value.on('node:drag', (evt) => {
-    // 节点拖拽处理
-  })
+// 高亮邻居节点
+function highlightNeighborhood(nodeId) {
+  clearHighlight()
+
+  const node = cy.value.getElementById(nodeId)
+  const neighbors = node.neighborhood().add(node)
+
+  cy.value.elements().addClass('faded')
+  neighbors.removeClass('faded')
+  neighbors.addClass('highlighted')
+}
+
+// 清除高亮
+function clearHighlight() {
+  cy.value.elements().removeClass('faded highlighted')
 }
 
 // 适应画布
 function fitView() {
-  if (graph.value) {
-    graph.value.fitView()
+  if (cy.value) {
+    cy.value.fit(30)
   }
 }
 
 // 切换布局
-async function changeLayout() {
-  if (graph.value) {
-    graph.value.setLayout({ type: currentLayout.value })
-    await graph.value.render()
+function changeLayout() {
+  if (cy.value) {
+    cy.value.layout(getLayout()).run()
   }
 }
 
 // 筛选和搜索
-async function filterGraph() {
-  if (!graph.value) return
+function filterGraph() {
+  if (!cy.value) return
 
-  let nodes = [...sampleData.nodes]
-  let edges = [...sampleData.edges]
+  let selector = ''
 
-  // 应用过滤
+  // 应用类型过滤
   if (filterType.value !== 'all') {
-    nodes = nodes.filter(n => n.data.type === filterType.value)
-    const nodeIds = new Set(nodes.map(n => n.id))
-    edges = edges.filter(e => nodeIds.has(e.source) && nodeIds.has(e.target))
+    selector = `node[type = "${filterType.value}"]`
   }
 
   // 应用搜索
   if (searchQuery.value) {
     const q = searchQuery.value.toLowerCase()
-    nodes = nodes.filter(n => n.data.label.toLowerCase().includes(q))
-    const nodeIds = new Set(nodes.map(n => n.id))
-    edges = edges.filter(e => nodeIds.has(e.source) && nodeIds.has(e.target))
+    const searchSelector = `node[label *= "${q}"]`
+    selector = selector ? `${selector}, ${searchSelector}` : searchSelector
   }
 
-  await graph.value.setData({ nodes, edges })
-  await graph.value.render()
+  if (selector) {
+    cy.value.elements().addClass('faded')
+    cy.value.elements(selector).removeClass('faded')
+  } else {
+    clearHighlight()
+  }
 }
 
 onMounted(() => {
@@ -179,8 +276,8 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', initGraph)
-  if (graph.value) {
-    graph.value.destroy()
+  if (cy.value) {
+    cy.value.destroy()
   }
 })
 </script>
@@ -217,7 +314,7 @@ onUnmounted(() => {
       </div>
       <div class="toolbar-section">
         <button class="action-btn" @click="fitView">
-          🎯 适应画布
+          适应画布
         </button>
       </div>
     </div>
