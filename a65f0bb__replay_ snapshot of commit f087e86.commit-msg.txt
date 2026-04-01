@@ -1,0 +1,16 @@
+sha:        a65f0bb821a6024d8486c574b78e2f7cf5719a12
+short:      a65f0bb
+author:     zhaoliuxue <2096343460@qq.com>
+date:       2026-04-01T11:57:42+08:00
+subject:    replay: snapshot of commit f087e86
+
+--- body ---
+replay: snapshot of commit f087e86
+
+original-subject: fix: 修复组件路由和画布组件问题
+original-author:  zhaoliuxue <2096343460@qq.com>
+original-date:    2026-04-01T11:57:42+08:00
+files:            7
+
+--- files (1) ---
+".commit-msgs/f087e86__fix_ \344\277\256\345\244\215\347\273\204\344\273\266\350\267\257\347\224\261\345\222\214\347\224\273\345\270\203\347\273\204\344\273\266\351\227\256\351\242\230.commit-msg.txt"
