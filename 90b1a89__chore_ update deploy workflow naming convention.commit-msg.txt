@@ -1,0 +1,16 @@
+sha:        90b1a8936c116f0427c564ce7d5c507e8b20fd0d
+short:      90b1a89
+author:     zhaoliuxue <2096343460@qq.com>
+date:       2026-04-01T10:34:20+08:00
+subject:    chore: update deploy workflow naming convention
+
+--- body ---
+chore: update deploy workflow naming convention
+
+- Rename container/image from three_vue to ve
+- Change port from 8001 to 80
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+
+--- files (1) ---
+.github/workflows/deploy.yml
