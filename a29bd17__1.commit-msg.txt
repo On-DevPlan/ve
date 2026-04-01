@@ -1,0 +1,11 @@
+sha:        a29bd1796f58f2c2d3575e3b308297a811bb1d76
+short:      a29bd17
+author:     zhaoliuxue <2096343460@qq.com>
+date:       2026-04-01T13:50:39+08:00
+subject:    1
+
+--- body ---
+
+
+--- files (1) ---
+.claude/skills/ve-workflow/SKILL.md
