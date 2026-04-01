@@ -15,11 +15,11 @@ jobs:
 
     - name: Build Docker image
       run: |
-        docker build -t three_vue:latest .
+        docker build -t ve:latest .
 
     - name: Save Docker image
       run: |
-        docker save three_vue:latest | gzip > app.tar.gz
+        docker save ve:latest | gzip > app.tar.gz
 
     - name: Copy files to server
       uses: appleboy/scp-action@v0.1.7
@@ -45,9 +45,9 @@ jobs:
           bash -c '
           # 设置变量
           APP_DIR="$HOME/app"
-          CONTAINER_NAME="three_vue_app"
-          IMAGE_NAME="three_vue"
-          PORT=8001
+          CONTAINER_NAME="ve_app"
+          IMAGE_NAME="ve"
+          PORT=80
 
           # 创建应用目录
           mkdir -p $APP_DIR
