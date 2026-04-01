@@ -1,0 +1,25 @@
+sha:        f087e8645636bd027f1c6dd7cacc541b4f4870ee
+short:      f087e86
+author:     zhaoliuxue <2096343460@qq.com>
+date:       2026-04-01T11:57:42+08:00
+subject:    fix: 修复组件路由和画布组件问题
+
+--- body ---
+fix: 修复组件路由和画布组件问题
+
+- 修复 router/index.js: component.route 访问路径（原错误使用 component.config.route）
+- 修复 Whiteboard: tldraw 切换为 vue-excalidraw（tldraw 是 React 库）
+- 修复 vue-excalidraw 导入: 使用命名导出 Excalidraw 替代默认导出
+- 更新 KnowledgeGraph: 适配 G6 5.x API（数据格式从 flat 改为 nested data）
+- App.vue: 添加 await setupComponentRoutes() 等待路由初始化完成
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+
+--- files (7) ---
+package-lock.json
+package.json
+src/App.vue
+src/components/canvas/KnowledgeGraph/index.vue
+src/components/canvas/Whiteboard/component.js
+src/components/canvas/Whiteboard/index.vue
+src/router/index.js
