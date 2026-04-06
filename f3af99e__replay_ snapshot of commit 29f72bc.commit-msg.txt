@@ -1,0 +1,16 @@
+sha:        f3af99e8194738214e60ce106c3ef21ad8919620
+short:      f3af99e
+author:     zhaoliuxue111 <zhaoliuxue111@xiaoduotech.com111>
+date:       2026-04-06T14:09:11+08:00
+subject:    replay: snapshot of commit 29f72bc
+
+--- body ---
+replay: snapshot of commit 29f72bc
+
+original-subject: chore: 删除 package-lock.json 避免与 pnpm 冲突
+original-author:  zhaoliuxue111 <zhaoliuxue111@xiaoduotech.com111>
+original-date:    2026-04-06T14:09:11+08:00
+files:            1
+
+--- files (1) ---
+".commit-msgs/29f72bc__chore_ \345\210\240\351\231\244 package-lock.json \351\201\277\345\205\215\344\270\216 pnpm \345\206\262\347\252\201.commit-msg.txt"
