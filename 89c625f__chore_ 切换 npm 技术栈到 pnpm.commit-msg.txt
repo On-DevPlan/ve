@@ -1,0 +1,19 @@
+sha:        89c625fb1d5b20ac11ede5f966eba6cdbde4fe0b
+short:      89c625f
+author:     zhaoliuxue111 <zhaoliuxue111@xiaoduotech.com111>
+date:       2026-04-06T14:07:48+08:00
+subject:    chore: 切换 npm 技术栈到 pnpm
+
+--- body ---
+chore: 切换 npm 技术栈到 pnpm
+
+将 Dockerfile 中的依赖安装和构建命令从 npm 改为 pnpm
+
+Generated with [Claude Code](https://claude.ai/code)
+via [Happy](https://happy.engineering)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+Co-Authored-By: Happy <yesreply@happy.engineering>
+
+--- files (1) ---
+Dockerfile
