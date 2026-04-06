@@ -1,0 +1,17 @@
+sha:        7f0dac27a1cd67fffbbd11c6684617b1ad804934
+short:      7f0dac2
+author:     zhaoliuxue111 <zhaoliuxue111@xiaoduotech.com111>
+date:       2026-04-07T00:09:30+08:00
+subject:    feat: 添加 RelaxFlow 放松流动组件
+
+--- body ---
+feat: 添加 RelaxFlow 放松流动组件
+
+蓝色渐变背景 + 气泡上浮动画 + 背景粒子效果
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+Co-Authored-By: Happy <yesreply@happy.engineering>
+
+--- files (2) ---
+src/components/RelaxFlow/component.js
+src/components/RelaxFlow/index.vue
