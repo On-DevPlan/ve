@@ -9,9 +9,9 @@ This is a **Vue 3 + Vite** demo showcase system with auto-discovering component 
 ## Development Commands
 
 ```bash
-npm run dev      # Start development server (0.0.0.0:5173)
-npm run build    # Build for production
-npm run preview  # Preview production build (0.0.0.0:4173)
+pnpm dev      # Start development server (0.0.0.0:5173)
+pnpm build    # Build for production
+pnpm preview  # Preview production build (0.0.0.0:4173)
 ```
 
 ## Adding New Demo Components
