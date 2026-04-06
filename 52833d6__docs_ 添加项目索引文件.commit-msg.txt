@@ -1,0 +1,18 @@
+sha:        52833d6b96d7523a1c9fef39511d96c5e3cd76f8
+short:      52833d6
+author:     zhaoliuxue111 <zhaoliuxue111@xiaoduotech.com111>
+date:       2026-04-07T00:25:24+08:00
+subject:    docs: 添加项目索引文件
+
+--- body ---
+docs: 添加项目索引文件
+
+- PROJECT_INDEX.md: 人类可读的项目概览
+- PROJECT_INDEX.json: 机器可读的组件清单
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+Co-Authored-By: Happy <yesreply@happy.engineering>
+
+--- files (2) ---
+PROJECT_INDEX.json
+PROJECT_INDEX.md
