@@ -1,0 +1,16 @@
+sha:        a5e72b0cac0c14ee3d3a0db04b3a66ff43eaf6d7
+short:      a5e72b0
+author:     zhaoliuxue111 <zhaoliuxue111@xiaoduotech.com111>
+date:       2026-04-06T14:07:48+08:00
+subject:    replay: snapshot of commit 89c625f
+
+--- body ---
+replay: snapshot of commit 89c625f
+
+original-subject: chore: 切换 npm 技术栈到 pnpm
+original-author:  zhaoliuxue111 <zhaoliuxue111@xiaoduotech.com111>
+original-date:    2026-04-06T14:07:48+08:00
+files:            1
+
+--- files (1) ---
+".commit-msgs/89c625f__chore_ \345\210\207\346\215\242 npm \346\212\200\346\234\257\346\240\210\345\210\260 pnpm.commit-msg.txt"
