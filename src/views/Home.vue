@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useComponentDiscovery } from '../utils/componentDiscovery'
 import ComponentInfoModal from '../components/ComponentInfoModal.vue'
