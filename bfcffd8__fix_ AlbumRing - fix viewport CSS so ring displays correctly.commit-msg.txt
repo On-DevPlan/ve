@@ -1,0 +1,11 @@
+sha:        bfcffd88d63c4acaa3a68670ff682629b37dc99e
+short:      bfcffd8
+author:     zhaoliuxue <2096343460@qq.com>
+date:       2026-04-07T12:55:05+08:00
+subject:    fix: AlbumRing - fix viewport CSS so ring displays correctly
+
+--- body ---
+
+
+--- files (1) ---
+src/components/AlbumRing/index.vue
