@@ -1,0 +1,16 @@
+sha:        4a08f9381163e36991b7c22443245c877803fdc4
+short:      4a08f93
+author:     zhaoliuxue <2096343460@qq.com>
+date:       2026-04-07T12:59:37+08:00
+subject:    replay: snapshot of commit 7c8075a
+
+--- body ---
+replay: snapshot of commit 7c8075a
+
+original-subject: fix: AlbumRing - add visible viewport border and glow
+original-author:  zhaoliuxue <2096343460@qq.com>
+original-date:    2026-04-07T12:59:37+08:00
+files:            1
+
+--- files (1) ---
+.commit-msgs/7c8075a__fix_ AlbumRing - add visible viewport border and glow.commit-msg.txt
