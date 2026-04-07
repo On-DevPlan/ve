@@ -16,7 +16,7 @@ export default defineConfig({
       }
     },
     // 优化构建
-    target: 'es2015',
+    target: 'esnext',
     // 使用默认压缩器，如果terser不存在
     minify: 'esbuild',
     sourcemap: false,
