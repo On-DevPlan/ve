@@ -112,6 +112,8 @@ onUnmounted(() => {
   position: relative;
   border-radius: 24px;
   background: linear-gradient(180deg, rgba(139, 92, 246, 0.03) 0%, transparent 60%);
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  box-shadow: 0 0 60px rgba(139, 92, 246, 0.1);
 }
 
 .scene {
