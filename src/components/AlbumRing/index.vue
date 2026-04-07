@@ -17,9 +17,9 @@ const ALBUMS = [
 ]
 
 const COUNT = ALBUMS.length
-const RADIUS = 500
+const RADIUS = 320
 const STEP = 360 / COUNT
-const TILT = 75
+const TILT = 60
 
 const currentAngle = ref(0)
 let targetAngle = 0
@@ -68,22 +68,20 @@ onUnmounted(() => {
 
 <template>
   <div class="album-ring-app">
-    <div class="viewport">
-      <div class="scene">
-        <div class="ring" :style="ringStyle">
-          <div
-            v-for="(album, i) in ALBUMS"
-            :key="i"
-            class="card"
-            :class="{ hovered: hoveredIdx === i }"
-            :style="cardTransforms[i]"
-            @mouseenter="hoveredIdx = i"
-            @mouseleave="hoveredIdx = null"
-          >
-            <img :src="album.cover" :alt="album.title" loading="lazy" />
-            <div class="overlay">
-              <span class="title">{{ album.title }}</span>
-            </div>
+    <div class="scene">
+      <div class="ring" :style="ringStyle">
+        <div
+          v-for="(album, i) in ALBUMS"
+          :key="i"
+          class="card"
+          :class="{ hovered: hoveredIdx === i }"
+          :style="cardTransforms[i]"
+          @mouseenter="hoveredIdx = i"
+          @mouseleave="hoveredIdx = null"
+        >
+          <img :src="album.cover" :alt="album.title" loading="lazy" />
+          <div class="overlay">
+            <span class="title">{{ album.title }}</span>
           </div>
         </div>
       </div>
@@ -94,57 +92,47 @@ onUnmounted(() => {
 
 <style scoped>
 .album-ring-app {
-  width: 100%;
-  height: 100%;
+  width: 100vw;
+  height: 100vh;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(ellipse at center, #1a1a2e 0%, #0a0a0a 100%);
-}
-
-.viewport {
-  width: 100%;
-  max-width: 1100px;
-  height: 320px;
-  overflow: hidden;
+  background: #0a0a0f;
   position: relative;
-  margin: 0 auto;
 }
 
 .scene {
   width: 100%;
-  height: 800px;
-  position: absolute;
-  top: 0;
-  perspective: 1000px;
-  perspective-origin: 50% 20%;
+  height: 100%;
+  position: relative;
+  perspective: 900px;
+  perspective-origin: 50% 45%;
+  overflow: hidden;
 }
 
 .ring {
   position: absolute;
   width: 100%;
   height: 100%;
-  top: 0;
-  left: 0;
   transform-style: preserve-3d;
 }
 
 .card {
   position: absolute;
-  width: 180px;
-  height: 240px;
+  width: 130px;
+  height: 173px;
   left: 50%;
   top: 50%;
-  margin-left: -90px;
-  margin-top: -120px;
-  border-radius: 14px;
+  margin-left: -65px;
+  margin-top: -86px;
+  border-radius: 12px;
   overflow: hidden;
   backface-visibility: hidden;
   cursor: pointer;
   user-select: none;
-  box-shadow: 0 6px 28px rgba(0, 0, 0, 0.55);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   transition:
     transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
     box-shadow 0.4s ease,
@@ -157,7 +145,7 @@ onUnmounted(() => {
   object-fit: cover;
   display: block;
   transition: transform 0.4s ease, filter 0.4s ease;
-  filter: brightness(0.75);
+  filter: brightness(0.8);
 }
 
 .overlay {
@@ -165,30 +153,30 @@ onUnmounted(() => {
   bottom: 0;
   left: 0;
   right: 0;
-  padding: 14px 12px;
-  background: linear-gradient(transparent, rgba(0, 0, 0, 0.75));
+  padding: 12px 10px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
   transform: translateY(100%);
   transition: transform 0.35s ease;
 }
 
 .title {
   color: #fff;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.5px;
 }
 
 .card.hovered {
-  transform: rotateY(var(--ry)) translateZ(calc(var(--tz) + 50px)) scale(1.15) !important;
+  transform: rotateY(var(--ry)) translateZ(calc(var(--tz) + 60px)) scale(1.12) !important;
   box-shadow:
-    0 0 36px rgba(139, 92, 246, 0.45),
-    0 0 72px rgba(139, 92, 246, 0.12);
-  border-color: rgba(139, 92, 246, 0.5);
+    0 0 40px rgba(139, 92, 246, 0.5),
+    0 0 80px rgba(139, 92, 246, 0.2);
+  border-color: rgba(139, 92, 246, 0.6);
   z-index: 10;
 }
 
 .card.hovered img {
-  transform: scale(1.08);
+  transform: scale(1.06);
   filter: brightness(1);
 }
 
@@ -197,10 +185,13 @@ onUnmounted(() => {
 }
 
 .hint {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
   text-align: center;
-  color: #555;
+  color: #666;
   font-size: 13px;
-  margin-top: 12px;
   font-family: system-ui, sans-serif;
 }
 </style>
