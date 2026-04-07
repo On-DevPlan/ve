@@ -1,0 +1,16 @@
+sha:        1a833b2bdf651b4c80557154768bf2f7ae11ed1f
+short:      1a833b2
+author:     zhaoliuxue <2096343460@qq.com>
+date:       2026-04-07T12:55:05+08:00
+subject:    replay: snapshot of commit bfcffd8
+
+--- body ---
+replay: snapshot of commit bfcffd8
+
+original-subject: fix: AlbumRing - fix viewport CSS so ring displays correctly
+original-author:  zhaoliuxue <2096343460@qq.com>
+original-date:    2026-04-07T12:55:05+08:00
+files:            1
+
+--- files (1) ---
+.commit-msgs/bfcffd8__fix_ AlbumRing - fix viewport CSS so ring displays correctly.commit-msg.txt
