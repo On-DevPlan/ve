@@ -17,9 +17,9 @@ const ALBUMS = [
 ]
 
 const COUNT = ALBUMS.length
-const RADIUS = 320
-const STEP = 360 / COUNT
-const TILT = 60
+const RING_RADIUS = 280
+const CARD_GAP = 360 / COUNT
+const TILT = 55
 
 const currentAngle = ref(0)
 let targetAngle = 0
@@ -28,11 +28,11 @@ const hoveredIdx = ref<number | null>(null)
 
 const cardTransforms = computed(() =>
   ALBUMS.map((_, i) => {
-    const ry = i * STEP
+    const ry = i * CARD_GAP
     return {
       '--ry': `${ry}deg`,
-      '--tz': `${RADIUS}px`,
-      transform: `rotateY(${ry}deg) translateZ(${RADIUS}px)`,
+      '--tz': `${RING_RADIUS}px`,
+      transform: `rotateY(${ry}deg) translateZ(${RING_RADIUS}px)`,
     }
   })
 )
@@ -68,20 +68,22 @@ onUnmounted(() => {
 
 <template>
   <div class="album-ring-app">
-    <div class="scene">
-      <div class="ring" :style="ringStyle">
-        <div
-          v-for="(album, i) in ALBUMS"
-          :key="i"
-          class="card"
-          :class="{ hovered: hoveredIdx === i }"
-          :style="cardTransforms[i]"
-          @mouseenter="hoveredIdx = i"
-          @mouseleave="hoveredIdx = null"
-        >
-          <img :src="album.cover" :alt="album.title" loading="lazy" />
-          <div class="overlay">
-            <span class="title">{{ album.title }}</span>
+    <div class="viewport">
+      <div class="scene">
+        <div class="ring" :style="ringStyle">
+          <div
+            v-for="(album, i) in ALBUMS"
+            :key="i"
+            class="card"
+            :class="{ hovered: hoveredIdx === i }"
+            :style="cardTransforms[i]"
+            @mouseenter="hoveredIdx = i"
+            @mouseleave="hoveredIdx = null"
+          >
+            <img :src="album.cover" :alt="album.title" loading="lazy" />
+            <div class="overlay">
+              <span class="title">{{ album.title }}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -102,37 +104,48 @@ onUnmounted(() => {
   position: relative;
 }
 
+.viewport {
+  width: 100%;
+  max-width: 900px;
+  height: 500px;
+  overflow: hidden;
+  position: relative;
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(139, 92, 246, 0.03) 0%, transparent 60%);
+}
+
 .scene {
   width: 100%;
   height: 100%;
   position: relative;
-  perspective: 900px;
-  perspective-origin: 50% 45%;
-  overflow: hidden;
+  perspective: 1000px;
+  perspective-origin: 50% 50%;
 }
 
 .ring {
   position: absolute;
   width: 100%;
   height: 100%;
+  left: 0;
+  top: 0;
   transform-style: preserve-3d;
 }
 
 .card {
   position: absolute;
-  width: 130px;
-  height: 173px;
+  width: 120px;
+  height: 160px;
   left: 50%;
   top: 50%;
-  margin-left: -65px;
-  margin-top: -86px;
+  margin-left: -60px;
+  margin-top: -80px;
   border-radius: 12px;
   overflow: hidden;
   backface-visibility: hidden;
   cursor: pointer;
   user-select: none;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   transition:
     transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
     box-shadow 0.4s ease,
@@ -145,7 +158,7 @@ onUnmounted(() => {
   object-fit: cover;
   display: block;
   transition: transform 0.4s ease, filter 0.4s ease;
-  filter: brightness(0.8);
+  filter: brightness(0.75);
 }
 
 .overlay {
@@ -153,7 +166,7 @@ onUnmounted(() => {
   bottom: 0;
   left: 0;
   right: 0;
-  padding: 12px 10px;
+  padding: 10px 8px;
   background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
   transform: translateY(100%);
   transition: transform 0.35s ease;
@@ -161,17 +174,17 @@ onUnmounted(() => {
 
 .title {
   color: #fff;
-  font-size: 13px;
-  font-weight: 700;
+  font-size: 12px;
+  font-weight: 600;
   letter-spacing: 0.5px;
 }
 
 .card.hovered {
-  transform: rotateY(var(--ry)) translateZ(calc(var(--tz) + 60px)) scale(1.12) !important;
+  transform: rotateY(var(--ry)) translateZ(calc(var(--tz) + 50px)) scale(1.1) !important;
   box-shadow:
     0 0 40px rgba(139, 92, 246, 0.5),
     0 0 80px rgba(139, 92, 246, 0.2);
-  border-color: rgba(139, 92, 246, 0.6);
+  border-color: rgba(139, 92, 246, 0.5);
   z-index: 10;
 }
 
