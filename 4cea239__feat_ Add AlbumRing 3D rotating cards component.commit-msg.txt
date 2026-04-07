@@ -1,0 +1,12 @@
+sha:        4cea2394b05efe8f79a67e264ae898f1e535b726
+short:      4cea239
+author:     zhaoliuxue <2096343460@qq.com>
+date:       2026-04-07T12:46:16+08:00
+subject:    feat: Add AlbumRing 3D rotating cards component
+
+--- body ---
+
+
+--- files (2) ---
+src/components/AlbumRing/component.js
+src/components/AlbumRing/index.vue
