@@ -17,29 +17,43 @@ const ALBUMS = [
 ]
 
 const COUNT = ALBUMS.length
-const RING_RADIUS = 280
-const CARD_GAP = 360 / COUNT
-const TILT = 55
+const RING_RADIUS = 180
+const ARC_START = -75
+const ARC_END = 75
+const ARC_RANGE = ARC_END - ARC_START
+const STEP = ARC_RANGE / (COUNT - 1)
+const CENTER_X = 240
+const CENTER_Y = 260
 
 const currentAngle = ref(0)
 let targetAngle = 0
 let rafId = 0
 const hoveredIdx = ref<number | null>(null)
 
-const cardTransforms = computed(() =>
+const cardStyles = computed(() =>
   ALBUMS.map((_, i) => {
-    const ry = i * CARD_GAP
+    const baseAngle = ARC_START + i * STEP
+    const angleDeg = baseAngle + currentAngle.value
+    const angleRad = (angleDeg * Math.PI) / 180
+
+    const x = CENTER_X + RING_RADIUS * Math.sin(angleRad) - 36
+    const y = CENTER_Y - RING_RADIUS * Math.cos(angleRad) - 48
+
+    const normalizedAngle = ((angleDeg + 180) % 360) - 180
+    const absAngle = Math.abs(normalizedAngle)
+    const opacity = absAngle > 90 ? 0 : Math.max(0.3, 1 - absAngle / 90)
+    const pointerEvents = absAngle > 100 ? 'none' : 'auto'
+    const zIndex = Math.round(100 - absAngle)
+
     return {
-      '--ry': `${ry}deg`,
-      '--tz': `${RING_RADIUS}px`,
-      transform: `rotateY(${ry}deg) translateZ(${RING_RADIUS}px)`,
+      left: `${x}px`,
+      top: `${y}px`,
+      opacity,
+      pointerEvents,
+      zIndex,
     }
   })
 )
-
-const ringStyle = computed(() => ({
-  transform: `rotateX(${TILT}deg) rotateY(${currentAngle.value}deg)`,
-}))
 
 function animate() {
   const diff = targetAngle - currentAngle.value
@@ -53,7 +67,7 @@ function animate() {
 
 function onWheel(e: WheelEvent) {
   e.preventDefault()
-  targetAngle += e.deltaY * 0.12
+  targetAngle += e.deltaY * 0.15
 }
 
 onMounted(() => {
@@ -69,22 +83,28 @@ onUnmounted(() => {
 <template>
   <div class="album-ring-app">
     <div class="viewport">
-      <div class="scene">
-        <div class="ring" :style="ringStyle">
-          <div
-            v-for="(album, i) in ALBUMS"
-            :key="i"
-            class="card"
-            :class="{ hovered: hoveredIdx === i }"
-            :style="cardTransforms[i]"
-            @mouseenter="hoveredIdx = i"
-            @mouseleave="hoveredIdx = null"
-          >
-            <img :src="album.cover" :alt="album.title" loading="lazy" />
-            <div class="overlay">
-              <span class="title">{{ album.title }}</span>
-            </div>
-          </div>
+      <svg class="semicircle-track" viewBox="0 0 480 200" preserveAspectRatio="none">
+        <path
+          d="M 60 200 A 180 180 0 0 1 420 200"
+          fill="none"
+          stroke="rgba(139, 92, 246, 0.1)"
+          stroke-width="1"
+          stroke-dasharray="4 6"
+        />
+      </svg>
+
+      <div
+        v-for="(album, i) in ALBUMS"
+        :key="i"
+        class="card"
+        :class="{ hovered: hoveredIdx === i }"
+        :style="cardStyles[i]"
+        @mouseenter="hoveredIdx = i"
+        @mouseleave="hoveredIdx = null"
+      >
+        <img :src="album.cover" :alt="album.title" loading="lazy" />
+        <div class="overlay">
+          <span class="title">{{ album.title }}</span>
         </div>
       </div>
     </div>
@@ -100,58 +120,44 @@ onUnmounted(() => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: #0a0a0f;
+  background: #000;
   position: relative;
 }
 
 .viewport {
-  width: 100%;
-  max-width: 900px;
-  height: 500px;
+  width: 480px;
+  height: 300px;
   overflow: hidden;
   position: relative;
-  border-radius: 24px;
-  background: linear-gradient(180deg, rgba(139, 92, 246, 0.03) 0%, transparent 60%);
-  border: 1px solid rgba(139, 92, 246, 0.2);
-  box-shadow: 0 0 60px rgba(139, 92, 246, 0.1);
+  border-radius: 16px;
+  background: #0a0a12;
+  border: 1px solid rgba(139, 92, 246, 0.12);
+  box-shadow: 0 0 60px rgba(139, 92, 246, 0.08);
 }
 
-.scene {
-  width: 100%;
-  height: 100%;
-  position: relative;
-  perspective: 1000px;
-  perspective-origin: 50% 50%;
-}
-
-.ring {
+.semicircle-track {
   position: absolute;
-  width: 100%;
-  height: 100%;
+  bottom: 0;
   left: 0;
-  top: 0;
-  transform-style: preserve-3d;
+  width: 100%;
+  height: 180px;
+  pointer-events: none;
 }
 
 .card {
   position: absolute;
-  width: 120px;
-  height: 160px;
-  left: 50%;
-  top: 50%;
-  margin-left: -60px;
-  margin-top: -80px;
-  border-radius: 12px;
+  width: 72px;
+  height: 96px;
+  border-radius: 8px;
   overflow: hidden;
-  backface-visibility: hidden;
   cursor: pointer;
   user-select: none;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.05);
   transition:
-    transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-    box-shadow 0.4s ease,
-    border-color 0.4s ease;
+    transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+    box-shadow 0.35s ease,
+    border-color 0.35s ease;
 }
 
 .card img {
@@ -159,7 +165,7 @@ onUnmounted(() => {
   height: 100%;
   object-fit: cover;
   display: block;
-  transition: transform 0.4s ease, filter 0.4s ease;
+  transition: transform 0.35s ease, filter 0.35s ease;
   filter: brightness(0.75);
 }
 
@@ -168,26 +174,28 @@ onUnmounted(() => {
   bottom: 0;
   left: 0;
   right: 0;
-  padding: 10px 8px;
-  background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
+  padding: 4px 2px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.85));
   transform: translateY(100%);
-  transition: transform 0.35s ease;
+  transition: transform 0.3s ease;
 }
 
 .title {
   color: #fff;
-  font-size: 12px;
+  font-size: 8px;
   font-weight: 600;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.2px;
+  display: block;
+  text-align: center;
 }
 
 .card.hovered {
-  transform: rotateY(var(--ry)) translateZ(calc(var(--tz) + 50px)) scale(1.1) !important;
   box-shadow:
-    0 0 40px rgba(139, 92, 246, 0.5),
-    0 0 80px rgba(139, 92, 246, 0.2);
-  border-color: rgba(139, 92, 246, 0.5);
-  z-index: 10;
+    0 0 24px rgba(139, 92, 246, 0.45),
+    0 0 48px rgba(139, 92, 246, 0.15);
+  border-color: rgba(139, 92, 246, 0.4);
+  transform: scale(1.12);
+  z-index: 100 !important;
 }
 
 .card.hovered img {
@@ -201,12 +209,12 @@ onUnmounted(() => {
 
 .hint {
   position: absolute;
-  bottom: 24px;
+  bottom: 20px;
   left: 50%;
   transform: translateX(-50%);
   text-align: center;
-  color: #666;
-  font-size: 13px;
+  color: #444;
+  font-size: 11px;
   font-family: system-ui, sans-serif;
 }
 </style>
