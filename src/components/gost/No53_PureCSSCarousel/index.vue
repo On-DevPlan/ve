@@ -1,0 +1,105 @@
+<script setup>
+// Pure CSS carousel - no JavaScript needed
+</script>
+
+<template>
+  <div class="demo-wrapper">
+    <div class="shell">
+      <input type="radio" name="position">
+      <input type="radio" name="position">
+      <input type="radio" name="position" checked>
+      <input type="radio" name="position">
+      <input type="radio" name="position">
+      <div class="box">
+        <div class="item"></div>
+        <div class="item"></div>
+        <div class="item"></div>
+        <div class="item"></div>
+        <div class="item"></div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+* {
+  padding: 0;
+  margin: 0;
+}
+
+.demo-wrapper {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  margin: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-image: linear-gradient(to right, #f0b5cf 0%, #b7b5ff 100%);
+}
+
+.shell {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  display: grid;
+  grid-template-rows: 500px 200px;
+}
+
+.box {
+  grid-row: 1 / 2;
+  grid-column: 1 / 8;
+  width: 100vw;
+  height: 570px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  transform-style: preserve-3d;
+  perspective: 800px;
+  --items: 5;
+  --middle: 3;
+  --position: 1;
+}
+
+div.item {
+  position: absolute;
+  width: 350px;
+  height: 500px;
+  background-color: coral;
+  --r: calc(var(--position) - var(--offset));
+  --abs: max(calc(var(--r) * -1), var(--r));
+  transition: all 0.25s linear;
+  transform: rotateY(calc(-10deg * var(--r))) translateX(calc(-330px * var(--r)));
+  z-index: calc((var(--position) - var(--abs)));
+  background-size: cover;
+  box-shadow: 0px 0px 30px rgba(0, 0, 0, 0.6);
+  border: #b5c5ff 10px solid;
+  border-radius: 5px;
+}
+
+input {
+  width: 35px;
+  height: 35px;
+  margin: 10px;
+}
+
+.box .item:nth-of-type(1) { --offset: 1; background-image: url(/gost/No53_PureCSSCarousel/1.jpg); }
+.box .item:nth-of-type(2) { --offset: 2; background-image: url(/gost/No53_PureCSSCarousel/2.jpg); }
+.box .item:nth-of-type(3) { --offset: 3; background-image: url(/gost/No53_PureCSSCarousel/3.jpg); }
+.box .item:nth-of-type(4) { --offset: 4; background-image: url(/gost/No53_PureCSSCarousel/4.jpg); }
+.box .item:nth-of-type(5) { --offset: 5; background-image: url(/gost/No53_PureCSSCarousel/5.jpg); }
+
+input:nth-of-type(1) { grid-column: 2/3; grid-row: 2/3; }
+input:nth-of-type(2) { grid-column: 3/4; grid-row: 2/3; }
+input:nth-of-type(3) { grid-column: 4/5; grid-row: 2/3; }
+input:nth-of-type(4) { grid-column: 5/6; grid-row: 2/3; }
+input:nth-of-type(5) { grid-column: 6/7; grid-row: 2/3; }
+
+input:nth-of-type(1):checked ~ .box { --position: 1; }
+input:nth-of-type(2):checked ~ .box { --position: 2; }
+input:nth-of-type(3):checked ~ .box { --position: 3; }
+input:nth-of-type(4):checked ~ .box { --position: 4; }
+input:nth-of-type(5):checked ~ .box { --position: 5; }
+</style>
