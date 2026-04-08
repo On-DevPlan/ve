@@ -19,6 +19,12 @@ COPY . .
 # 设置NODE_OPTIONS以处理crypto问题
 ENV NODE_OPTIONS="--openssl-legacy-provider"
 
+# 传入构建信息（Git commit SHA 和构建时间）
+ARG VITE_GIT_COMMIT=unknown
+ARG VITE_BUILD_TIME=unknown
+ENV VITE_GIT_COMMIT=${VITE_GIT_COMMIT}
+ENV VITE_BUILD_TIME=${VITE_BUILD_TIME}
+
 # 构建应用
 RUN pnpm run build
 
