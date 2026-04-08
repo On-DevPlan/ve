@@ -47,6 +47,9 @@ importers:
       jspreadsheet-ce:
         specifier: ^5.0.4
         version: 5.0.4
+      markdown-it:
+        specifier: ^14.1.1
+        version: 14.1.1
       markdown-it-math:
         specifier: ^5.2.1
         version: 5.2.1
