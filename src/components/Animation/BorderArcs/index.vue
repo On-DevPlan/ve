@@ -1,38 +1,72 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 
-// 每个圆独立维护旋转角度
+// 每个圆维护 angle（角度）和 velocity（速度），用于惯性动量
 const circles = ref([
-  { id: 'top', angle: 0 },
-  { id: 'bottom', angle: 0 },
-  { id: 'left', angle: 0 },
-  { id: 'right', angle: 0 }
+  { id: 'top',    angle: 0, velocity: 0 },
+  { id: 'bottom', angle: 0, velocity: 0 },
+  { id: 'left',   angle: 0, velocity: 0 },
+  { id: 'right',  angle: 0, velocity: 0 }
 ])
 
 const circleEls = ref([])
+let rafId = null
+const FRICTION = 0.94   // 每帧速度衰减系数，越小衰减越快
+const MIN_VELOCITY = 0.1 // 低于此值时停止动画
 
 function setCircleRef(el, index) {
   if (el) circleEls.value[index] = el
 }
 
-// 单圆独立滚动
+// 单圆滚动：积累速度，不是直接改角度
 function onWheel(e, index) {
   e.preventDefault()
   e.stopPropagation()
-  circles.value[index].angle += e.deltaY * 0.3
-  circleEls.value[index].style.transform = `rotate(${circles.value[index].angle}deg)`
+  circles.value[index].velocity += e.deltaY * 0.12
+  circles.value[index].velocity = Math.max(-60, Math.min(60, circles.value[index].velocity))
+  startMomentum()
 }
 
-// 全局滚动：不在圆上时四圆联动
+// 全局滚动：四圆联动
 function onGlobalWheel(e) {
   if (e.target.classList.contains('circle')) return
   e.preventDefault()
+  circles.value.forEach((c) => {
+    c.velocity += e.deltaY * 0.06
+    c.velocity = Math.max(-60, Math.min(60, c.velocity))
+  })
+  startMomentum()
+}
+
+// 启动惯性动画循环
+function startMomentum() {
+  if (rafId !== null) return
+  rafId = requestAnimationFrame(momentumTick)
+}
+
+// 每帧更新：角度 += 速度，速度 *= 衰减，接近零时停止
+function momentumTick() {
+  let anyAlive = false
+
   circles.value.forEach((c, i) => {
-    c.angle += e.deltaY * 0.15
+    if (Math.abs(c.velocity) < MIN_VELOCITY) {
+      c.velocity = 0
+    } else {
+      c.angle += c.velocity
+      c.velocity *= FRICTION
+      anyAlive = true
+    }
+
     if (circleEls.value[i]) {
       circleEls.value[i].style.transform = `rotate(${c.angle}deg)`
     }
   })
+
+  if (anyAlive) {
+    rafId = requestAnimationFrame(momentumTick)
+  } else {
+    rafId = null
+  }
 }
 
 onMounted(() => {
@@ -41,6 +75,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   document.removeEventListener('wheel', onGlobalWheel)
+  if (rafId !== null) cancelAnimationFrame(rafId)
 })
 </script>
 
