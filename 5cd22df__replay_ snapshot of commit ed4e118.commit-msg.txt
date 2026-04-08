@@ -1,0 +1,16 @@
+sha:        5cd22dfb30a13efb75206bb71296526ad941693c
+short:      5cd22df
+author:     zhaoliuxue <2096343460@qq.com>
+date:       2026-04-08T14:58:57+08:00
+subject:    replay: snapshot of commit ed4e118
+
+--- body ---
+replay: snapshot of commit ed4e118
+
+original-subject: fix: ensure component routes are ready before app mount
+original-author:  zhaoliuxue <2096343460@qq.com>
+original-date:    2026-04-08T14:58:57+08:00
+files:            2
+
+--- files (1) ---
+.commit-msgs/ed4e118__fix_ ensure component routes are ready before app mount.commit-msg.txt
