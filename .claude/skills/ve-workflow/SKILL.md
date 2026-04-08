@@ -122,6 +122,28 @@ git push origin {current-branch}
 | `Basic` | Basic demos | HelloWorld |
 | `huang` | Custom components | gis, map, report |
 
+## Adding New Dependencies
+
+When creating components that import external packages, **MUST declare them in package.json**:
+
+```bash
+pnpm add <package-name>
+```
+
+**Why this matters:**
+- Docker build uses `pnpm install` to install only packages listed in `dependencies`
+- If a component imports a package not in package.json, the build will fail with "Rollup failed to resolve import"
+- Always run `pnpm run build` after adding new imports to verify
+
+**Example:**
+```javascript
+// In component
+import MarkdownIt from 'markdown-it'
+
+// Must run
+pnpm add markdown-it
+```
+
 ## Common Mistakes
 
 | Mistake | Prevention |
@@ -130,6 +152,7 @@ git push origin {current-branch}
 | `name` doesn't match directory | Verify exact match (case-sensitive) |
 | Build errors not caught | Always run `pnpm run build` before commit |
 | Not pushing after task | Git push triggers GitHub Actions deployment |
+| Missing package.json entry | Always run `pnpm add <package>` after importing new libs |
 
 ## Project Structure
 
