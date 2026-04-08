@@ -74,14 +74,14 @@ pnpm run build
 ```
 
 **Build output indicates:**
-- `dist/` generated → Syntax OK
+- `✓ built` shown → Syntax OK
 - Errors shown → Fix before proceeding
 
 **Common errors to watch for:**
 - Missing required fields in `component.js`
 - Vue template syntax errors
 - Import path issues
-- Missing dependencies
+- **Missing dependencies** — `Rollup failed to resolve import` means a package is imported in source but not in `package.json`. Run `pnpm add <missing-package>` to fix.
 
 ### 4. After Task Completion
 
@@ -131,18 +131,32 @@ pnpm add <package-name>
 ```
 
 **Why this matters:**
-- Docker build uses `pnpm install` to install only packages listed in `dependencies`
-- If a component imports a package not in package.json, the build will fail with "Rollup failed to resolve import"
-- Always run `pnpm run build` after adding new imports to verify
+- Docker build uses `pnpm install --frozen-lockfile` — it installs **only** packages already declared in `package.json` + `pnpm-lock.yaml`
+- If a component imports a package not in package.json, the build fails with `Rollup failed to resolve import "X"`
+- Always run `pnpm run build` after adding new imports to verify the fix works
 
-**Example:**
-```javascript
-// In component
-import MarkdownIt from 'markdown-it'
+**Critical workflow for new dependencies:**
+```bash
+# 1. Add the dependency (updates both package.json and pnpm-lock.yaml)
+pnpm add <package-name>
 
-// Must run
-pnpm add markdown-it
+# 2. Verify build succeeds locally
+pnpm run build
+
+# 3. Commit both package.json and pnpm-lock.yaml
+git add package.json pnpm-lock.yaml
+git commit -m "fix: add missing <package> dependency"
+
+# 4. Push — GitHub Actions will now succeed
+git push origin {branch}
 ```
+
+**Common import errors and their cause:**
+
+| Error | Cause |
+|-------|-------|
+| `Rollup failed to resolve import "X"` | Package not in `package.json` |
+| Works locally but fails in Docker | Lockfile not updated before push |
 
 ## Common Mistakes
 
@@ -153,6 +167,8 @@ pnpm add markdown-it
 | Build errors not caught | Always run `pnpm run build` before commit |
 | Not pushing after task | Git push triggers GitHub Actions deployment |
 | Missing package.json entry | Always run `pnpm add <package>` after importing new libs |
+| Only committing one of package.json / pnpm-lock.yaml | Commit both files together |
+| Testing locally without lockfile update | Run `pnpm install` after `pnpm add` to ensure lockfile is fresh |
 
 ## Project Structure
 
