@@ -24,7 +24,6 @@
     "jspreadsheet-ce": "^5.0.4",
     "katex": "^0.16.45",
     "markdown-it": "^14.1.1",
-    "markdown-it-math": "^5.2.1",
     "marked": "^18.0.0",
     "ol": "^10.7.0",
     "three": "^0.182.0",

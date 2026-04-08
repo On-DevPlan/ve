@@ -1,50 +1,63 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onUnmounted } from 'vue'
 import MarkdownIt from 'markdown-it'
-import markdownItMath from 'markdown-it-math'
 import katex from 'katex'
 
-// 初始化 markdown-it
+// markdown-it（无 math 插件）
 const md = new MarkdownIt({
   html: true,
   linkify: true,
   typographer: true
 })
 
-// 使用 markdown-it-math 插件
-md.use(markdownItMath)
-
-// KaTeX 配置
-const katexOptions = {
+// KaTeX 选项
+const KatexOpts = {
   throwOnError: false,
   displayMode: true
 }
-
-const katexOptionsInline = {
+const KatexOptsInline = {
   throwOnError: false,
   displayMode: false
 }
 
-// markdown-it-math 插件输出的 HTML 不自动渲染 KaTeX，
-// 需要手动 post-processing：把 $$...$$ 和 $...$ 里的 LaTeX 用 KaTeX 渲染
-function renderKatex(html) {
-  // 渲染块级公式 $$...$$
-  html = html.replace(/\$\$([^$]+)\$\$/g, (_, tex) => {
+// 先把 LaTeX 渲染成 KaTeX HTML，再交给 markdown-it 处理剩余文字
+// 这样 markdown-it 不会把 $$ 转成 HTML 实体
+function renderMath(src) {
+  // 块级 $$...$$
+  src = src.replace(/\$\$([\s\S]+?)\$\$/g, (_, tex) => {
     try {
-      return `<div class="katex-display"><div class="katex">${katex.renderToString(tex.trim(), { ...katexOptions, displayMode: true })}</div></div>`
+      return `<div class="katex-display">${katex.renderToString(tex.trim(), { ...KatexOpts, displayMode: true })}</div>`
     } catch {
       return `<div class="katex-display"><code>${tex}</code></div>`
     }
   })
-  // 渲染行内公式 $...$
-  html = html.replace(/\$([^$\n]+)\$/g, (_, tex) => {
+  // 行内 $...$（确保不在 code block 内）
+  src = src.replace(/(^|[^\\])\$([^$\n]+?)\$/gm, (_, lead, tex) => {
     try {
-      return `<span class="katex-inline">${katex.renderToString(tex.trim(), { ...katexOptionsInline, displayMode: false })}</span>`
+      return `${lead}<span class="katex-inline">${katex.renderToString(tex.trim(), { ...KatexOptsInline, displayMode: false })}</span>`
     } catch {
-      return `<code>${tex}</code>`
+      return `${lead}<code>${tex}</code>`
     }
   })
-  return html
+  return src
+}
+
+// 对已渲染好的 HTML 中的行内公式做二次处理（markdown-it 可能破坏 $...$）
+function renderInlineMath(html) {
+  return html.replace(/<span class="katex-inline">([\s\S]*?)<\/span>/g, (match, tex) => {
+    try {
+      return `<span class="katex-inline">${katex.renderToString(tex.trim(), { ...KatexOptsInline, displayMode: false })}</span>`
+    } catch {
+      return match
+    }
+  })
+}
+
+// 最终渲染
+function render(src) {
+  if (!src) return ''
+  const withMath = renderMath(src)
+  return renderInlineMath(md.render(withMath))
 }
 
 // 状态
@@ -64,7 +77,6 @@ const speedOptions = [
   { label: '龟速', value: 200 }
 ]
 
-// 包含 LaTeX 数学公式的示例
 const sampleTexts = [
   {
     title: '数学公式',
@@ -105,8 +117,6 @@ $$f(x) = \\frac{1}{\\sigma\\sqrt{2\\pi}} e^{-\\frac{(x-\\mu)^2}{2\\sigma^2}}$$
 $$E = mc^2$$
 
 ## 薛定谔方程
-
-### 薛定谔方程（时间独立形式）
 
 $$-\\frac{\\hbar^2}{2m}\\nabla^2\\psi + V\\psi = E\\psi$$
 
@@ -152,10 +162,6 @@ function fibonacci(n) {
   if (n <= 1) return n
   return fibonacci(n - 1) + fibonacci(n - 2)
 }
-
-// 时间复杂度分析
-// T(n) = T(n-1) + T(n-2) + O(1)
-// 解为 O(φ^n)，其中 φ = (1 + √5) / 2 ≈ 1.618
 \`\`\`
 
 ## 斐波那契数列通项
@@ -166,10 +172,9 @@ $$F_n = \\frac{\\varphi^n - (1-\\varphi)^n}{\\sqrt{5}}$$
   }
 ]
 
-// 渲染内容
 const renderedContent = computed(() => {
   if (!content.value) return ''
-  return renderKatex(md.render(content.value))
+  return render(content.value)
 })
 
 function startCursor() {
@@ -222,12 +227,10 @@ function startStream(text) {
       stopCursor()
       return
     }
-
     const chunkSize = getChunkSize()
     const end = Math.min(index + chunkSize, len)
     content.value = text.substring(0, end)
     index = end
-
     const delay = currentSpeed.value < 30 ? currentSpeed.value * 0.5 : currentSpeed.value
     streamTimeout = setTimeout(streamNext, delay)
   }
@@ -239,32 +242,6 @@ function setSpeed(speed) {
   currentSpeed.value = speed
 }
 
-watch(currentSpeed, () => {
-  if (isStreaming.value && rawContent.value) {
-    stopStream()
-    isStreaming.value = true
-    startCursor()
-    let index = content.value.length
-    const chars = rawContent.value.split('')
-    const len = chars.length
-
-    function streamNext() {
-      if (!isStreaming.value || index >= len) {
-        isStreaming.value = false
-        stopCursor()
-        return
-      }
-      const chunkSize = currentSpeed.value <= 15 ? 5 : currentSpeed.value <= 35 ? 3 : 1
-      const end = Math.min(index + chunkSize, len)
-      content.value = rawContent.value.substring(0, end)
-      index = end
-      const delay = currentSpeed.value < 30 ? currentSpeed.value * 0.5 : currentSpeed.value
-      streamTimeout = setTimeout(streamNext, delay)
-    }
-    streamTimeout = setTimeout(streamNext, currentSpeed.value)
-  }
-})
-
 onUnmounted(() => {
   stopStream()
   stopCursor()
@@ -273,8 +250,6 @@ onUnmounted(() => {
 
 <template>
   <div class="md-math">
-    <div class="bg-pattern"></div>
-
     <!-- 顶部栏 -->
     <header class="header">
       <div class="header-left">
@@ -338,7 +313,7 @@ onUnmounted(() => {
 
     <!-- 底部说明 -->
     <footer class="footer">
-      <span>支持 $\\inline$ 行内公式 和 $$\\block$$ 块级公式 · KaTeX 渲染引擎</span>
+      <span>支持 $inline$ 行内公式 和 $$block$$ 块级公式 · KaTeX 渲染引擎</span>
     </footer>
   </div>
 </template>
@@ -349,17 +324,8 @@ onUnmounted(() => {
   inset: 0;
   display: flex;
   flex-direction: column;
-  background: #141820;
+  background: #f5f5f7;
   overflow: hidden;
-}
-
-.bg-pattern {
-  position: absolute;
-  inset: 0;
-  background-image:
-    radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.08) 0%, transparent 40%),
-    radial-gradient(circle at 90% 80%, rgba(59, 130, 246, 0.06) 0%, transparent 40%);
-  pointer-events: none;
 }
 
 /* 顶部栏 */
@@ -368,8 +334,8 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   padding: 14px 24px;
-  background: rgba(20, 24, 32, 0.95);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  background: #ffffff;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
   z-index: 10;
 }
 
@@ -381,19 +347,19 @@ onUnmounted(() => {
 
 .tech-badge {
   padding: 3px 10px;
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.25), rgba(59, 130, 246, 0.25));
-  border: 1px solid rgba(99, 102, 241, 0.4);
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(59, 130, 246, 0.15));
+  border: 1px solid rgba(99, 102, 241, 0.3);
   border-radius: 4px;
   font-size: 11px;
   font-weight: 700;
-  color: #818cf8;
+  color: #6366f1;
   letter-spacing: 1px;
 }
 
 .header-title {
   font-size: 14px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.85);
+  color: #1d1d1f;
 }
 
 .header-right {
@@ -417,7 +383,7 @@ onUnmounted(() => {
 
 .status-label {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.4);
+  color: #86868b;
 }
 
 /* 控制栏 */
@@ -426,8 +392,8 @@ onUnmounted(() => {
   align-items: center;
   gap: 20px;
   padding: 10px 24px;
-  background: rgba(22, 26, 36, 0.9);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  background: #ffffff;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
   z-index: 10;
   flex-wrap: wrap;
 }
@@ -442,7 +408,7 @@ onUnmounted(() => {
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.8px;
-  color: rgba(255, 255, 255, 0.35);
+  color: #86868b;
   font-weight: 500;
 }
 
@@ -453,28 +419,28 @@ onUnmounted(() => {
 
 .ctrl-btn, .sample-btn, .action-btn {
   padding: 5px 11px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(0, 0, 0, 0.12);
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.03);
-  color: rgba(255, 255, 255, 0.65);
+  background: #f5f5f7;
+  color: #1d1d1f;
   font-size: 12px;
   cursor: pointer;
   transition: all 0.15s;
 }
 
 .ctrl-btn:hover, .sample-btn:hover, .action-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.9);
+  background: #e8e8ed;
+  color: #1d1d1f;
 }
 
 .ctrl-btn.active {
-  background: rgba(99, 102, 241, 0.2);
-  border-color: rgba(99, 102, 241, 0.5);
-  color: #a5b4fc;
+  background: #007aff;
+  border-color: #007aff;
+  color: #fff;
 }
 
 .sample-btn:disabled {
-  opacity: 0.3;
+  opacity: 0.35;
   cursor: not-allowed;
 }
 
@@ -492,8 +458,8 @@ onUnmounted(() => {
 }
 
 .action-btn.pause {
-  border-color: rgba(251, 191, 36, 0.4);
-  color: #fbbf24;
+  border-color: rgba(251, 191, 36, 0.6);
+  color: #d97706;
 }
 
 .action-btn.pause:disabled {
@@ -502,8 +468,8 @@ onUnmounted(() => {
 }
 
 .action-btn.clear {
-  border-color: rgba(248, 113, 113, 0.4);
-  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #ef4444;
 }
 
 /* 内容区 */
@@ -516,23 +482,23 @@ onUnmounted(() => {
 .render-paper {
   max-width: 820px;
   margin: 0 auto;
-  background: rgba(20, 24, 32, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 10px;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
   min-height: 300px;
   position: relative;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
 }
 
 .math-body {
   padding: 28px 32px;
-  color: #f8fafc;
+  color: #1d1d1f;
   line-height: 1.8;
 }
 
 .blink-cursor {
   display: inline-block;
-  color: #818cf8;
+  color: #6366f1;
   opacity: 0;
   transition: opacity 0.1s;
 }
@@ -541,64 +507,49 @@ onUnmounted(() => {
   opacity: 1;
 }
 
-/* Markdown + KaTeX 样式 */
+/* Markdown 样式 */
 .math-body :deep(h1) {
   font-size: 1.6em;
-  font-weight: 600;
+  font-weight: 700;
   margin: 0 0 24px;
   padding-bottom: 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
-  color: #ffffff;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  color: #1d1d1f;
 }
 
 .math-body :deep(h2) {
   font-size: 1.3em;
   font-weight: 600;
   margin: 28px 0 14px;
-  color: #f1f5f9;
+  color: #1d1d1f;
 }
 
 .math-body :deep(h3) {
   font-size: 1.1em;
   font-weight: 600;
   margin: 20px 0 10px;
-  color: #e2e8f0;
+  color: #3d3d3d;
 }
 
 .math-body :deep(p) {
   margin: 10px 0;
-  color: #e2e8f0;
+  color: #3d3d3d;
 }
 
 .math-body :deep(strong) {
-  color: #ffffff;
+  color: #1d1d1f;
   font-weight: 600;
 }
 
 .math-body :deep(em) {
-  color: #cbd5e1;
+  color: #5c5c5c;
   font-style: italic;
-}
-
-.math-body :deep(blockquote) {
-  margin: 14px 0;
-  padding: 10px 18px;
-  background: rgba(99, 102, 241, 0.1);
-  border-left: 3px solid #818cf8;
-  border-radius: 0 5px 5px 0;
-  color: #c7d2fe;
-}
-
-.math-body :deep(hr) {
-  border: none;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
-  margin: 24px 0;
 }
 
 .math-body :deep(ul), .math-body :deep(ol) {
   margin: 10px 0;
   padding-left: 22px;
+  color: #3d3d3d;
 }
 
 .math-body :deep(li) {
@@ -612,8 +563,8 @@ onUnmounted(() => {
 .math-body :deep(pre) {
   margin: 14px 0;
   padding: 14px;
-  background: #0d1117;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #f5f5f7;
+  border: 1px solid rgba(0, 0, 0, 0.06);
   border-radius: 6px;
   overflow-x: auto;
 }
@@ -622,61 +573,53 @@ onUnmounted(() => {
   font-family: 'Fira Code', 'Cascadia Code', monospace;
   font-size: 12.5px;
   line-height: 1.5;
-  color: #c9d1d9;
+  color: #3d3d3d;
 }
 
 .math-body :deep(code) {
   font-family: 'Fira Code', 'Cascadia Code', monospace;
   font-size: 0.88em;
   padding: 2px 5px;
-  background: rgba(110, 118, 129, 0.18);
-  border: 1px solid rgba(110, 118, 129, 0.25);
+  background: rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 3px;
-  color: #f0883e;
+  color: #d97706;
 }
 
-/* KaTeX 数学公式样式 */
+/* KaTeX 样式 */
 .math-body :deep(.katex-display) {
   margin: 16px 0;
   padding: 14px 18px;
-  background: rgba(99, 102, 241, 0.06);
-  border: 1px solid rgba(99, 102, 241, 0.18);
+  background: rgba(99, 102, 241, 0.05);
+  border: 1px solid rgba(99, 102, 241, 0.15);
   border-radius: 8px;
   overflow-x: auto;
 }
 
 .math-body :deep(.katex) {
   font-size: 1.1em;
-  color: #e2e8f0;
+  color: #1d1d1f;
 }
 
 .math-body :deep(.katex-display > .katex) {
   font-size: 1.2em;
-  color: #f1f5f9;
 }
 
 .math-body :deep(.katex-inline .katex) {
-  color: #e2e8f0;
-}
-
-.math-body :deep(.katex-display .katex .mord),
-.math-body :deep(.katex-display .katex .mbin),
-.math-body :deep(.katex-display .katex .mrel),
-.math-body :deep(.katex-display .katex .mopen),
-.math-body :deep(.katex-display .katex .mclose) {
-  color: #f1f5f9;
+  font-size: 1em;
+  color: #1d1d1f;
 }
 
 /* 页脚 */
 .footer {
   padding: 9px 24px;
-  background: rgba(20, 24, 32, 0.9);
-  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  background: #ffffff;
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
   text-align: center;
 }
 
 .footer span {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.3);
+  color: #86868b;
 }
 </style>
