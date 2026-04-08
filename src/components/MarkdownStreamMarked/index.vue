@@ -300,7 +300,7 @@ onUnmounted(() => {
   inset: 0;
   display: flex;
   flex-direction: column;
-  background: #0d1117;
+  background: #f5f5f7;
   overflow: hidden;
 }
 
@@ -308,8 +308,8 @@ onUnmounted(() => {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse at 20% 0%, rgba(88, 166, 255, 0.15) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 100%, rgba(139, 92, 246, 0.1) 0%, transparent 50%);
+    radial-gradient(ellipse at 20% 0%, rgba(99, 102, 241, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 100%, rgba(59, 130, 246, 0.06) 0%, transparent 50%);
   pointer-events: none;
 }
 
@@ -317,8 +317,8 @@ onUnmounted(() => {
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+    linear-gradient(rgba(0, 0, 0, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.025) 1px, transparent 1px);
   background-size: 40px 40px;
   pointer-events: none;
 }
@@ -331,8 +331,8 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   padding: 14px 24px;
-  background: rgba(13, 17, 23, 0.8);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: #ffffff;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
 }
 
 .header-left {
@@ -343,12 +343,12 @@ onUnmounted(() => {
 
 .badge {
   padding: 4px 10px;
-  background: rgba(139, 92, 246, 0.2);
-  border: 1px solid rgba(139, 92, 246, 0.4);
+  background: rgba(99, 102, 241, 0.1);
+  border: 1px solid rgba(99, 102, 241, 0.3);
   border-radius: 4px;
   font-size: 11px;
   font-weight: 600;
-  color: #a78bfa;
+  color: #6366f1;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -356,7 +356,7 @@ onUnmounted(() => {
 .title {
   font-size: 15px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.9);
+  color: #1d1d1f;
 }
 
 .header-right {
@@ -380,7 +380,7 @@ onUnmounted(() => {
 
 .status-text {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.5);
+  color: #86868b;
 }
 
 /* 控制面板 */
@@ -391,8 +391,8 @@ onUnmounted(() => {
   align-items: center;
   gap: 20px;
   padding: 12px 24px;
-  background: rgba(22, 27, 34, 0.9);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  background: #ffffff;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
   flex-wrap: wrap;
 }
 
@@ -405,7 +405,7 @@ onUnmounted(() => {
 .section-label {
   font-size: 11px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.4);
+  color: #86868b;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -417,25 +417,24 @@ onUnmounted(() => {
 
 .speed-btn, .sample-btn, .action-btn {
   padding: 5px 11px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(0, 0, 0, 0.12);
   border-radius: 5px;
-  background: rgba(255, 255, 255, 0.03);
-  color: rgba(255, 255, 255, 0.7);
+  background: #f5f5f7;
+  color: #1d1d1f;
   font-size: 12px;
   cursor: pointer;
   transition: all 0.15s;
 }
 
 .speed-btn:hover, .sample-btn:hover, .action-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.2);
-  color: rgba(255, 255, 255, 0.9);
+  background: #e8e8ed;
+  color: #1d1d1f;
 }
 
 .speed-btn.active {
-  background: rgba(88, 166, 255, 0.15);
-  border-color: rgba(88, 166, 255, 0.5);
-  color: #58a6ff;
+  background: #007aff;
+  border-color: #007aff;
+  color: #ffffff;
 }
 
 .sample-btn:disabled {
@@ -448,8 +447,8 @@ onUnmounted(() => {
 }
 
 .action-btn.pause {
-  border-color: rgba(251, 146, 60, 0.4);
-  color: #fb923c;
+  border-color: rgba(251, 146, 60, 0.5);
+  color: #d97706;
 }
 
 .action-btn.pause:disabled {
@@ -458,8 +457,8 @@ onUnmounted(() => {
 }
 
 .action-btn.reset {
-  border-color: rgba(248, 113, 113, 0.4);
-  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #ef4444;
 }
 
 /* 内容区域 */
@@ -476,23 +475,21 @@ onUnmounted(() => {
   max-width: 800px;
   min-height: 400px;
   position: relative;
-  background: rgba(22, 27, 34, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 12px;
-  box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.03),
-    0 20px 50px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.06);
 }
 
 .markdown-body {
   padding: 32px 36px;
   line-height: 1.85;
-  color: #e6edf3;
+  color: #1d1d1f;
 }
 
 .cursor {
   display: inline-block;
-  color: #58a6ff;
+  color: #6366f1;
   font-weight: bold;
   opacity: 0;
   transition: opacity 0.08s;
@@ -502,14 +499,14 @@ onUnmounted(() => {
   opacity: 1;
 }
 
-/* Markdown 样式 - GitHub Dark 风格 */
+/* Markdown 样式 - Light 风格 */
 .markdown-body :deep(h1) {
   font-size: 1.75em;
-  font-weight: 600;
+  font-weight: 700;
   margin: 0 0 28px;
   padding-bottom: 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
-  color: #f0f6fc;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  color: #1d1d1f;
 }
 
 .markdown-body :deep(h2) {
@@ -517,22 +514,22 @@ onUnmounted(() => {
   font-weight: 600;
   margin: 32px 0 16px;
   padding-bottom: 8px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  color: #f0f6fc;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  color: #1d1d1f;
 }
 
 .markdown-body :deep(h3) {
   font-size: 1.15em;
   font-weight: 600;
   margin: 24px 0 12px;
-  color: #c9d1d9;
+  color: #3d3d3d;
 }
 
 .markdown-body :deep(h4), .markdown-body :deep(h5), .markdown-body :deep(h6) {
   font-size: 1em;
   font-weight: 600;
   margin: 16px 0 8px;
-  color: #8b949e;
+  color: #5c5c5c;
 }
 
 .markdown-body :deep(p) {
@@ -540,32 +537,32 @@ onUnmounted(() => {
 }
 
 .markdown-body :deep(strong) {
-  color: #f0f6fc;
+  color: #1d1d1f;
   font-weight: 600;
 }
 
 .markdown-body :deep(em) {
-  color: #c9d1d9;
+  color: #5c5c5c;
   font-style: italic;
 }
 
 .markdown-body :deep(blockquote) {
   margin: 16px 0;
   padding: 12px 20px;
-  background: rgba(56, 139, 253, 0.1);
-  border-left: 3px solid #388bfd;
+  background: rgba(0, 122, 255, 0.05);
+  border-left: 3px solid #007aff;
   border-radius: 0 6px 6px 0;
-  color: #8b949e;
+  color: #5c5c5c;
 }
 
 .markdown-body :deep(blockquote strong) {
-  color: #58a6ff;
+  color: #007aff;
 }
 
 .markdown-body :deep(hr) {
   border: none;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent);
+  background: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.12), transparent);
   margin: 28px 0;
 }
 
@@ -592,15 +589,15 @@ onUnmounted(() => {
   margin: 16px 0;
   border-radius: 6px;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(0, 0, 0, 0.1);
 }
 
 .markdown-body :deep(thead) {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(0, 0, 0, 0.03);
 }
 
 .markdown-body :deep(tr) {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .markdown-body :deep(tr:last-child) {
@@ -614,21 +611,21 @@ onUnmounted(() => {
 
 .markdown-body :deep(th) {
   font-weight: 600;
-  color: #f0f6fc;
+  color: #1d1d1f;
   font-size: 13px;
 }
 
 .markdown-body :deep(td) {
-  color: #c9d1d9;
+  color: #3d3d3d;
   font-size: 13px;
 }
 
-/* 代码块 - GitHub Dark 风格 */
+/* 代码块 - Light 风格 */
 .markdown-body :deep(pre) {
   margin: 16px 0;
   padding: 16px;
-  background: #161b22;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #f5f5f7;
+  border: 1px solid rgba(0, 0, 0, 0.06);
   border-radius: 6px;
   overflow-x: auto;
 }
@@ -637,7 +634,7 @@ onUnmounted(() => {
   font-family: 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
   font-size: 13px;
   line-height: 1.6;
-  color: #c9d1d9;
+  color: #3d3d3d;
   background: none;
   padding: 0;
   border: none;
@@ -648,10 +645,10 @@ onUnmounted(() => {
   font-family: 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
   font-size: 0.9em;
   padding: 2px 6px;
-  background: rgba(110, 118, 129, 0.2);
-  border: 1px solid rgba(110, 118, 129, 0.3);
+  background: rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 4px;
-  color: #f0883e;
+  color: #d97706;
 }
 
 /* 页脚 */
@@ -659,17 +656,17 @@ onUnmounted(() => {
   position: relative;
   z-index: 10;
   padding: 10px 24px;
-  background: rgba(13, 17, 23, 0.8);
-  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  background: #ffffff;
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
   text-align: center;
 }
 
 .footer span {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.3);
+  color: #86868b;
 }
 
 .footer strong {
-  color: rgba(255, 255, 255, 0.5);
+  color: #5c5c5c;
 }
 </style>
