@@ -1,7 +1,7 @@
 export default {
   // === Basic Information ===
   name: 'GISUser',
-  title: 'GIS 旅行日记 - 用户展示',
+  title: '演唱会 - 用户侧',
   description: '演唱会巡演路线展示系统（用户模式）- 展示巡演路线、站点信息、播放动画',
   version: '1.0.0',
 
