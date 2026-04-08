@@ -25,6 +25,28 @@ const katexOptionsInline = {
   displayMode: false
 }
 
+// markdown-it-math 插件输出的 HTML 不自动渲染 KaTeX，
+// 需要手动 post-processing：把 $$...$$ 和 $...$ 里的 LaTeX 用 KaTeX 渲染
+function renderKatex(html) {
+  // 渲染块级公式 $$...$$
+  html = html.replace(/\$\$([^$]+)\$\$/g, (_, tex) => {
+    try {
+      return `<div class="katex-display"><div class="katex">${katex.renderToString(tex.trim(), { ...katexOptions, displayMode: true })}</div></div>`
+    } catch {
+      return `<div class="katex-display"><code>${tex}</code></div>`
+    }
+  })
+  // 渲染行内公式 $...$
+  html = html.replace(/\$([^$\n]+)\$/g, (_, tex) => {
+    try {
+      return `<span class="katex-inline">${katex.renderToString(tex.trim(), { ...katexOptionsInline, displayMode: false })}</span>`
+    } catch {
+      return `<code>${tex}</code>`
+    }
+  })
+  return html
+}
+
 // 状态
 const content = ref('')
 const rawContent = ref('')
@@ -147,7 +169,7 @@ $$F_n = \\frac{\\varphi^n - (1-\\varphi)^n}{\\sqrt{5}}$$
 // 渲染内容
 const renderedContent = computed(() => {
   if (!content.value) return ''
-  return md.render(content.value)
+  return renderKatex(md.render(content.value))
 })
 
 function startCursor() {
@@ -504,7 +526,7 @@ onUnmounted(() => {
 
 .math-body {
   padding: 28px 32px;
-  color: #e2e8f0;
+  color: #f8fafc;
   line-height: 1.8;
 }
 
@@ -525,45 +547,46 @@ onUnmounted(() => {
   font-weight: 600;
   margin: 0 0 24px;
   padding-bottom: 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-  color: #f1f5f9;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  color: #ffffff;
 }
 
 .math-body :deep(h2) {
   font-size: 1.3em;
   font-weight: 600;
   margin: 28px 0 14px;
-  color: #e2e8f0;
+  color: #f1f5f9;
 }
 
 .math-body :deep(h3) {
   font-size: 1.1em;
   font-weight: 600;
   margin: 20px 0 10px;
-  color: #cbd5e1;
+  color: #e2e8f0;
 }
 
 .math-body :deep(p) {
   margin: 10px 0;
+  color: #e2e8f0;
 }
 
 .math-body :deep(strong) {
-  color: #f1f5f9;
+  color: #ffffff;
   font-weight: 600;
 }
 
 .math-body :deep(em) {
-  color: #94a3b8;
+  color: #cbd5e1;
   font-style: italic;
 }
 
 .math-body :deep(blockquote) {
   margin: 14px 0;
   padding: 10px 18px;
-  background: rgba(99, 102, 241, 0.08);
-  border-left: 3px solid #6366f1;
+  background: rgba(99, 102, 241, 0.1);
+  border-left: 3px solid #818cf8;
   border-radius: 0 5px 5px 0;
-  color: #a5b4fc;
+  color: #c7d2fe;
 }
 
 .math-body :deep(hr) {
@@ -616,18 +639,32 @@ onUnmounted(() => {
 .math-body :deep(.katex-display) {
   margin: 16px 0;
   padding: 14px 18px;
-  background: rgba(99, 102, 241, 0.05);
-  border: 1px solid rgba(99, 102, 241, 0.15);
+  background: rgba(99, 102, 241, 0.06);
+  border: 1px solid rgba(99, 102, 241, 0.18);
   border-radius: 8px;
   overflow-x: auto;
 }
 
 .math-body :deep(.katex) {
   font-size: 1.1em;
+  color: #e2e8f0;
 }
 
 .math-body :deep(.katex-display > .katex) {
   font-size: 1.2em;
+  color: #f1f5f9;
+}
+
+.math-body :deep(.katex-inline .katex) {
+  color: #e2e8f0;
+}
+
+.math-body :deep(.katex-display .katex .mord),
+.math-body :deep(.katex-display .katex .mbin),
+.math-body :deep(.katex-display .katex .mrel),
+.math-body :deep(.katex-display .katex .mopen),
+.math-body :deep(.katex-display .katex .mclose) {
+  color: #f1f5f9;
 }
 
 /* 页脚 */
