@@ -7,6 +7,9 @@ import ComponentInfoModal from '../components/ComponentInfoModal.vue'
 const router = useRouter()
 const { components, loading } = useComponentDiscovery()
 
+// 构建信息（来自 Vite define 注入）
+const buildInfo = __BUILD_INFO__
+
 // 信息弹窗状态
 const selectedComponent = ref(null)
 const showInfoModal = ref(false)
@@ -103,6 +106,7 @@ const closeInfoModal = () => {
       <div class="header-main">
         <h1 class="title">组件中心</h1>
         <span class="subtitle">{{ filteredComponents.length }} 个组件</span>
+        <span class="build-badge" :title="buildInfo.time">{{ buildInfo.commit.slice(0, 7) }}</span>
       </div>
 
       <!-- 分组过滤 - 横向胶囊 -->
@@ -209,6 +213,17 @@ const closeInfoModal = () => {
 .subtitle {
   font-size: 14px;
   color: #86868b;
+}
+
+.build-badge {
+  font-size: 11px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  color: #86868b;
+  background: #f5f5f7;
+  padding: 3px 8px;
+  border-radius: 6px;
+  cursor: default;
+  letter-spacing: 0;
 }
 
 /* 分组胶囊 */

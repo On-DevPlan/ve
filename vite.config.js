@@ -1,10 +1,20 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 
+// 注入构建信息：Git commit + 构建时间（来自 Docker --build-arg）
+// 在 vite.config.js 中用 process.env（Vite CLI 会把 --build-arg 注入进来）
+const buildInfo = JSON.stringify({
+  commit: process.env.VITE_GIT_COMMIT || 'dev',
+  time: process.env.VITE_BUILD_TIME || new Date().toISOString()
+})
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [vue()],
   base: '/', // 确保使用正确的base路径
+  define: {
+    __BUILD_INFO__: buildInfo
+  },
   build: {
     rollupOptions: {
       output: {
