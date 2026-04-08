@@ -1,15 +1,6 @@
 <script setup>
-import { onMounted } from 'vue'
-import { useRoute } from 'vue-router'
-import { setupComponentRoutes } from './router'
-
-const route = useRoute()
-
-// 初始化组件路由 - 必须等待完成
-onMounted(async () => {
-  await setupComponentRoutes()
-  console.log('Component routes initialized')
-})
+// 组件路由已在 main.js 的 app.mount() 前通过 setupComponentRoutes() 完成初始化
+// 此处无需重复调用
 </script>
 
 <template>
