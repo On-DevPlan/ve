@@ -1,0 +1,16 @@
+sha:        12093c05f5f4e2e16ee21df4239856a8b3972890
+short:      12093c0
+author:     zhaoliuxue111 <zhaoliuxue111@xiaoduotech.com111>
+date:       2026-04-10T01:10:44+08:00
+subject:    replay: snapshot of commit bb29084
+
+--- body ---
+replay: snapshot of commit bb29084
+
+original-subject: fix(WorkflowCanvas): add position relative to all node roots
+original-author:  zhaoliuxue111 <zhaoliuxue111@xiaoduotech.com111>
+original-date:    2026-04-10T01:10:44+08:00
+files:            3
+
+--- files (1) ---
+.commit-msgs/bb29084__fix(WorkflowCanvas)_ add position relative to all node roots.commit-msg.txt
