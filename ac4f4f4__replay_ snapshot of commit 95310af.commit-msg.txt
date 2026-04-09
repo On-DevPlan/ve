@@ -1,0 +1,16 @@
+sha:        ac4f4f43f888ddd8590e4ef4672e676071eb8f73
+short:      ac4f4f4
+author:     zhaoliuxue111 <zhaoliuxue111@xiaoduotech.com111>
+date:       2026-04-10T00:43:24+08:00
+subject:    replay: snapshot of commit 95310af
+
+--- body ---
+replay: snapshot of commit 95310af
+
+original-subject: docs: add WorkflowCanvas nodes implementation plan
+original-author:  zhaoliuxue111 <zhaoliuxue111@xiaoduotech.com111>
+original-date:    2026-04-10T00:43:24+08:00
+files:            1
+
+--- files (1) ---
+.commit-msgs/95310af__docs_ add WorkflowCanvas nodes implementation plan.commit-msg.txt
