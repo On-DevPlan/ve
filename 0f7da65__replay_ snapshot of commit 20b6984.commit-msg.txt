@@ -1,0 +1,16 @@
+sha:        0f7da6578cd58ea35f9040ad0c427a8fa06a443a
+short:      0f7da65
+author:     zhaoliuxue111 <zhaoliuxue111@xiaoduotech.com111>
+date:       2026-04-10T00:45:24+08:00
+subject:    replay: snapshot of commit 20b6984
+
+--- body ---
+replay: snapshot of commit 20b6984
+
+original-subject: feat(WorkflowCanvas): add useNodeActions composable
+original-author:  zhaoliuxue111 <zhaoliuxue111@xiaoduotech.com111>
+original-date:    2026-04-10T00:45:24+08:00
+files:            1
+
+--- files (1) ---
+.commit-msgs/20b6984__feat(WorkflowCanvas)_ add useNodeActions composable.commit-msg.txt
