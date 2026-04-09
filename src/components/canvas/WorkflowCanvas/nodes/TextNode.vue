@@ -35,6 +35,7 @@ const props = defineProps({
 
 <style scoped>
 .text-node {
+  position: relative;
   background: #fff;
   border: 2px solid #e8e8e8;
   border-radius: 12px;

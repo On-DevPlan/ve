@@ -91,6 +91,7 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .image-node {
+  position: relative;
   background: #fff;
   border: 2px solid #e8e8e8;
   border-radius: 12px;

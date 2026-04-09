@@ -34,6 +34,7 @@ const props = defineProps({
 
 <style scoped>
 .input-node {
+  position: relative;
   background: #fff;
   border: 2px solid #10b981;
   border-radius: 12px;
