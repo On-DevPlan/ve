@@ -1,0 +1,13 @@
+sha:        95310afad44cf1c80b7f3935f3361ecd6effea5e
+short:      95310af
+author:     zhaoliuxue111 <zhaoliuxue111@xiaoduotech.com111>
+date:       2026-04-10T00:43:24+08:00
+subject:    docs: add WorkflowCanvas nodes implementation plan
+
+--- body ---
+docs: add WorkflowCanvas nodes implementation plan
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+
+--- files (1) ---
+docs/superpowers/plans/2026-04-10-workflow-canvas-nodes-plan.md
