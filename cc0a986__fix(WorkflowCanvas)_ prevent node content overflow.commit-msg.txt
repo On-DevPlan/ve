@@ -1,0 +1,17 @@
+sha:        cc0a986126e980ec550bcef2f70dac29bade2b1e
+short:      cc0a986
+author:     zhaoliuxue111 <zhaoliuxue111@xiaoduotech.com111>
+date:       2026-04-10T01:00:20+08:00
+subject:    fix(WorkflowCanvas): prevent node content overflow
+
+--- body ---
+fix(WorkflowCanvas): prevent node content overflow
+
+- InputNode: add max-height 120px and overflow-y auto on textarea
+- TextNode: add max-width 300px on node, max-height 200px on text content
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+
+--- files (2) ---
+src/components/canvas/WorkflowCanvas/nodes/InputNode.vue
+src/components/canvas/WorkflowCanvas/nodes/TextNode.vue
