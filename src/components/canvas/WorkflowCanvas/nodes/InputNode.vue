@@ -19,7 +19,7 @@ const props = defineProps({
 
 <template>
   <div class="input-node">
-    <Handle type="target" :position="Position.Left" class="handle-left" />
+    <Handle type="target" :position="Position.Left" />
     <div class="node-body">
       <div class="node-header">{{ data?.label }}</div>
       <textarea
@@ -28,25 +28,23 @@ const props = defineProps({
         rows="3"
       ></textarea>
     </div>
-    <Handle type="source" :position="Position.Right" class="handle-right" />
+    <Handle type="source" :position="Position.Right" />
   </div>
 </template>
 
 <style scoped>
 .input-node {
   background: #fff;
-  border: 2px solid #e8e8e8;
+  border: 2px solid #10b981;
   border-radius: 12px;
   min-width: 180px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  display: flex;
-  align-items: center;
 }
 
 .node-body {
-  flex: 1;
   padding: 12px;
-  min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .node-header {
@@ -71,6 +69,6 @@ textarea {
 
 textarea:focus {
   outline: none;
-  border-color: #3b82f6;
+  border-color: #10b981;
 }
 </style>
