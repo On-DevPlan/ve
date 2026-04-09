@@ -1,0 +1,16 @@
+sha:        d9901505d710b962654c0834fae88445743a3760
+short:      d990150
+author:     zhaoliuxue111 <zhaoliuxue111@xiaoduotech.com111>
+date:       2026-04-10T01:00:20+08:00
+subject:    replay: snapshot of commit cc0a986
+
+--- body ---
+replay: snapshot of commit cc0a986
+
+original-subject: fix(WorkflowCanvas): prevent node content overflow
+original-author:  zhaoliuxue111 <zhaoliuxue111@xiaoduotech.com111>
+original-date:    2026-04-10T01:00:20+08:00
+files:            2
+
+--- files (1) ---
+.commit-msgs/cc0a986__fix(WorkflowCanvas)_ prevent node content overflow.commit-msg.txt
