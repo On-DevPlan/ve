@@ -1,0 +1,16 @@
+sha:        af8d76ba3fb3e006fdc29e87b6d70b3e407a87f3
+short:      af8d76b
+author:     zhaoliuxue111 <zhaoliuxue111@xiaoduotech.com111>
+date:       2026-04-10T00:51:32+08:00
+subject:    replay: snapshot of commit 90819e3
+
+--- body ---
+replay: snapshot of commit 90819e3
+
+original-subject: feat(WorkflowCanvas): add InputNode component
+original-author:  zhaoliuxue111 <zhaoliuxue111@xiaoduotech.com111>
+original-date:    2026-04-10T00:51:32+08:00
+files:            1
+
+--- files (1) ---
+.commit-msgs/90819e3__feat(WorkflowCanvas)_ add InputNode component.commit-msg.txt
