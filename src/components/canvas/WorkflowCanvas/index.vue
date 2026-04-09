@@ -26,7 +26,7 @@ const { isDragging, handleDrop, handleDragover, handleDragleave, enablePaste, di
 // Node types - MUST use markRaw
 const nodeTypes = {
   image: markRaw(ImageNode),
-  input: markRaw(InputNode),
+  textInput: markRaw(InputNode),
   text: markRaw(TextNode)
 }
 
@@ -37,7 +37,7 @@ onConnect((params) => addEdges([params]))
 // Toolbar buttons
 const toolbarButtons = [
   { type: 'image', label: 'Image', icon: '🖼️' },
-  { type: 'input', label: 'Input', icon: '📝' },
+  { type: 'textInput', label: 'Input', icon: '📝' },
   { type: 'text', label: 'Text', icon: '📄' }
 ]
 
@@ -146,7 +146,7 @@ onUnmounted(() => {
           <label>Image URL:</label>
           <span class="prop-value">{{ selectedNode.data?.imageUrl || '(empty)' }}</span>
         </div>
-        <div v-if="selectedNode.type === 'input'" class="prop-item">
+        <div v-if="selectedNode.type === 'textInput'" class="prop-item">
           <label>Input Text:</label>
           <textarea
             class="prop-input"

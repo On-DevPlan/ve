@@ -3,7 +3,7 @@ import { ref } from 'vue'
 // Default data per node type
 const defaultNodeData = {
   image: { label: 'Image', imageUrl: '', imageWidth: 200, imageHeight: 150 },
-  input: { label: 'Input', inputText: '', placeholder: 'Enter content...' },
+  textInput: { label: 'Input', inputText: '', placeholder: 'Enter content...' },
   text: { label: 'Text', content: 'Display content', fontSize: 14 }
 }
 
@@ -127,3 +127,4 @@ export function useNodeActions(nodes, edges) {
     onNodeClick
   }
 }
+  
