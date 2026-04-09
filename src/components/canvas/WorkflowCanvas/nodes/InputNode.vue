@@ -19,9 +19,8 @@ const props = defineProps({
 
 <template>
   <div class="input-node">
-    <Handle type="target" :position="Position.Left" />
-
-    <div class="node-content">
+    <Handle type="target" :position="Position.Left" class="handle-left" />
+    <div class="node-body">
       <div class="node-header">{{ data?.label }}</div>
       <textarea
         v-model="data.inputText"
@@ -29,8 +28,7 @@ const props = defineProps({
         rows="3"
       ></textarea>
     </div>
-
-    <Handle type="source" :position="Position.Right" />
+    <Handle type="source" :position="Position.Right" class="handle-right" />
   </div>
 </template>
 
@@ -41,10 +39,14 @@ const props = defineProps({
   border-radius: 12px;
   min-width: 180px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
 }
 
-.node-content {
+.node-body {
+  flex: 1;
   padding: 12px;
+  min-width: 0;
 }
 
 .node-header {
