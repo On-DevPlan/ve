@@ -1,0 +1,16 @@
+sha:        a11eae13d03b5f13d000e5df589f4d9cdf5d3557
+short:      a11eae1
+author:     zhaoliuxue111 <zhaoliuxue111@xiaoduotech.com111>
+date:       2026-04-10T00:56:28+08:00
+subject:    replay: snapshot of commit a5385dc
+
+--- body ---
+replay: snapshot of commit a5385dc
+
+original-subject: feat(WorkflowCanvas): update component.js for new node types
+original-author:  zhaoliuxue111 <zhaoliuxue111@xiaoduotech.com111>
+original-date:    2026-04-10T00:56:28+08:00
+files:            1
+
+--- files (1) ---
+.commit-msgs/a5385dc__feat(WorkflowCanvas)_ update component.js for new node types.commit-msg.txt
