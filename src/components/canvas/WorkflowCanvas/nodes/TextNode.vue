@@ -39,6 +39,7 @@ const props = defineProps({
   border: 2px solid #e8e8e8;
   border-radius: 12px;
   min-width: 120px;
+  max-width: 300px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
@@ -57,5 +58,7 @@ const props = defineProps({
   color: #666;
   white-space: pre-wrap;
   word-break: break-word;
+  max-height: 200px;
+  overflow-y: auto;
 }
 </style>

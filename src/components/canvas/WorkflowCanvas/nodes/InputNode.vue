@@ -63,6 +63,8 @@ textarea {
   font-family: inherit;
   resize: vertical;
   box-sizing: border-box;
+  max-height: 120px;
+  overflow-y: auto;
 }
 
 textarea:focus {
