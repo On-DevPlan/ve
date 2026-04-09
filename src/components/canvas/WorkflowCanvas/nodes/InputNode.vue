@@ -44,8 +44,6 @@ const props = defineProps({
 
 .node-body {
   padding: 12px;
-  display: flex;
-  flex-direction: column;
 }
 
 .node-header {
