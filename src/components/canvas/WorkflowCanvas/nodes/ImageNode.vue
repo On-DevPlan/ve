@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onBeforeUnmount } from 'vue'
 import { Handle, Position } from '@vue-flow/core'
 
 const props = defineProps({
@@ -20,7 +20,7 @@ const props = defineProps({
 
 const fileInput = ref(null)
 
-const hasImage = computed(() => !!props.data.imageUrl)
+const hasImage = computed(() => !!props.data?.imageUrl)
 
 function openFilePicker() {
   fileInput.value?.click()
@@ -28,19 +28,33 @@ function openFilePicker() {
 
 function handleFileSelect(event) {
   const file = event.target.files?.[0]
-  if (!file) return
+  if (!file || !file.type.startsWith('image/')) return
+
+  // Revoke old blob URL to prevent memory leak
+  if (props.data?.imageUrl) {
+    URL.revokeObjectURL(props.data.imageUrl)
+  }
 
   const reader = new FileReader()
   reader.onload = (e) => {
     const arrayBuffer = e.target.result
     const blob = new Blob([arrayBuffer], { type: file.type })
-    props.data.imageUrl = URL.createObjectURL(blob)
+    const blobUrl = URL.createObjectURL(blob)
+    if (props.data) {
+      props.data.imageUrl = blobUrl
+    }
   }
   reader.readAsArrayBuffer(file)
 
   // Reset input so same file can be selected again
   event.target.value = ''
 }
+
+onBeforeUnmount(() => {
+  if (props.data?.imageUrl) {
+    URL.revokeObjectURL(props.data.imageUrl)
+  }
+})
 </script>
 
 <template>
@@ -54,10 +68,10 @@ function handleFileSelect(event) {
       </div>
       <img
         v-else
-        :src="data.imageUrl"
+        :src="data?.imageUrl"
         :style="{
-          maxWidth: `${data.imageWidth}px`,
-          maxHeight: `${data.imageHeight}px`
+          maxWidth: `${data?.imageWidth || 200}px`,
+          maxHeight: `${data?.imageHeight || 150}px`
         }"
         alt="Node image"
       />
