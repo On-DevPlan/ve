@@ -1,0 +1,16 @@
+sha:        7a62e5862e07b79f8a7e681b1357986313c78036
+short:      7a62e58
+author:     zhaoliuxue111 <zhaoliuxue111@xiaoduotech.com111>
+date:       2026-04-10T00:50:54+08:00
+subject:    replay: snapshot of commit 5f57c1a
+
+--- body ---
+replay: snapshot of commit 5f57c1a
+
+original-subject: fix(WorkflowCanvas): ImageNode memory leak and null safety
+original-author:  zhaoliuxue111 <zhaoliuxue111@xiaoduotech.com111>
+original-date:    2026-04-10T00:50:54+08:00
+files:            1
+
+--- files (1) ---
+.commit-msgs/5f57c1a__fix(WorkflowCanvas)_ ImageNode memory leak and null safety.commit-msg.txt
