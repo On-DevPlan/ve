@@ -1,0 +1,16 @@
+sha:        59b7e14b033e6e9225f6c2368fac3cf699e24a99
+short:      59b7e14
+author:     zhaoliuxue111 <zhaoliuxue111@xiaoduotech.com111>
+date:       2026-04-10T01:26:30+08:00
+subject:    replay: snapshot of commit 527bdae
+
+--- body ---
+replay: snapshot of commit 527bdae
+
+original-subject: fix(WorkflowCanvas): rename input type to textInput
+original-author:  zhaoliuxue111 <zhaoliuxue111@xiaoduotech.com111>
+original-date:    2026-04-10T01:26:30+08:00
+files:            3
+
+--- files (1) ---
+.commit-msgs/527bdae__fix(WorkflowCanvas)_ rename input type to textInput.commit-msg.txt
