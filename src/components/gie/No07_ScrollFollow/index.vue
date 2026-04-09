@@ -39,6 +39,7 @@ const scrollHandler = () => {
   if (window.scrollY < distanceTrigger) {
     boxRef.value.style = null
     distanceScroll = 0
+    textRef.value.style.strokeDashoffset = '0'
   } else {
     distanceScroll = window.scrollY - distanceTrigger
     distanceScroll = Math.max(0, distanceScroll)

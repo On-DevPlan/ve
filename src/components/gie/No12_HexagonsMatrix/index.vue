@@ -58,16 +58,6 @@ const hidden = () => {
         each: 0.002
       }
     })
-    .to(blocks, {
-      scale: 0,
-      opacity: 0,
-      duration: 1,
-      ease: 'power2.out',
-      stagger: {
-        from: 'center',
-        each: 0.004
-      }
-    }, '<0.2')
 }
 
 onMounted(() => {

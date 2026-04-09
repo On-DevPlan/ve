@@ -114,8 +114,8 @@ svg {
 
 svg polygon {
   fill: none;
-  stroke-width: 0.5;
+  stroke-width: 2;
   stroke: #17f700;
-  transition: stroke-dashoffset 20s ease;
+  transition: stroke-dashoffset 0.3s ease;
 }
 </style>
