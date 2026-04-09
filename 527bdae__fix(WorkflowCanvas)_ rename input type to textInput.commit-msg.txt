@@ -1,0 +1,20 @@
+sha:        527bdae2354c88ea5c732011e210ecffcff4ba20
+short:      527bdae
+author:     zhaoliuxue111 <zhaoliuxue111@xiaoduotech.com111>
+date:       2026-04-10T01:26:30+08:00
+subject:    fix(WorkflowCanvas): rename input type to textInput
+
+--- body ---
+fix(WorkflowCanvas): rename input type to textInput
+
+VueFlow has built-in node types 'input' and 'output' with default
+theme styles (width:150px, blue border). Our 'input' type collided
+with this, causing the node to overflow and show a blue box.
+Renaming to 'textInput' avoids the conflict.
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+
+--- files (3) ---
+src/components/canvas/WorkflowCanvas/composables/useNodeActions.js
+src/components/canvas/WorkflowCanvas/index.vue
+src/components/canvas/WorkflowCanvas/nodes/InputNode.vue
