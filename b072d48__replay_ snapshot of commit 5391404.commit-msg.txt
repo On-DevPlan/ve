@@ -1,0 +1,16 @@
+sha:        b072d48e8989cd71b4a315e7365196f264d54a49
+short:      b072d48
+author:     zhaoliuxue111 <zhaoliuxue111@xiaoduotech.com111>
+date:       2026-04-10T00:34:17+08:00
+subject:    replay: snapshot of commit 5391404
+
+--- body ---
+replay: snapshot of commit 5391404
+
+original-subject: docs: add WorkflowCanvas node infrastructure design spec
+original-author:  zhaoliuxue111 <zhaoliuxue111@xiaoduotech.com111>
+original-date:    2026-04-10T00:34:17+08:00
+files:            1
+
+--- files (1) ---
+.commit-msgs/5391404__docs_ add WorkflowCanvas node infrastructure design spec.commit-msg.txt
