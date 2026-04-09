@@ -1,0 +1,16 @@
+sha:        360cc9f119a72c3593d9e8a2eab1afbedfa25ae8
+short:      360cc9f
+author:     zhaoliuxue111 <zhaoliuxue111@xiaoduotech.com111>
+date:       2026-04-10T01:03:52+08:00
+subject:    replay: snapshot of commit b014a45
+
+--- body ---
+replay: snapshot of commit b014a45
+
+original-subject: fix(WorkflowCanvas): InputNode flex layout, prevent handle overflow
+original-author:  zhaoliuxue111 <zhaoliuxue111@xiaoduotech.com111>
+original-date:    2026-04-10T01:03:52+08:00
+files:            1
+
+--- files (1) ---
+.commit-msgs/b014a45__fix(WorkflowCanvas)_ InputNode flex layout, prevent handle overflow.commit-msg.txt
