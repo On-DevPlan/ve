@@ -1,0 +1,13 @@
+sha:        20b6984d4cedf66ded6a46bab0c90090bdf31a29
+short:      20b6984
+author:     zhaoliuxue111 <zhaoliuxue111@xiaoduotech.com111>
+date:       2026-04-10T00:45:24+08:00
+subject:    feat(WorkflowCanvas): add useNodeActions composable
+
+--- body ---
+feat(WorkflowCanvas): add useNodeActions composable
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+
+--- files (1) ---
+src/components/canvas/WorkflowCanvas/composables/useNodeActions.js
