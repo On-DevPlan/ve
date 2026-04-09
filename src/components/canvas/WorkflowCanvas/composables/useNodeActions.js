@@ -28,6 +28,9 @@ export function useNodeActions(nodes, edges) {
    * @returns {Object} The newly created node
    */
   function addNode(type, position) {
+    if (!defaultNodeData[type]) {
+      throw new Error(`Unknown node type: "${type}". Valid types: ${Object.keys(defaultNodeData).join(', ')}`)
+    }
     const id = `${type}-${Date.now()}`
     const newNode = {
       id,
@@ -89,9 +92,10 @@ export function useNodeActions(nodes, edges) {
       reader.onload = (e) => {
         try {
           const data = JSON.parse(e.target.result)
-          if (data.nodes && data.edges) {
+          if (Array.isArray(data.nodes) && Array.isArray(data.edges)) {
             nodes.value = data.nodes
             edges.value = data.edges
+            selectedNode.value = null
             resolve(data)
           } else {
             reject(new Error('Invalid workflow format: missing nodes or edges'))
