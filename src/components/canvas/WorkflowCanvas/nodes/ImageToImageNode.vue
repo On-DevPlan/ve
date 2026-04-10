@@ -90,14 +90,12 @@ function handleFileSelect(event) {
   if (!file || !file.type.startsWith('image/')) return
   const reader = new FileReader()
   reader.onload = (e) => {
-    const arrayBuffer = e.target.result
-    const blob = new Blob([arrayBuffer], { type: file.type })
-    const blobUrl = URL.createObjectURL(blob)
-    form.subjectImageUrl = blobUrl
-    imagePreview.value = blobUrl
+    // Store as data URL (base64) so it can be sent to the API
+    form.subjectImageUrl = e.target.result
+    imagePreview.value = e.target.result
     syncData()
   }
-  reader.readAsArrayBuffer(file)
+  reader.readAsDataURL(file)
   event.target.value = ''
 }
 
@@ -107,13 +105,11 @@ function handleDrop(event) {
   if (!file || !file.type.startsWith('image/')) return
   const reader = new FileReader()
   reader.onload = (e) => {
-    const blob = new Blob([e.target.result], { type: file.type })
-    const blobUrl = URL.createObjectURL(blob)
-    form.subjectImageUrl = blobUrl
-    imagePreview.value = blobUrl
+    form.subjectImageUrl = e.target.result
+    imagePreview.value = e.target.result
     syncData()
   }
-  reader.readAsArrayBuffer(file)
+  reader.readAsDataURL(file)
 }
 
 function handleDragover(event) {
