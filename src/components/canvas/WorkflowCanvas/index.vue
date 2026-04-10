@@ -1,6 +1,6 @@
 <script setup>
 import { ref, markRaw, onMounted, onUnmounted } from 'vue'
-import { VueFlow, useVueFlow } from '@vue-flow/core'
+import { VueFlow, useVueFlow, SelectionMode } from '@vue-flow/core'
 import { Background } from '@vue-flow/background'
 import { Controls } from '@vue-flow/controls'
 import { MiniMap } from '@vue-flow/minimap'
@@ -12,6 +12,7 @@ import '@vue-flow/minimap/dist/style.css'
 import ImageNode from './nodes/ImageNode.vue'
 import InputNode from './nodes/InputNode.vue'
 import TextNode from './nodes/TextNode.vue'
+import GroupNode from './nodes/GroupNode.vue'
 import { useNodeActions } from './composables/useNodeActions'
 import { useClipboard } from './composables/useClipboard'
 
@@ -20,17 +21,29 @@ const nodes = ref([])
 const edges = ref([])
 
 // Composables
-const { selectedNode, addNode, removeNode, clearAll, exportJSON, importJSON, onNodeClick } = useNodeActions(nodes, edges)
+const {
+  selectedNode,
+  hasSelectedNodes,
+  addNode,
+  removeNode,
+  clearAll,
+  exportJSON,
+  importJSON,
+  onNodeClick,
+  groupSelected,
+  ungroupSelected
+} = useNodeActions(nodes, edges)
 const { isDragging, handleDrop, handleDragover, handleDragleave, enablePaste, disablePaste } = useClipboard(nodes, addNode)
 
 // Node types - MUST use markRaw
 const nodeTypes = {
   image: markRaw(ImageNode),
   textInput: markRaw(InputNode),
-  text: markRaw(TextNode)
+  text: markRaw(TextNode),
+  group: markRaw(GroupNode)
 }
 
-// VueFlow connection handler
+// VueFlow connection + selection handlers
 const { onConnect, addEdges, fitView } = useVueFlow()
 onConnect((params) => addEdges([params]))
 
@@ -48,6 +61,15 @@ function handleImport(event) {
     importJSON(file).catch(err => console.error('Import failed:', err))
     event.target.value = ''
   }
+}
+
+// Grouping handlers
+function handleGroup() {
+  groupSelected()
+}
+
+function handleUngroup() {
+  ungroupSelected()
 }
 
 // Lifecycle
@@ -91,6 +113,20 @@ onUnmounted(() => {
         >
           🗑️ Delete
         </button>
+        <button
+          class="action-btn group-btn"
+          :disabled="!hasSelectedNodes"
+          @click="handleGroup"
+        >
+          📦 Group
+        </button>
+        <button
+          class="action-btn group-btn"
+          :disabled="!hasSelectedNodes"
+          @click="handleUngroup"
+        >
+          📤 Ungroup
+        </button>
         <button class="action-btn" @click="clearAll">
           🧹 Clear
         </button>
@@ -112,6 +148,10 @@ onUnmounted(() => {
         :node-types="nodeTypes"
         :default-viewport="{ x: 0, y: 0, zoom: 0.8 }"
         fit-view-on-init
+        :pan-on-drag="false"
+        :selection-mode="SelectionMode.Full"
+        :selection-key-code="'Shift'"
+        :multi-selection-key-code="'Shift'"
         @node-click="onNodeClick"
       >
         <Background pattern-color="#aaa" :gap="16" />
@@ -140,6 +180,12 @@ onUnmounted(() => {
           <span class="prop-value">
             X: {{ Math.round(selectedNode.position?.x ?? 0) }},
             Y: {{ Math.round(selectedNode.position?.y ?? 0) }}
+          </span>
+        </div>
+        <div v-if="selectedNode.type === 'group'" class="prop-item">
+          <label>Children:</label>
+          <span class="prop-value">
+            {{ nodes.filter(n => n.parentNode === selectedNode.id).length }} node(s)
           </span>
         </div>
         <div v-if="selectedNode.type === 'image'" class="prop-item">
@@ -255,6 +301,14 @@ onUnmounted(() => {
   cursor: not-allowed;
 }
 
+.group-btn {
+  background: #8b5cf6;
+}
+
+.group-btn:hover:not(:disabled) {
+  background: #7c3aed;
+}
+
 .import-btn {
   cursor: pointer;
 }
@@ -287,7 +341,7 @@ onUnmounted(() => {
   width: 260px;
   background: #fff;
   border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
   overflow: hidden;
   z-index: 100;
 }
