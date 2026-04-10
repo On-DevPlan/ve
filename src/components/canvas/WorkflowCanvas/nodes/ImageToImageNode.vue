@@ -85,12 +85,17 @@ function openFilePicker() {
   fileInput.value?.click()
 }
 
+const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+
 function handleFileSelect(event) {
   const file = event.target.files?.[0]
   if (!file || !file.type.startsWith('image/')) return
+  if (file.size > MAX_FILE_SIZE) {
+    props.data.error = 'Image must be smaller than 10MB'
+    return
+  }
   const reader = new FileReader()
   reader.onload = (e) => {
-    // Store as data URL (base64) so it can be sent to the API
     form.subjectImageUrl = e.target.result
     imagePreview.value = e.target.result
     syncData()
@@ -103,6 +108,10 @@ function handleDrop(event) {
   event.preventDefault()
   const file = event.dataTransfer?.files?.[0]
   if (!file || !file.type.startsWith('image/')) return
+  if (file.size > MAX_FILE_SIZE) {
+    props.data.error = 'Image must be smaller than 10MB'
+    return
+  }
   const reader = new FileReader()
   reader.onload = (e) => {
     form.subjectImageUrl = e.target.result
