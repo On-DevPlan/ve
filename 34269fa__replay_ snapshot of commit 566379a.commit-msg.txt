@@ -1,0 +1,16 @@
+sha:        34269fa4808ea9645b17e086c1e19ff0970e8761
+short:      34269fa
+author:     zhaoliuxue <2096343460@qq.com>
+date:       2026-04-10T10:25:38+08:00
+subject:    replay: snapshot of commit 566379a
+
+--- body ---
+replay: snapshot of commit 566379a
+
+original-subject: feat(WorkflowCanvas): add text paste via Ctrl+V and document development structure
+original-author:  zhaoliuxue <2096343460@qq.com>
+original-date:    2026-04-10T10:25:38+08:00
+files:            2
+
+--- files (1) ---
+.commit-msgs/566379a__feat(WorkflowCanvas)_ add text paste via Ctrl+V and document development structu.commit-msg.txt
