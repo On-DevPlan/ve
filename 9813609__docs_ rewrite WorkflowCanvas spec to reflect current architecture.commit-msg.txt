@@ -1,0 +1,20 @@
+sha:        98136096b3c084ee53b643204a64154627f15776
+short:      9813609
+author:     zhaoliuxue <2096343460@qq.com>
+date:       2026-04-10T11:54:32+08:00
+subject:    docs: rewrite WorkflowCanvas spec to reflect current architecture
+
+--- body ---
+docs: rewrite WorkflowCanvas spec to reflect current architecture
+
+- Add components/ directory (Toolbar, ApiConfigModal, ContextMenu, PropertyPanel)
+- Document disabledRef mechanism for modal-based shortcut suppression
+- Update useImageGen.saveApiConfig signature (3 params)
+- Add right-click context menu extension point
+- Add AI generation node section
+- Fix extension steps to reflect new Toolbar.vue / index.vue split
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+
+--- files (1) ---
+docs/workflow-canvas.md
