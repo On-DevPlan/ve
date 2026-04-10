@@ -1,7 +1,7 @@
 export default {
   name: 'WorkflowCanvas',
   title: 'Workflow Canvas',
-  description: 'Node-based workflow canvas with ImageNode, InputNode, and TextNode - supports paste/drag/upload images, text input, and text display nodes',
+  description: 'Node-based workflow canvas with ImageNode, InputNode, and TextNode - supports paste/drag/upload images, text paste (Ctrl+V), text input, and text display nodes',
   version: '1.1.0',
   group: 'Canvas',
   category: 'Workflow',
