@@ -1,20 +1,28 @@
 <script setup>
 import { Handle, Position } from '@vue-flow/core'
 
-defineProps({
+const props = defineProps({
   id: { type: String, required: true },
   data: { type: Object, default: () => ({ label: 'Input', inputText: '', placeholder: 'Enter content...' }) }
 })
+const emit = defineEmits(['node-focus', 'node-blur'])
 </script>
 
 <template>
-  <div class="input-node">
+  <div
+    class="input-node"
+    @focusin="emit('node-focus', { node: { id: props.id } })"
+    @focusout="emit('node-blur')"
+  >
     <Handle type="target" :position="Position.Left" />
 
     <div class="node-content">
       <div class="node-label">{{ data?.label }}</div>
       <div class="input-wrapper">
-        <textarea v-model="data.inputText" :placeholder="data?.placeholder"></textarea>
+        <textarea
+          v-model="data.inputText"
+          :placeholder="data?.placeholder"
+        />
       </div>
     </div>
 
@@ -26,10 +34,16 @@ defineProps({
 .input-node {
   position: relative;
   background: #fff;
-  border: 2px solid #10b981;
+  border: 2px solid #e8e8e8;
   border-radius: 12px;
   min-width: 120px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: border-color 0.15s;
+}
+
+.input-node:focus-within {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
 }
 
 .node-content {
@@ -58,10 +72,11 @@ textarea {
   font-family: inherit;
   box-sizing: border-box;
   resize: none;
+  background: #fff;
 }
 
 textarea:focus {
   outline: none;
-  border-color: #10b981;
+  border-color: #d1d5db;
 }
 </style>

@@ -14,14 +14,16 @@ import InputNode from './nodes/InputNode.vue'
 import TextNode from './nodes/TextNode.vue'
 import { useNodeActions } from './composables/useNodeActions'
 import { useClipboard } from './composables/useClipboard'
+import { useKeyboard } from './composables/useKeyboard'
 
 // State
 const nodes = ref([])
 const edges = ref([])
 
 // Composables
-const { selectedNode, addNode, removeNode, clearAll, exportJSON, importJSON, onNodeClick } = useNodeActions(nodes, edges)
+const { selectedNode, focusedNodeId, addNode, removeNode, clearAll, exportJSON, importJSON, onNodeClick, onNodeFocus, onNodeBlur } = useNodeActions(nodes, edges)
 const { isDragging, handleDrop, handleDragover, handleDragleave, enablePaste, disablePaste } = useClipboard(nodes, addNode)
+useKeyboard(focusedNodeId)
 
 // Node types - MUST use markRaw
 const nodeTypes = {
@@ -113,6 +115,8 @@ onUnmounted(() => {
         :default-viewport="{ x: 0, y: 0, zoom: 0.8 }"
         fit-view-on-init
         @node-click="onNodeClick"
+        @node-focus="onNodeFocus"
+        @node-blur="onNodeBlur"
       >
         <Background pattern-color="#aaa" :gap="16" />
         <Controls />

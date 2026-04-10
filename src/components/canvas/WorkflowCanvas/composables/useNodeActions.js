@@ -20,6 +20,7 @@ function getDefaultPosition() {
  */
 export function useNodeActions(nodes, edges) {
   const selectedNode = ref(null)
+  const focusedNodeId = ref(null)
 
   /**
    * Creates a new node with default data for the given type
@@ -117,14 +118,25 @@ export function useNodeActions(nodes, edges) {
     selectedNode.value = node
   }
 
+  function onNodeFocus({ node }) {
+    focusedNodeId.value = node.id
+  }
+
+  function onNodeBlur() {
+    focusedNodeId.value = null
+  }
+
   return {
     selectedNode,
+    focusedNodeId,
     addNode,
     removeNode,
     clearAll,
     exportJSON,
     importJSON,
-    onNodeClick
+    onNodeClick,
+    onNodeFocus,
+    onNodeBlur
   }
 }
   
