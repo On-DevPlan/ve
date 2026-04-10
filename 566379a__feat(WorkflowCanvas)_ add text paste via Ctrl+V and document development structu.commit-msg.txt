@@ -1,0 +1,19 @@
+sha:        566379ad0be373074dd39a06bb5b8daa6a7ed4ad
+short:      566379a
+author:     zhaoliuxue <2096343460@qq.com>
+date:       2026-04-10T10:25:38+08:00
+subject:    feat(WorkflowCanvas): add text paste via Ctrl+V and document development structure
+
+--- body ---
+feat(WorkflowCanvas): add text paste via Ctrl+V and document development structure
+
+- useClipboard: handlePaste now handles text/plain → creates TextNode
+- docs: add workflow-canvas.md documenting directory structure,
+  composables responsibilities, node types, positioning, and paste system
+- Add markdown-it-math dependency (was missing on deploy branch)
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+
+--- files (2) ---
+docs/workflow-canvas.md
+src/components/canvas/WorkflowCanvas/composables/useClipboard.js
