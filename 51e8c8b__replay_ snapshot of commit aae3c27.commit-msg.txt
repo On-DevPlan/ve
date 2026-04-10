@@ -1,0 +1,16 @@
+sha:        51e8c8b9ed958df056eb59d7f9523ab7c8d0bd65
+short:      51e8c8b
+author:     zhaoliuxue <2096343460@qq.com>
+date:       2026-04-10T10:25:48+08:00
+subject:    replay: snapshot of commit aae3c27
+
+--- body ---
+replay: snapshot of commit aae3c27
+
+original-subject: chore(WorkflowCanvas): update description for text paste capability
+original-author:  zhaoliuxue <2096343460@qq.com>
+original-date:    2026-04-10T10:25:48+08:00
+files:            1
+
+--- files (1) ---
+.commit-msgs/aae3c27__chore(WorkflowCanvas)_ update description for text paste capability.commit-msg.txt
