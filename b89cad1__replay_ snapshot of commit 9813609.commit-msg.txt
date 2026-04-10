@@ -1,0 +1,16 @@
+sha:        b89cad1d869cd50589e24c0306fd88de4806f37a
+short:      b89cad1
+author:     zhaoliuxue <2096343460@qq.com>
+date:       2026-04-10T11:54:32+08:00
+subject:    replay: snapshot of commit 9813609
+
+--- body ---
+replay: snapshot of commit 9813609
+
+original-subject: docs: rewrite WorkflowCanvas spec to reflect current architecture
+original-author:  zhaoliuxue <2096343460@qq.com>
+original-date:    2026-04-10T11:54:32+08:00
+files:            1
+
+--- files (1) ---
+.commit-msgs/9813609__docs_ rewrite WorkflowCanvas spec to reflect current architecture.commit-msg.txt
