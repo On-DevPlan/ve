@@ -1,0 +1,16 @@
+sha:        4c20d6700e99ce54693b02f7f30f778dd70346f3
+short:      4c20d67
+author:     zhaoliuxue <2096343460@qq.com>
+date:       2026-04-10T11:20:06+08:00
+subject:    replay: snapshot of commit 64e7cf5
+
+--- body ---
+replay: snapshot of commit 64e7cf5
+
+original-subject: fix(WorkflowCanvas): disable canvas shortcuts when API modal is open,
+original-author:  zhaoliuxue <2096343460@qq.com>
+original-date:    2026-04-10T11:20:06+08:00
+files:            6
+
+--- files (1) ---
+.commit-msgs/64e7cf5__fix(WorkflowCanvas)_ disable canvas shortcuts when API modal is open,.commit-msg.txt
