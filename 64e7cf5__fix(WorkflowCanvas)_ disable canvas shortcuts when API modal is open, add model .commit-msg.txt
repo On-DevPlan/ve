@@ -1,0 +1,27 @@
+sha:        64e7cf5d3f7f0ac22b8308d08cd3eb3622e1659c
+short:      64e7cf5
+author:     zhaoliuxue <2096343460@qq.com>
+date:       2026-04-10T11:20:06+08:00
+subject:    fix(WorkflowCanvas): disable canvas shortcuts when API modal is open, add model field to API config
+
+--- body ---
+fix(WorkflowCanvas): disable canvas shortcuts when API modal is open,
+add model field to API config
+
+- useKeyboard/useClipboard now accept disabledRef; when the API
+  config modal is open (showApiConfig=true) all keyboard shortcuts
+  (WASD panning, Ctrl+V paste) are suppressed so text input works
+  correctly in the modal.
+- API config modal now includes a Default Model dropdown
+  (image-01 / image-01-live) persisted to localStorage and used as
+  the default for new T→Image / I→Image nodes.
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+
+--- files (6) ---
+src/components/canvas/WorkflowCanvas/composables/useClipboard.js
+src/components/canvas/WorkflowCanvas/composables/useImageGen.js
+src/components/canvas/WorkflowCanvas/composables/useKeyboard.js
+src/components/canvas/WorkflowCanvas/index.vue
+src/components/canvas/WorkflowCanvas/nodes/ImageToImageNode.vue
+src/components/canvas/WorkflowCanvas/nodes/TextToImageNode.vue
