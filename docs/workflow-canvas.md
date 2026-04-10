@@ -61,12 +61,34 @@ const defaultNodeData = {
 | `handlePaste` | Ctrl+V 粘贴：图片 → ImageNode，文字 → TextNode |
 | `enablePaste / disablePaste` | 注册/注销 document paste 事件监听 |
 
+### composables/useKeyboard.js（键盘控制）
+
+| 职责 | 说明 |
+|------|------|
+| WASD 平移画布 | W=上, A=左, S=下, D=右；聚焦节点输入框时自动禁用 |
+
+```js
+// 传入 focusedNodeId，当有节点输入框聚焦时自动禁用 WASD
+useKeyboard(focusedNodeId)
+```
+
+### composables/useNodeActions.js（节点管理）
+
+新增状态：
+
+| 状态/方法 | 说明 |
+|-----------|------|
+| `focusedNodeId` | 当前聚焦的节点 ID（textarea focus 时） |
+| `onNodeFocus({ node })` | 节点输入框聚焦时调用 |
+| `onNodeBlur()` | 节点输入框失焦时调用 |
+
 ### nodes/*.vue（节点视图）
 
 每个节点组件必须：
 - 接收 `id`（string）和 `data`（object）props
 - 使用 `@vue-flow/core` 的 `<Handle>` 声明连接桩（`type="target"` / `type="source"`，`position` 指定边）
 - 根元素设置 `position: relative`（Handle 定位依赖）
+- 有输入框的节点（InputNode）需 emit `node-focus`（`@focusin`）和 `node-blur`（`@focusout`）事件，根 div 使用 `@focusin`/`@focusout` 配合 `emit` 向上传递
 
 ## 节点类型
 
@@ -112,6 +134,21 @@ const defaultNodeData = {
    ```js
    newNode: { label: 'New', ...otherFields }
    ```
+
+## 聚焦高亮系统
+
+当节点内的输入框聚焦时，节点显示蓝色边框：
+
+```css
+/* 默认灰色边框 */
+border: 2px solid #e8e8e8;
+
+/* 聚焦时蓝色边框 */
+border-color: #3b82f6;
+box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+```
+
+InputNode 使用 `:focus-within` 实现自动高亮，无需额外 JS 代码。有输入框的节点需向上 emit `node-focus`/`node-blur` 事件，由 VueFlow relay 到 index.vue 统一管理 `focusedNodeId`。
 
 ## 粘贴系统（Ctrl+V）
 
