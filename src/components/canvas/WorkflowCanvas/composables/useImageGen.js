@@ -2,8 +2,10 @@ import { ref } from 'vue'
 
 const STORAGE_KEY_ENDPOINT = 'wf_imagegen_endpoint'
 const STORAGE_KEY_APIKEY = 'wf_imagegen_apikey'
+const STORAGE_KEY_MODEL = 'wf_imagegen_model'
 
 const DEFAULT_ENDPOINT = 'https://api.minimaxi.com'
+const DEFAULT_MODEL = 'image-01'
 
 /**
  * MiniMax Image Generation API composable.
@@ -14,6 +16,7 @@ const DEFAULT_ENDPOINT = 'https://api.minimaxi.com'
 export function useImageGen(nodeData) {
   const endpoint = localStorage.getItem(STORAGE_KEY_ENDPOINT) || DEFAULT_ENDPOINT
   const apiKey = localStorage.getItem(STORAGE_KEY_APIKEY) || ''
+  const defaultModel = localStorage.getItem(STORAGE_KEY_MODEL) || DEFAULT_MODEL
 
   async function generate(payload) {
     if (!apiKey) {
@@ -51,7 +54,7 @@ export function useImageGen(nodeData) {
 
   async function textToImage({
     prompt,
-    model = 'image-01',
+    model = defaultModel,
     styleType,
     styleWeight,
     aspectRatio = '1:1',
@@ -83,7 +86,7 @@ export function useImageGen(nodeData) {
   async function imageToImage({
     prompt,
     imageUrl,
-    model = 'image-01',
+    model = defaultModel,
     styleType,
     styleWeight,
     aspectRatio = '1:1',
@@ -125,13 +128,15 @@ export function useImageGen(nodeData) {
 
 export const apiConfig = ref({
   endpoint: localStorage.getItem(STORAGE_KEY_ENDPOINT) || DEFAULT_ENDPOINT,
-  apiKey: localStorage.getItem(STORAGE_KEY_APIKEY) || ''
+  apiKey: localStorage.getItem(STORAGE_KEY_APIKEY) || '',
+  model: localStorage.getItem(STORAGE_KEY_MODEL) || DEFAULT_MODEL
 })
 
-export function saveApiConfig(endpoint, apiKey) {
+export function saveApiConfig(endpoint, apiKey, model) {
   localStorage.setItem(STORAGE_KEY_ENDPOINT, endpoint)
   localStorage.setItem(STORAGE_KEY_APIKEY, apiKey)
-  apiConfig.value = { endpoint, apiKey }
+  localStorage.setItem(STORAGE_KEY_MODEL, model)
+  apiConfig.value = { endpoint, apiKey, model }
 }
 
 export function hasApiKey() {

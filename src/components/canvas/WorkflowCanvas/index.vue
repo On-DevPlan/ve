@@ -25,8 +25,8 @@ const edges = ref([])
 
 // Composables
 const { selectedNode, focusedNodeId, addNode, removeNode, clearAll, exportJSON, importJSON, onNodeClick, onNodeFocus, onNodeBlur } = useNodeActions(nodes, edges)
-const { isDragging, handleDrop, handleDragover, handleDragleave, enablePaste, disablePaste } = useClipboard(nodes, addNode)
-useKeyboard(focusedNodeId)
+const { isDragging, handleDrop, handleDragover, handleDragleave, enablePaste, disablePaste } = useClipboard(nodes, addNode, showApiConfig)
+useKeyboard(focusedNodeId, showApiConfig)
 
 // Node types - MUST use markRaw
 const nodeTypes = {
@@ -54,9 +54,10 @@ const toolbarButtons = [
 const showApiConfig = ref(false)
 const apiEndpoint = ref(apiConfig.value.endpoint)
 const apiKey = ref(apiConfig.value.apiKey)
+const apiModel = ref(apiConfig.value.model || 'image-01')
 
 function handleSaveApiConfig() {
-  saveApiConfig(apiEndpoint.value, apiKey.value)
+  saveApiConfig(apiEndpoint.value, apiKey.value, apiModel.value)
   showApiConfig.value = false
 }
 
@@ -148,6 +149,13 @@ onUnmounted(() => {
           <div class="field">
             <label>API Key</label>
             <input v-model="apiKey" type="password" placeholder="Enter your API key" class="modal-input" />
+          </div>
+          <div class="field">
+            <label>Default Model</label>
+            <select v-model="apiModel" class="modal-input">
+              <option value="image-01">image-01</option>
+              <option value="image-01-live">image-01-live</option>
+            </select>
           </div>
           <p class="hint">API key is stored in localStorage and never sent anywhere except the specified endpoint.</p>
           <div class="modal-actions">

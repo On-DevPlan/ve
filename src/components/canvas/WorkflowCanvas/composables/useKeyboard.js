@@ -11,10 +11,11 @@ let rafId = null
  * Active only when no node input is focused (checked via focusedNodeId ref).
  * @param {Ref} focusedNodeId - Ref<string|null> indicating currently focused node
  */
-export function useKeyboard(focusedNodeId) {
+export function useKeyboard(focusedNodeId, disabledRef) {
   const { getViewport, setViewport } = useVueFlow()
 
   function tick() {
+    if (disabledRef?.value) { rafId = null; return }
     if (focusedNodeId?.value) {
       rafId = null
       return
@@ -33,6 +34,7 @@ export function useKeyboard(focusedNodeId) {
   }
 
   function handleKeyDown(event) {
+    if (disabledRef?.value) return
     if (focusedNodeId?.value) return
     if (event.ctrlKey || event.metaKey || event.altKey) return
 

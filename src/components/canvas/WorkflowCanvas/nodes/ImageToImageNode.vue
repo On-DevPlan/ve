@@ -1,7 +1,7 @@
 <script setup>
 import { ref, reactive, computed } from 'vue'
 import { Handle, Position } from '@vue-flow/core'
-import { useImageGen } from '../composables/useImageGen'
+import { useImageGen, apiConfig } from '../composables/useImageGen'
 
 const props = defineProps({
   id: { type: String, required: true },
@@ -54,7 +54,7 @@ const STYLE_OPTIONS = [
 const form = reactive({
   subjectImageUrl: props.data.subjectImageUrl || '',
   prompt: props.data.prompt || '',
-  model: props.data.model || 'image-01',
+  model: props.data.model || apiConfig.value.model || 'image-01',
   aspectRatio: props.data.aspectRatio || '1:1',
   styleType: props.data.styleType || '',
   styleWeight: props.data.styleWeight ?? 0.8,

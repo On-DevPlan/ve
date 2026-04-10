@@ -6,7 +6,7 @@ import { ref } from 'vue'
  * @param {Function} addNodeFn - Function to add a new node
  * @returns {Object} Clipboard handlers and state
  */
-export function useClipboard(nodes, addNodeFn) {
+export function useClipboard(nodes, addNodeFn, disabledRef) {
   const isDragging = ref(false)
 
   /**
@@ -90,6 +90,7 @@ export function useClipboard(nodes, addNodeFn) {
    * @param {ClipboardEvent} event
    */
   async function handlePaste(event) {
+    if (disabledRef?.value) return
     event.preventDefault()
 
     const items = event.clipboardData?.items
