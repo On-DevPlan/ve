@@ -43,9 +43,11 @@ src/components/canvas/WorkflowCanvas/
 
 ```js
 const defaultNodeData = {
-  image:     { label: 'Image',     imageUrl: '',     imageWidth: 200, imageHeight: 150 },
-  textInput: { label: 'Input',    inputText: '',   placeholder: 'Enter content...' },
-  text:      { label: 'Text',     content: 'Display content', fontSize: 14 }
+  image:        { label: 'Image',        imageUrl: '',         imageWidth: 200, imageHeight: 150 },
+  textInput:    { label: 'Input',        inputText: '',        placeholder: 'Enter content...' },
+  text:         { label: 'Text',         content: 'Display content', fontSize: 14 },
+  textToImage:  { label: 'Text→Image',   prompt: '', model: 'image-01', aspectRatio: '1:1', styleType: '', styleWeight: 0.8, n: 1, promptOptimizer: false, aigcWatermark: false, imageUrls: [], loading: false, error: null },
+  imageToImage: { label: 'Image→Image',  subjectImageUrl: '',  prompt: '', model: 'image-01', aspectRatio: '1:1', styleType: '', styleWeight: 0.8, n: 1, promptOptimizer: false, aigcWatermark: false, imageUrls: [], loading: false, error: null }
 }
 ```
 
@@ -97,6 +99,38 @@ useKeyboard(focusedNodeId)
 | `image` | ImageNode.vue | 显示图片 | `imageUrl` |
 | `textInput` | InputNode.vue | 可编辑输入框 | `inputText`, `placeholder` |
 | `text` | TextNode.vue | 纯文本展示 | `content`, `fontSize` |
+| `textToImage` | TextToImageNode.vue | 文生图（MiniMax API） | `prompt`, `model`, `aspectRatio`, `styleType`, `n`, `imageUrls`, `loading`, `error` |
+| `imageToImage` | ImageToImageNode.vue | 图生图（MiniMax API） | `subjectImageUrl`, `prompt`, `model`, `aspectRatio`, `styleType`, `n`, `imageUrls`, `loading`, `error` |
+
+## AI 生成节点（MiniMax）
+
+### API 配置
+
+点击工具栏 **🔐 API** 按钮，在弹窗中填写：
+- **Endpoint**：默认为 `https://api.minimaxi.com`，可自定义
+- **API Key**：存储在 localStorage，仅发送到目标 endpoint
+
+### TextToImageNode（文生图）
+
+- 输入 prompt，选择模型、宽高比、画风
+- 点击 **✨ Generate** 发起请求
+- 生成的图片显示为缩略图，点击可添加到画布（自动创建 ImageNode）
+
+### ImageToImageNode（图生图）
+
+- 先上传/拖入一张主体参考图
+- 输入 prompt，选择模型、宽高比、画风
+- 点击 **✨ Transform** 发起请求
+- 生成的图片同样可点击添加到画布
+
+### useImageGen.js
+
+| 导出 | 说明 |
+|------|------|
+| `useImageGen(nodeData)` | 返回 `textToImage()`、`imageToImage()` 方法，操作 nodeData 上的 `imageUrls` / `loading` / `error` |
+| `saveApiConfig(ep, key)` | 保存到 localStorage |
+| `hasApiKey()` | 检查是否已配置 |
+| `apiConfig` | 响应式配置对象 |
 
 ## 添加新节点类型
 
