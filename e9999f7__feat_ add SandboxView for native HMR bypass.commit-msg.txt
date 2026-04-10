@@ -1,0 +1,19 @@
+sha:        e9999f74f3747525eca159c48b7d81c0180f7e13
+short:      e9999f7
+author:     zhaoliuxue <2096343460@qq.com>
+date:       2026-04-10T10:44:32+08:00
+subject:    feat: add SandboxView for native HMR bypass
+
+--- body ---
+feat: add SandboxView for native HMR bypass
+
+Add /sandbox/:name route with static imports that bypass
+componentDiscovery, enabling native Vite HMR for WorkflowCanvas.
+Add Sandbox link to Home.vue header.
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+
+--- files (3) ---
+src/router/index.js
+src/views/Home.vue
+src/views/SandboxView.vue
