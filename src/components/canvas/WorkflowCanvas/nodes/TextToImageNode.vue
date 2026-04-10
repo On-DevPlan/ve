@@ -24,9 +24,6 @@ const props = defineProps({
   }
 })
 
-// Share addNode via useClipboard's internal addNode
-const { addNode: spawnImageNode } = useClipboard(null, () => {})
-
 const MODEL_OPTIONS = [
   { value: 'image-01', label: 'image-01' },
   { value: 'image-01-live', label: 'image-01-live' }
