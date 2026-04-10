@@ -1,0 +1,16 @@
+sha:        953fe9551accb2dd085d7895434d1966df05fc90
+short:      953fe95
+author:     zhaoliuxue <2096343460@qq.com>
+date:       2026-04-10T11:46:13+08:00
+subject:    feat(WorkflowCanvas): add right-click context menu with delete option
+
+--- body ---
+feat(WorkflowCanvas): add right-click context menu with delete option
+
+Right-clicking a node shows a context menu with a Delete button.
+Menu dismisses on click outside or Escape.
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+
+--- files (1) ---
+src/components/canvas/WorkflowCanvas/index.vue
