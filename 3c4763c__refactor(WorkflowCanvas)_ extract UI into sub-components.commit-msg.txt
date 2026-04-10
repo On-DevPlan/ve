@@ -1,0 +1,28 @@
+sha:        3c4763c665576689c81ac82facc359e24e428620
+short:      3c4763c
+author:     zhaoliuxue <2096343460@qq.com>
+date:       2026-04-10T11:51:49+08:00
+subject:    refactor(WorkflowCanvas): extract UI into sub-components
+
+--- body ---
+refactor(WorkflowCanvas): extract UI into sub-components
+
+Break index.vue (~630 lines) into focused components:
+- Toolbar.vue: add-node / delete / clear / export / import buttons
+- ApiConfigModal.vue: endpoint / apikey / model configuration
+- ContextMenu.vue: right-click delete menu
+- PropertyPanel.vue: selected node property editor
+- index.vue: now only handles VueFlow composable orchestration
+  and canvas-level events
+
+New directory: components/ for UI sub-components;
+nodes/ and composables/ remain for domain logic.
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+
+--- files (5) ---
+src/components/canvas/WorkflowCanvas/components/ApiConfigModal.vue
+src/components/canvas/WorkflowCanvas/components/ContextMenu.vue
+src/components/canvas/WorkflowCanvas/components/PropertyPanel.vue
+src/components/canvas/WorkflowCanvas/components/Toolbar.vue
+src/components/canvas/WorkflowCanvas/index.vue
