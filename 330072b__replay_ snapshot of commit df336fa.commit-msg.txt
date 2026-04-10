@@ -1,0 +1,16 @@
+sha:        330072bdf93fdd4b476b8addef92881f2d11770c
+short:      330072b
+author:     zhaoliuxue <2096343460@qq.com>
+date:       2026-04-10T10:34:10+08:00
+subject:    replay: snapshot of commit df336fa
+
+--- body ---
+replay: snapshot of commit df336fa
+
+original-subject: feat(WorkflowCanvas): focus highlight border and WASD canvas pan
+original-author:  zhaoliuxue <2096343460@qq.com>
+original-date:    2026-04-10T10:34:10+08:00
+files:            4
+
+--- files (1) ---
+.commit-msgs/df336fa__feat(WorkflowCanvas)_ focus highlight border and WASD canvas pan.commit-msg.txt
