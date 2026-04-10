@@ -1,0 +1,16 @@
+sha:        3207d13a733297c087e06ff894ff32d314dfa391
+short:      3207d13
+author:     zhaoliuxue <2096343460@qq.com>
+date:       2026-04-10T11:22:57+08:00
+subject:    fix(WorkflowCanvas): move showApiConfig ref before composable usage
+
+--- body ---
+fix(WorkflowCanvas): move showApiConfig ref before composable usage
+
+Fix TDZ error where showApiConfig was used before its declaration
+in setup.
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+
+--- files (1) ---
+src/components/canvas/WorkflowCanvas/index.vue
