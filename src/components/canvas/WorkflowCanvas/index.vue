@@ -23,6 +23,12 @@ import { saveApiConfig, hasApiKey, apiConfig } from './composables/useImageGen'
 const nodes = ref([])
 const edges = ref([])
 
+// API Config (declared first so composables can reference it)
+const showApiConfig = ref(false)
+const apiEndpoint = ref(apiConfig.value.endpoint)
+const apiKey = ref(apiConfig.value.apiKey)
+const apiModel = ref(apiConfig.value.model || 'image-01')
+
 // Composables
 const { selectedNode, focusedNodeId, addNode, removeNode, clearAll, exportJSON, importJSON, onNodeClick, onNodeFocus, onNodeBlur } = useNodeActions(nodes, edges)
 const { isDragging, handleDrop, handleDragover, handleDragleave, enablePaste, disablePaste } = useClipboard(nodes, addNode, showApiConfig)
@@ -49,12 +55,6 @@ const toolbarButtons = [
   { type: 'textToImage', label: 'T→Image', icon: '🎨' },
   { type: 'imageToImage', label: 'I→Image', icon: '🖼️' }
 ]
-
-// API Config
-const showApiConfig = ref(false)
-const apiEndpoint = ref(apiConfig.value.endpoint)
-const apiKey = ref(apiConfig.value.apiKey)
-const apiModel = ref(apiConfig.value.model || 'image-01')
 
 function handleSaveApiConfig() {
   saveApiConfig(apiEndpoint.value, apiKey.value, apiModel.value)
