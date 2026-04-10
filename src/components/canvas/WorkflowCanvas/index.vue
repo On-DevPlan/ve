@@ -66,6 +66,25 @@ function onAddImageNode(event) {
   nodes.value.push(event.detail)
 }
 
+// Context menu
+const contextMenu = ref({ visible: false, x: 0, y: 0, nodeId: null })
+
+function onNodeContextMenu({ event, node }) {
+  event.preventDefault()
+  contextMenu.value = { visible: true, x: event.clientX, y: event.clientY, nodeId: node.id }
+}
+
+function closeContextMenu() {
+  contextMenu.value.visible = false
+}
+
+function handleContextDelete() {
+  if (contextMenu.value.nodeId) {
+    removeNode(contextMenu.value.nodeId)
+  }
+  closeContextMenu()
+}
+
 // Import handler
 function handleImport(event) {
   const file = event.target.files?.[0]
@@ -80,11 +99,14 @@ onMounted(() => {
   enablePaste()
   setTimeout(() => fitView(), 100)
   window.addEventListener('wf:add-image-node', onAddImageNode)
+  document.addEventListener('click', closeContextMenu)
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeContextMenu() })
 })
 
 onUnmounted(() => {
   disablePaste()
   window.removeEventListener('wf:add-image-node', onAddImageNode)
+  document.removeEventListener('click', closeContextMenu)
 })
 </script>
 
@@ -166,6 +188,20 @@ onUnmounted(() => {
       </div>
     </div>
 
+    <!-- Context Menu -->
+    <Teleport to="body">
+      <div
+        v-if="contextMenu.visible"
+        class="ctx-menu"
+        :style="{ left: contextMenu.x + 'px', top: contextMenu.y + 'px' }"
+        @click.stop
+      >
+        <button class="ctx-item ctx-delete" @click="handleContextDelete">
+          🗑️ Delete
+        </button>
+      </div>
+    </Teleport>
+
     <!-- Canvas -->
     <div class="canvas-wrapper">
       <VueFlow
@@ -177,6 +213,7 @@ onUnmounted(() => {
         @node-click="onNodeClick"
         @node-focus="onNodeFocus"
         @node-blur="onNodeBlur"
+        @node-context-menu="onNodeContextMenu"
       >
         <Background pattern-color="#aaa" :gap="16" />
         <Controls />
@@ -547,5 +584,44 @@ onUnmounted(() => {
 :deep(.vue-flow__minimap) {
   background: #fff;
   border-radius: 8px;
+}
+
+/* Context Menu */
+.ctx-menu {
+  position: fixed;
+  background: #fff;
+  border: 1px solid #e8e8e8;
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  z-index: 9999;
+  padding: 6px;
+  min-width: 140px;
+}
+
+.ctx-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: none;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s;
+}
+
+.ctx-item:hover {
+  background: #f5f5f5;
+}
+
+.ctx-delete {
+  color: #ef4444;
+}
+
+.ctx-delete:hover {
+  background: #fef2f2;
 }
 </style>
