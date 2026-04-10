@@ -1,0 +1,21 @@
+sha:        df336fa578b40c78a25b2e0dd75589afc4cf05af
+short:      df336fa
+author:     zhaoliuxue <2096343460@qq.com>
+date:       2026-04-10T10:34:10+08:00
+subject:    feat(WorkflowCanvas): focus highlight border and WASD canvas pan
+
+--- body ---
+feat(WorkflowCanvas): focus highlight border and WASD canvas pan
+
+- InputNode: remove default green border, use CSS :focus-within for blue highlight when textarea is focused
+- useNodeActions: add focusedNodeId ref + onNodeFocus/onNodeBlur methods
+- useKeyboard: new composable for WASD canvas panning (disabled when node input is focused)
+- VueFlow template: relay @node-focus/@node-blur from node components
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+
+--- files (4) ---
+src/components/canvas/WorkflowCanvas/composables/useKeyboard.js
+src/components/canvas/WorkflowCanvas/composables/useNodeActions.js
+src/components/canvas/WorkflowCanvas/index.vue
+src/components/canvas/WorkflowCanvas/nodes/InputNode.vue
