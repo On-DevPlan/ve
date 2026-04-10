@@ -1,0 +1,18 @@
+sha:        72ed2fd55e0e8e9ec6abe124ffb91da624c3e3f3
+short:      72ed2fd
+author:     zhaoliuxue <2096343460@qq.com>
+date:       2026-04-10T11:57:02+08:00
+subject:    fix(ImageToImageNode): use base64 data URL instead of blob URL
+
+--- body ---
+fix(ImageToImageNode): use base64 data URL instead of blob URL
+
+Blob URLs (blob:localhost/...) are only accessible locally and cannot
+be fetched by the API server. Switch to readAsDataURL() so the image
+is embedded as a base64 data URL, which works for both preview
+display and API requests.
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+
+--- files (1) ---
+src/components/canvas/WorkflowCanvas/nodes/ImageToImageNode.vue
