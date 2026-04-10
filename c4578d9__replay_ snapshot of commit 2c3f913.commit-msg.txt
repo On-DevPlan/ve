@@ -1,0 +1,16 @@
+sha:        c4578d956eacde76d124f59f61e6ebccf0213bfe
+short:      c4578d9
+author:     zhaoliuxue <2096343460@qq.com>
+date:       2026-04-10T12:02:37+08:00
+subject:    replay: snapshot of commit 2c3f913
+
+--- body ---
+replay: snapshot of commit 2c3f913
+
+original-subject: fix(ImageToImageNode): enforce 10MB file size limit per API docs
+original-author:  zhaoliuxue <2096343460@qq.com>
+original-date:    2026-04-10T12:02:37+08:00
+files:            1
+
+--- files (1) ---
+.commit-msgs/2c3f913__fix(ImageToImageNode)_ enforce 10MB file size limit per API docs.commit-msg.txt
