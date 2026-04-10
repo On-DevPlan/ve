@@ -1,0 +1,13 @@
+sha:        aae3c27937ece3a006e316d9389e469e2c8c970b
+short:      aae3c27
+author:     zhaoliuxue <2096343460@qq.com>
+date:       2026-04-10T10:25:48+08:00
+subject:    chore(WorkflowCanvas): update description for text paste capability
+
+--- body ---
+chore(WorkflowCanvas): update description for text paste capability
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+
+--- files (1) ---
+src/components/canvas/WorkflowCanvas/component.js
