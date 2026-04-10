@@ -86,6 +86,7 @@ export function useClipboard(nodes, addNodeFn) {
 
   /**
    * Handler for paste events - creates ImageNode from clipboard image
+   * or TextNode from clipboard text
    * @param {ClipboardEvent} event
    */
   async function handlePaste(event) {
@@ -94,8 +95,12 @@ export function useClipboard(nodes, addNodeFn) {
     const items = event.clipboardData?.items
     if (!items) return
 
+    let handledImage = false
+    let handledText = false
+
     for (const item of items) {
-      if (item.type.startsWith('image/')) {
+      // Handle image paste
+      if (!handledImage && item.type.startsWith('image/')) {
         try {
           const file = item.getAsFile()
           if (!file) continue
@@ -105,10 +110,28 @@ export function useClipboard(nodes, addNodeFn) {
           if (node && node.data) {
             node.data.imageUrl = imageUrl
           }
+          handledImage = true
         } catch (err) {
           console.error('Failed to paste image:', err)
         }
-        break
+      }
+
+      // Handle text paste - create TextNode
+      if (!handledText && item.type === 'text/plain') {
+        try {
+          const text = event.clipboardData?.getData('text/plain')
+          if (!text || !text.trim()) continue
+
+          const node = addNodeFn('text', { x: 400, y: 250 })
+          if (node && node.data) {
+            node.data.content = text
+            node.data.label = 'Text'
+            node.data.fontSize = 14
+          }
+          handledText = true
+        } catch (err) {
+          console.error('Failed to paste text:', err)
+        }
       }
     }
   }
