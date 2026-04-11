@@ -1,0 +1,12 @@
+sha:        910be133e7541a7ac53590860a8c4de838059de6
+short:      910be13
+author:     zhaoliuxue111 <zhaoliuxue111@xiaoduotech.com111>
+date:       2026-04-11T12:48:29+08:00
+subject:    Merge branch 'deploy' of github.com:ZHLX2005/ve into deploy
+
+--- body ---
+
+
+--- files (2) ---
+src/components/canvas/WorkflowCanvas/composables/useNodeActions.js
+src/components/canvas/WorkflowCanvas/index.vue
