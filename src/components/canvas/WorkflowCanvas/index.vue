@@ -13,54 +13,75 @@ import ImageNode from './nodes/ImageNode.vue'
 import InputNode from './nodes/InputNode.vue'
 import TextNode from './nodes/TextNode.vue'
 import GroupNode from './nodes/GroupNode.vue'
+import TextToImageNode from './nodes/TextToImageNode.vue'
+import ImageToImageNode from './nodes/ImageToImageNode.vue'
 import { useNodeActions } from './composables/useNodeActions'
 import { useClipboard } from './composables/useClipboard'
+import { useKeyboard } from './composables/useKeyboard'
+import { saveApiConfig, apiConfig } from './composables/useImageGen'
 
-// State
+import Toolbar from './components/Toolbar.vue'
+import ApiConfigModal from './components/ApiConfigModal.vue'
+import ContextMenu from './components/ContextMenu.vue'
+import PropertyPanel from './components/PropertyPanel.vue'
+
+// --- State ---
 const nodes = ref([])
 const edges = ref([])
 
 // Composables
-const {
-  selectedNode,
-  hasSelectedNodes,
-  addNode,
-  removeNode,
-  clearAll,
-  exportJSON,
-  importJSON,
-  onNodeClick,
-  groupSelected,
-  ungroupSelected
-} = useNodeActions(nodes, edges)
+const { selectedNode, addNode, removeNode, clearAll, exportJSON, importJSON, onNodeClick, onNodeFocus, onNodeBlur, groupSelected, ungroupSelected } = useNodeActions(nodes, edges)
 const { isDragging, handleDrop, handleDragover, handleDragleave, enablePaste, disablePaste } = useClipboard(nodes, addNode)
 
-// Node types - MUST use markRaw
+// --- VueFlow ---
+const { onConnect, addEdges, fitView } = useVueFlow()
+onConnect((params) => addEdges([params]))
+
+// --- Node registry ---
 const nodeTypes = {
   image: markRaw(ImageNode),
   textInput: markRaw(InputNode),
   text: markRaw(TextNode),
-  group: markRaw(GroupNode)
+  group: markRaw(GroupNode),
+  textToImage: markRaw(TextToImageNode),
+  imageToImage: markRaw(ImageToImageNode)
 }
-
-// VueFlow connection + selection handlers
-const { onConnect, addEdges, fitView } = useVueFlow()
-onConnect((params) => addEdges([params]))
 
 // Toolbar buttons
 const toolbarButtons = [
   { type: 'image', label: 'Image', icon: '🖼️' },
   { type: 'textInput', label: 'Input', icon: '📝' },
-  { type: 'text', label: 'Text', icon: '📄' }
+  { type: 'text', label: 'Text', icon: '📄' },
+  { type: 'textToImage', label: 'T→Image', icon: '🎨' },
+  { type: 'imageToImage', label: 'I→Image', icon: '🖼️' }
 ]
 
-// Import handler
-function handleImport(event) {
-  const file = event.target.files?.[0]
-  if (file) {
-    importJSON(file).catch(err => console.error('Import failed:', err))
-    event.target.value = ''
-  }
+// --- Context menu ---
+const contextMenu = ref({ visible: false, x: 0, y: 0, nodeId: null })
+
+function onNodeContextMenu({ event, node }) {
+  event.preventDefault()
+  contextMenu.value = { visible: true, x: event.clientX, y: event.clientY, nodeId: node.id }
+}
+
+function closeContextMenu() {
+  contextMenu.value.visible = false
+}
+
+function handleContextDelete() {
+  if (contextMenu.value.nodeId) removeNode(contextMenu.value.nodeId)
+  closeContextMenu()
+}
+
+// --- Image node spawn from generation results ---
+function onAddImageNode(event) {
+  nodes.value.push(event.detail)
+}
+
+// --- API Config handlers ---
+function handleSaveApiConfig({ endpoint, apiKey: key, model }) {
+  saveApiConfig(endpoint, key, model)
+  showApiConfig.value = false
 }
 
 // Grouping handlers
@@ -72,14 +93,28 @@ function handleUngroup() {
   ungroupSelected()
 }
 
-// Lifecycle
+// --- Import handler ---
+function handleImport(event) {
+  const file = event.target.files?.[0]
+  if (file) {
+    importJSON(file)
+    event.target.value = ''
+  }
+}
+
+// --- Lifecycle ---
 onMounted(() => {
   enablePaste()
   setTimeout(() => fitView(), 100)
+  window.addEventListener('wf:add-image-node', onAddImageNode)
+  document.addEventListener('click', closeContextMenu)
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeContextMenu() })
 })
 
 onUnmounted(() => {
   disablePaste()
+  window.removeEventListener('wf:add-image-node', onAddImageNode)
+  document.removeEventListener('click', closeContextMenu)
 })
 </script>
 
@@ -113,20 +148,6 @@ onUnmounted(() => {
         >
           🗑️ Delete
         </button>
-        <button
-          class="action-btn group-btn"
-          :disabled="!hasSelectedNodes"
-          @click="handleGroup"
-        >
-          📦 Group
-        </button>
-        <button
-          class="action-btn group-btn"
-          :disabled="!hasSelectedNodes"
-          @click="handleUngroup"
-        >
-          📤 Ungroup
-        </button>
         <button class="action-btn" @click="clearAll">
           🧹 Clear
         </button>
@@ -137,6 +158,12 @@ onUnmounted(() => {
           📂 Import
           <input type="file" accept=".json" @change="handleImport" hidden />
         </label>
+        <button class="action-btn" @click="handleGroup">
+          📦 Group
+        </button>
+        <button class="action-btn" @click="handleUngroup">
+          📭 Ungroup
+        </button>
       </div>
     </div>
 
@@ -153,6 +180,9 @@ onUnmounted(() => {
         :selection-key-code="'Shift'"
         :multi-selection-key-code="'Shift'"
         @node-click="onNodeClick"
+        @node-focus="onNodeFocus"
+        @node-blur="onNodeBlur"
+        @node-context-menu="onNodeContextMenu"
       >
         <Background pattern-color="#aaa" :gap="16" />
         <Controls />
@@ -180,12 +210,6 @@ onUnmounted(() => {
           <span class="prop-value">
             X: {{ Math.round(selectedNode.position?.x ?? 0) }},
             Y: {{ Math.round(selectedNode.position?.y ?? 0) }}
-          </span>
-        </div>
-        <div v-if="selectedNode.type === 'group'" class="prop-item">
-          <label>Children:</label>
-          <span class="prop-value">
-            {{ nodes.filter(n => n.parentNode === selectedNode.id).length }} node(s)
           </span>
         </div>
         <div v-if="selectedNode.type === 'image'" class="prop-item">
@@ -301,14 +325,6 @@ onUnmounted(() => {
   cursor: not-allowed;
 }
 
-.group-btn {
-  background: #8b5cf6;
-}
-
-.group-btn:hover:not(:disabled) {
-  background: #7c3aed;
-}
-
 .import-btn {
   cursor: pointer;
 }
@@ -341,7 +357,7 @@ onUnmounted(() => {
   width: 260px;
   background: #fff;
   border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
   overflow: hidden;
   z-index: 100;
 }

@@ -5,7 +5,9 @@ const defaultNodeData = {
   image: { label: 'Image', imageUrl: '', imageWidth: 200, imageHeight: 150 },
   textInput: { label: 'Input', inputText: '', placeholder: 'Enter content...' },
   text: { label: 'Text', content: 'Display content', fontSize: 14 },
-  group: { label: 'Group', color: '#8b5cf6' }
+  group: { label: 'Group', color: '#8b5cf6' },
+  textToImage: { label: 'Text→Image', prompt: '', model: 'image-01', aspectRatio: '1:1', styleType: '', styleWeight: 0.8, n: 1, promptOptimizer: false, aigcWatermark: false, imageUrls: [], loading: false, error: null },
+  imageToImage: { label: 'Image→Image', subjectImageUrl: '', prompt: '', model: 'image-01', aspectRatio: '1:1', styleType: '', styleWeight: 0.8, n: 1, promptOptimizer: false, aigcWatermark: false, imageUrls: [], loading: false, error: null }
 }
 
 // Default position generator
@@ -21,6 +23,7 @@ function getDefaultPosition() {
  */
 export function useNodeActions(nodes, edges) {
   const selectedNode = ref(null)
+  const focusedNodeId = ref(null)
 
   const hasSelectedNodes = computed(() => nodes.value.filter(n => n.selected).length > 0)
 
@@ -124,6 +127,14 @@ export function useNodeActions(nodes, edges) {
     selectedNode.value = node
   }
 
+  function onNodeFocus({ node }) {
+    focusedNodeId.value = node.id
+  }
+
+  function onNodeBlur() {
+    focusedNodeId.value = null
+  }
+
   /**
    * Groups selected nodes under a new group node
    * @returns {Object|null} The created group node, or null if no nodes selected
@@ -180,14 +191,16 @@ export function useNodeActions(nodes, edges) {
     selectedNode,
     hasSelectedNodes,
     getSelectedNodes,
+    focusedNodeId,
     addNode,
     removeNode,
     clearAll,
     exportJSON,
     importJSON,
     onNodeClick,
+    onNodeFocus,
+    onNodeBlur,
     groupSelected,
     ungroupSelected
   }
 }
-  

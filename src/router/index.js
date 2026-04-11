@@ -4,6 +4,7 @@ import { componentDiscovery } from '../utils/componentDiscovery'
 // 首页组件
 const Home = () => import('../views/Home.vue')
 const ComponentView = () => import('../views/ComponentView.vue')
+const SandboxView = () => import('../views/SandboxView.vue')
 
 // 创建路由
 const router = createRouter({
@@ -33,6 +34,16 @@ const router = createRouter({
       props: true,
       meta: {
         title: '组件详情'
+      }
+    },
+    // Sandbox 路由：直接静态 import 组件，绕过 componentDiscovery，启用原生 HMR
+    {
+      path: '/sandbox/:name',
+      name: 'Sandbox',
+      component: SandboxView,
+      props: true,
+      meta: {
+        title: 'Sandbox'
       }
     },
     // 404页面

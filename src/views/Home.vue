@@ -103,6 +103,7 @@ const closeInfoModal = () => {
       <div class="header-main">
         <h1 class="title">组件中心</h1>
         <span class="subtitle">{{ filteredComponents.length }} 个组件</span>
+        <a href="/sandbox/WorkflowCanvas" class="sandbox-link">🔧 Sandbox</a>
       </div>
 
       <!-- 分组过滤 - 横向胶囊 -->
@@ -209,6 +210,22 @@ const closeInfoModal = () => {
 .subtitle {
   font-size: 14px;
   color: #86868b;
+}
+
+.sandbox-link {
+  margin-left: auto;
+  font-size: 13px;
+  color: #3b82f6;
+  text-decoration: none;
+  padding: 4px 12px;
+  border: 1px solid #3b82f6;
+  border-radius: 16px;
+  transition: all 0.2s;
+}
+
+.sandbox-link:hover {
+  background: #3b82f6;
+  color: #fff;
 }
 
 /* 分组胶囊 */
