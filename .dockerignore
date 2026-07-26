@@ -1,5 +1,6 @@
-# 依赖目录
+# 所有 node_modules（根+workspace嵌套）
 node_modules
+**/node_modules
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
