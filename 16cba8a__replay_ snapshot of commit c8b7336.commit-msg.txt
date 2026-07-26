@@ -1,0 +1,16 @@
+sha:        16cba8ad77c0d0e5bb1799c5ffd10a51849d96ec
+short:      16cba8a
+author:     Style Library Bot <ai@style-library.local>
+date:       2026-07-26T19:04:54+08:00
+subject:    replay: snapshot of commit c8b7336
+
+--- body ---
+replay: snapshot of commit c8b7336
+
+original-subject: feat: implement component framework with manifest system, mount adapters, and showcase
+original-author:  Style Library Bot <ai@style-library.local>
+original-date:    2026-07-26T19:04:54+08:00
+files:            240
+
+--- files (1) ---
+.commit-msgs/c8b7336__feat_ implement component framework with manifest system, mount adapters, and sh.commit-msg.txt
