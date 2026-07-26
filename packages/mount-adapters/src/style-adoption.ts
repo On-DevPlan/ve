@@ -24,8 +24,14 @@ function styleFingerprint(text: string): string {
 const seenStyleFingerprintsByShadowRoot = new WeakMap<ShadowRoot, Set<string>>();
 
 /**
- * 扫描 document.head 的 <style>,把还没 clone 进 shadowRoot 的克隆进去。
+ * 扫描 document.head 的 <style> 和 <link rel="stylesheet">,
+ * 把还没 clone 进 shadowRoot 的克隆进去。
  * 幂等:同一 ShadowRoot 多次调用不会重复克隆同一份样式。
+ *
+ * 为什么也要处理 <link>:
+ *   Vite build (mode=production) 把 CSS 拆成外部 .css 文件,通过
+ *   <link rel="stylesheet"> 加载;只有 dev 模式才用 <style> 内联。
+ *   adoptStylesInto 只扫 <style> 会让 build 产物无样式。
  */
 export function adoptStylesInto(shadowRoot: ShadowRoot): void {
   let seen = seenStyleFingerprintsByShadowRoot.get(shadowRoot);
@@ -33,18 +39,36 @@ export function adoptStylesInto(shadowRoot: ShadowRoot): void {
     seen = new Set<string>();
     seenStyleFingerprintsByShadowRoot.set(shadowRoot, seen);
   }
-  const styles = Array.from(document.head.querySelectorAll('style'));
-  for (const s of styles) {
+
+  // 1) 克隆 <style> 标签(dev 模式)
+  const styleEls = Array.from(document.head.querySelectorAll('style'));
+  for (const s of styleEls) {
     const text = s.textContent ?? '';
     if (!text) continue;
     const fp = styleFingerprint(text);
     if (seen.has(fp)) continue;
     seen.add(fp);
-    // 同一 shadowRoot 内若已存在(理论上 seen 已拦截),跳过
     if (shadowRoot.querySelector(`style[data-sl-clone="${fp}"]`)) continue;
     const cloned = document.createElement('style');
     cloned.setAttribute('data-sl-clone', fp);
     cloned.textContent = text;
+    shadowRoot.appendChild(cloned);
+  }
+
+  // 2) 克隆 <link rel="stylesheet">(build 模式)
+  const linkEls = Array.from(document.head.querySelectorAll('link[rel="stylesheet"]'));
+  for (const link of linkEls) {
+    const href = link.getAttribute('href') ?? '';
+    if (!href) continue;
+    // 用 href 做指纹(外部文件内容由服务器决定,URL 足够区分)
+    const fp = styleFingerprint(href);
+    if (seen.has(fp)) continue;
+    seen.add(fp);
+    if (shadowRoot.querySelector(`link[data-sl-clone="${fp}"]`)) continue;
+    const cloned = document.createElement('link');
+    cloned.setAttribute('rel', 'stylesheet');
+    cloned.setAttribute('href', href);
+    cloned.setAttribute('data-sl-clone', fp);
     shadowRoot.appendChild(cloned);
   }
 }

@@ -5,13 +5,17 @@
 # Layout notes:
 #   - This repo is a pnpm workspace (apps/ + packages/).
 #   - Root package.json#scripts.build routes through
-#     \`pnpm --filter @style-library/showcase build\`.
+#     `pnpm --filter @style-library/showcase build`.
 #   - pnpm corepack version is pinned to whatever root
 #     package.json#packageManager says, so CI and Docker stay in sync.
 #
-# Build context gotcha: COPY must hand pnpm every workspace manifest
-# before \`pnpm install --frozen-lockfile\` so it can resolve the
-# workspace graph and materialize @style-library/* node_modules links.
+# Build context gotcha:
+#   `.dockerignore` only ignores root `node_modules` — it DOES NOT ignore
+#   `apps/showcase/node_modules` (which is an empty pnpm-symlink dir on
+#   the host). So if we `COPY apps ./apps` before `pnpm install`, the
+#   empty host dir silently overwrites the container `node_modules` just
+#   populated by `pnpm install`. The fix: copy everything FIRST, then
+#   install, then build.
 
 # ---- Stage 1: builder ----
 FROM node:22-alpine AS builder
@@ -22,36 +26,19 @@ WORKDIR /app
 RUN corepack enable \
  && corepack prepare pnpm@9.12.0 --activate
 
-# Monorepo top-level manifests + lockfile. Order matters:
-# these three files let pnpm resolve the workspace graph and verify
-# `--frozen-lockfile` without yet touching any source.
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY tsconfig.base.json vitest.workspace.ts ./
-
-# Workspace subtree manifests. pnpm needs to see package.json for each
-# workspace package so it can install their deps and resolve workspace:*
-# links. Sources are copied next, but their package.json must be present
-# before install so the workspace protocol can resolve.
-COPY apps ./apps
-COPY packages ./packages
-
-# Install everything — root devDeps + every workspace.
-# This is what produces apps/showcase/node_modules/.bin/vite, which
-# `pnpm --filter @style-library/showcase build` will invoke.
-RUN pnpm install --frozen-lockfile
-
-# Everything else: eslint config, scripts, eslint-rules, .gitignore etc.
-# Already-copied files are overwritten by this — pnpm install must have
-# run before this line so node_modules in apps/ and packages/ already
-# exist with the right pnpm symlink layout.
+# Copy EVERYTHING in one shot, then install, then build.
+# This avoids nested node_modules being overwritten by a prior empty COPY.
 COPY . .
+
+# Install all workspace dependencies (root devDeps + every workspace).
+# After this, apps/showcase/node_modules/.bin/vite exists.
+RUN pnpm install --frozen-lockfile
 
 # Workaround legacy crypto provider complaints from a few transitive
 # webpack/terser plugins when Node 22 builds the old vue 3.4 demo.
-# Safe to keep: NODE_OPTIONS is forwarded into Vite's worker children.
 ENV NODE_OPTIONS="--openssl-legacy-provider"
 
-# Drives vite build via the workspace-aware root script.
+# Drives `pnpm --filter @style-library/showcase build` via root script.
 RUN pnpm run build
 
 # ---- Stage 2: runtime ----
