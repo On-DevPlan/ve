@@ -1,0 +1,12 @@
+sha:        f4020b4a902b2bd8afb10f4c5aebbb3e61dc12ae
+short:      f4020b4
+author:     Style Library Bot <ai@style-library.local>
+date:       2026-07-27T00:44:04+08:00
+subject:    feat(car-battle): add React entry component with HUD and result panel
+
+--- body ---
+
+
+--- files (2) ---
+packages/react-components/src/car-battle/index.css
+packages/react-components/src/car-battle/index.tsx
