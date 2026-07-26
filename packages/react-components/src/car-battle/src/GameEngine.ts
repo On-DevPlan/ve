@@ -51,6 +51,7 @@ export class GameEngine {
     this.gameTime = 0;
     this.lastTime = performance.now();
     this.running = true;
+    this.emitState(); // 立即发出初始状态，避免 React 在 rAF 之前显示旧 UI
 
     this.loop(performance.now());
   }
