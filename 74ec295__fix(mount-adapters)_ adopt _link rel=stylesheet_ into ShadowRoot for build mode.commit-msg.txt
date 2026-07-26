@@ -1,0 +1,25 @@
+sha:        74ec2954fe51494fad04d2cdcd1951faff5cfdab
+short:      74ec295
+author:     Style Library Bot <ai@style-library.local>
+date:       2026-07-26T23:22:33+08:00
+subject:    fix(mount-adapters): adopt <link rel=stylesheet> into ShadowRoot for build mode
+
+--- body ---
+fix(mount-adapters): adopt <link rel=stylesheet> into ShadowRoot for build mode
+
+Vite dev inlines component CSS as <style> tags; vite build emits separate
+.css files loaded via <link rel=stylesheet>. adoptStylesInto only cloned
+<style> into Shadow DOM, so build mode had zero component styles in the
+ShadowRoot.
+
+Fix: adoptStylesInto now also scans document.head.querySelectorAll('link[rel=stylesheet]')
+and clones unmatched <link> elements into ShadowRoot, with the same djb2
+fingerprint dedup used by the <style> path.
+
+Also add ref doc: .claude/skills/web-work-flow/references/shadow-dom-build-css-loss.md
+
+--- files (4) ---
+.claude/skills/web-work-flow/references/shadow-dom-build-css-loss.md
+.dockerignore
+Dockerfile
+packages/mount-adapters/src/style-adoption.ts
