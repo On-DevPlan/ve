@@ -1,0 +1,16 @@
+sha:        65e188de2aedf9ab93aff55b120b5769d055783d
+short:      65e188d
+author:     joke-lx <2196824165@qq.com>
+date:       2026-07-26T22:29:43+08:00
+subject:    replay: snapshot of commit 698ceb4
+
+--- body ---
+replay: snapshot of commit 698ceb4
+
+original-subject: fix(deploy): Dockerfile monorepo + diagnose secrets before scp (#2)
+original-author:  joke-lx <2196824165@qq.com>
+original-date:    2026-07-26T22:29:43+08:00
+files:            2
+
+--- files (1) ---
+.commit-msgs/698ceb4__fix(deploy)_ Dockerfile monorepo + diagnose secrets before scp (#2).commit-msg.txt
