@@ -20,14 +20,17 @@ import validComponentConfig from './eslint/rules/valid-component-config.js'; // 
 // 默认导出即 ESLint 加载的配置数组;配置项按数组顺序合并,后者可覆盖前者。
 export default [
   {
-    // 文件级忽略:node_modules、构建产物、生成物、覆盖率、showcase 静态资源
+    // 文件级忽略:node_modules、构建产物、生成物、覆盖率
     // 这些目录要么不需要 lint,要么是构建输出/外部产物
     ignores: [
       '**/node_modules/**', // 第三方依赖
       '**/dist/**', // 构建输出
       '**/coverage/**', // 测试覆盖率报告
-      'apps/showcase/public/**', // showcase 的静态资源目录
+      '**/.omc/**', // OMC 临时目录(工作记忆、wiki 缓存等)
+      '**/.tmp/**', // 临时分析/调试脚本
       '**/.claude/worktrees/**', // agent 工作树(临时目录,不参与 lint)
+      '**/eslint/__tests__/fixtures/**', // 自定义规则测试夹具(不保证 lint 干净)
+      'apps/showcase/public/**', // showcase 静态资源目录(包含大量闭源第三方资产)
     ],
   },
   js.configs.recommended, // 通用 ES 推荐规则集
