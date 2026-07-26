@@ -1,44 +1,66 @@
-# 使用多阶段构建
-# 第一阶段：构建应用
+# Use multi-stage build.
+# Stage 1 — install + build showcase in the monorepo.
+# Stage 2 — serve the built dist/ via nginx:alpine.
+#
+# Layout notes:
+#   - This repo is a pnpm workspace (apps/ + packages/).
+#   - Root package.json#scripts.build routes through
+#     `pnpm --filter @style-library/showcase build`.
+#   - pnpm corepack version is pinned to whatever root
+#     package.json#packageManager says, so CI and Docker stay in sync.
+#
+# Build context gotcha:
+#   `.dockerignore` only ignores root `node_modules` — it DOES NOT ignore
+#   `apps/showcase/node_modules` (which is an empty pnpm-symlink dir on
+#   the host). So if we `COPY apps ./apps` before `pnpm install`, the
+#   empty host dir silently overwrites the container `node_modules` just
+#   populated by `pnpm install`. The fix: copy everything FIRST, then
+#   install, then build.
+
+# ---- Stage 1: builder ----
 FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-# 安装pnpm
-RUN corepack enable && corepack prepare pnpm@9 --activate
+# Pin pnpm to whatever root package.json#packageManager says.
+RUN corepack enable \
+ && corepack prepare pnpm@9.12.0 --activate
 
-# 复制package文件
-COPY package*.json pnpm-lock.yaml ./
-
-# 安装依赖
-RUN pnpm install --frozen-lockfile
-
-# 复制源代码
+# Copy EVERYTHING in one shot, then install, then build.
+# This avoids nested node_modules being overwritten by a prior empty COPY.
 COPY . .
 
-# 设置NODE_OPTIONS以处理crypto问题
+# Install all workspace dependencies (root devDeps + every workspace).
+# After this, apps/showcase/node_modules/.bin/vite exists.
+RUN pnpm install --frozen-lockfile
+
+# Workaround legacy crypto provider complaints from a few transitive
+# webpack/terser plugins when Node 22 builds the old vue 3.4 demo.
 ENV NODE_OPTIONS="--openssl-legacy-provider"
 
-# 构建应用
+# Drives `pnpm --filter @style-library/showcase build` via root script.
 RUN pnpm run build
 
-# 第二阶段：nginx服务
+# ---- Stage 2: runtime ----
 FROM nginx:alpine
 
-# 复制自定义nginx站点配置（覆盖默认配置）
+# Custom nginx site config overriding the default.conf that ships in
+# nginx:alpine. Mounted at /etc/nginx/conf.d/default.conf so it actually
+# wins against the bundled /etc/nginx/nginx.conf.
 COPY default.conf /etc/nginx/conf.d/default.conf
 
-# 从构建阶段复制构建产物到nginx目录
-COPY --from=builder /app/dist /usr/share/nginx/html
+# Copy the built artifact. Note the path now lives under
+# apps/showcase/dist, not /app/dist, because the root is a workspace.
+COPY --from=builder /app/apps/showcase/dist /usr/share/nginx/html
 
-# 验证文件是否正确复制
-RUN ls -la /usr/share/nginx/html/ && \
-    if [ ! -f /usr/share/nginx/html/index.html ]; then \
-        echo "Error: index.html not found!" && exit 1; \
+# Sanity check — fail fast in the image build if vite didn't emit
+# index.html so the runtime container never serves an empty 404 page.
+RUN ls -la /usr/share/nginx/html/ \
+ && if [ ! -f /usr/share/nginx/html/index.html ]; then \
+      echo "Error: index.html not found!"; \
+      exit 1; \
     fi
 
-# 暴露端口
 EXPOSE 80
 
-# 启动nginx
 CMD ["nginx", "-g", "daemon off;"]
