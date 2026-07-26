@@ -1,0 +1,11 @@
+sha:        0a86dfbdd07a26570f68d0a314f588e713e7b9da
+short:      0a86dfb
+author:     Style Library Bot <ai@style-library.local>
+date:       2026-07-27T00:52:42+08:00
+subject:    fix(car-battle): emit initial state before rAF to prevent stale finished UI flash
+
+--- body ---
+
+
+--- files (1) ---
+packages/react-components/src/car-battle/src/GameEngine.ts
