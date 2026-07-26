@@ -1,0 +1,16 @@
+sha:        ecfb395596b6ffd20fa84abe9f888236c776b88f
+short:      ecfb395
+author:     Style Library Bot <ai@style-library.local>
+date:       2026-07-27T01:19:09+08:00
+subject:    replay: snapshot of commit b5ffde1
+
+--- body ---
+replay: snapshot of commit b5ffde1
+
+original-subject: fix(car-battle): remove unused constants to pass tsc --noEmit
+original-author:  Style Library Bot <ai@style-library.local>
+original-date:    2026-07-27T01:19:09+08:00
+files:            2
+
+--- files (1) ---
+.commit-msgs/b5ffde1__fix(car-battle)_ remove unused constants to pass tsc --noEmit.commit-msg.txt
