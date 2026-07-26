@@ -1,0 +1,16 @@
+sha:        c2daacd965acaf1431795f2bc2fb9b948158e2c8
+short:      c2daacd
+author:     Style Library Bot <ai@style-library.local>
+date:       2026-07-26T23:22:33+08:00
+subject:    replay: snapshot of commit 74ec295
+
+--- body ---
+replay: snapshot of commit 74ec295
+
+original-subject: fix(mount-adapters): adopt <link rel=stylesheet> into ShadowRoot for build mode
+original-author:  Style Library Bot <ai@style-library.local>
+original-date:    2026-07-26T23:22:33+08:00
+files:            4
+
+--- files (1) ---
+.commit-msgs/74ec295__fix(mount-adapters)_ adopt _link rel=stylesheet_ into ShadowRoot for build mode.commit-msg.txt
