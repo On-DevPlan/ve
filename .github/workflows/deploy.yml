@@ -21,6 +21,19 @@ jobs:
       run: |
         docker save ve:latest | gzip > app.tar.gz
 
+    - name: Diagnose secrets (length only)
+      if: always()
+      env:
+        HOST_LEN:      ${{ secrets.HOST }}
+        USERNAME_LEN:  ${{ secrets.USERNAME }}
+        SSH_KEY_LEN:   ${{ secrets.SSH_KEY }}
+        PORT_LEN:      ${{ secrets.PORT }}
+      run: |
+        echo "HOST length: ${#HOST_LEN}"
+        echo "USERNAME length: ${#USERNAME_LEN}"
+        echo "SSH_KEY length: ${#SSH_KEY_LEN}"
+        echo "PORT length: ${#PORT_LEN}"
+
     - name: Copy files to server
       uses: appleboy/scp-action@v0.1.7
       with:
