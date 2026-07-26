@@ -16,7 +16,7 @@ export class InputManager {
     this.handleKeyDown = (e: KeyboardEvent) => {
       this.keys.add(e.code);
       // 阻止方向键滚动页面
-      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.code)) {
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
         e.preventDefault();
       }
     };

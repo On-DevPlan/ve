@@ -7,6 +7,7 @@ import type { GameState, HitEvent } from './src/types';
 export default function CarBattle(): JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<GameEngine | null>(null);
+  const unsubRef = useRef<{ state?: () => void; hit?: () => void }>({});
 
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [hitFlash, setHitFlash] = useState<{ from: 0 | 1; key: number } | null>(null);
@@ -18,10 +19,10 @@ export default function CarBattle(): JSX.Element {
   const handleHit = useCallback((_event: HitEvent) => {
     const key = Date.now();
     setHitFlash({ from: _event.from, key });
-    // 动画结束后清除
     setTimeout(() => setHitFlash(null), 800);
   }, []);
 
+  // mount → subscribe + start
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -29,30 +30,36 @@ export default function CarBattle(): JSX.Element {
     const engine = new GameEngine();
     engineRef.current = engine;
 
-    const unsubState = engine.onStateChange(handleState);
-    const unsubHit = engine.onHit(handleHit);
+    const s = engine.onStateChange(handleState);
+    const h = engine.onHit(handleHit);
+    unsubRef.current = { state: s, hit: h };
 
     engine.start(canvas);
 
     return () => {
-      unsubState();
-      unsubHit();
+      s();
+      h();
       engine.stop();
     };
   }, [handleState, handleHit]);
 
+  // restart → clean old subscriptions, then new subscribe + start
   const handleRestart = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const old = engineRef.current;
+    // unsubscribe old callbacks before stopping — symmetric with effect cleanup
+    unsubRef.current.state?.();
+    unsubRef.current.hit?.();
     old?.stop();
 
     const engine = new GameEngine();
     engineRef.current = engine;
 
-    engine.onStateChange(handleState);
-    engine.onHit(handleHit);
+    const s = engine.onStateChange(handleState);
+    const h = engine.onHit(handleHit);
+    unsubRef.current = { state: s, hit: h };
 
     engine.start(canvas);
   }, [handleState, handleHit]);
@@ -68,20 +75,17 @@ export default function CarBattle(): JSX.Element {
       {/* HUD */}
       {gameState && !isFinished && (
         <div className="sl-cb-hud">
-          {/* 蓝方分数 */}
           <div className="sl-cb-score sl-cb-score--blue">
             <div className="sl-cb-score__value">{gameState.cars[0].score}</div>
             <div className="sl-cb-score__label">玩家1 [W A S D]</div>
           </div>
 
-          {/* 计时器 */}
           {!isCountdown && (
             <div className={`sl-cb-timer ${timerWarning ? 'sl-cb-timer--warning' : ''}`}>
               {Math.ceil(gameState.timeRemaining)}s
             </div>
           )}
 
-          {/* 红方分数 */}
           <div className="sl-cb-score sl-cb-score--red">
             <div className="sl-cb-score__value">{gameState.cars[1].score}</div>
             <div className="sl-cb-score__label">玩家2 [↑ ↓ ← →]</div>

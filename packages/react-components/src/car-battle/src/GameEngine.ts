@@ -79,13 +79,6 @@ export class GameEngine {
     };
   }
 
-  /** 重置游戏 */
-  reset(): void {
-    this.stop();
-    this.input = new InputManager();
-    // 其他状态在 start 中重置
-  }
-
   private loop = (now: number): void => {
     if (!this.running) return;
 
