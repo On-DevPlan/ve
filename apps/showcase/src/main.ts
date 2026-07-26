@@ -1,0 +1,68 @@
+// main.ts —— showcase 应用启动入口。
+//
+// 启动流程(spec §8.1):
+//   1) applyThemeToDocument —— 把默认主题 token 写到 documentElement
+//   2) loadManifest          —— 异步拉取 ComponentManifest(dev 中间件 / prod 静态)
+//   3) createRegistry        —— 建全局注册表,把 manifest 灌入
+//   4) createSearchIndex     —— 建全局搜索索引,基于 registry.entries
+//   5) registerComponentRoutes —— 把每个组件的详情路由注册到 vue-router
+//   6) createApp             —— 建 Vue app,provide registry / search,挂 RouterView,挂载到 #app
+//
+// 失败兜底:
+//   - bootstrap() 抛错时,直接把错误信息渲染到 body,避免白屏无反馈
+//
+// 设计要点:
+//   - 全程 async;manifest 加载失败时,用户看到一个明确的错误页,而不是黑屏
+//   - registry / search 用 provide 注入,组件层通过 useRegistry / useSearch 读取
+//     (而不是挂在 window 上,见 composables/useRegistry.ts)
+
+import { createApp } from 'vue';
+import App from './App.vue';
+import { router } from './router';
+import { loadManifest } from './manifest-loader';
+import { createRegistry } from './registry/ComponentRegistry';
+import { createSearchIndex } from './registry/SearchIndex';
+import { registerComponentRoutes } from './registry/RouterRegistrar';
+import { setLoaders, LoadersKey } from './registry/loaders';
+import { RegistryKey } from './composables/useRegistry';
+import { SearchKey } from './composables/useSearch';
+import { defaultTokens } from './theme/tokens';
+import { applyThemeToDocument } from './theme/apply-theme';
+
+async function bootstrap() {
+  // 1) 主题先行 —— 在挂载 Vue app 前就把 CSS 变量铺好,首屏就能拿到正确样式
+  applyThemeToDocument(defaultTokens);
+
+  // 2) 拉 manifest
+  const manifest = await loadManifest();
+
+  // 3) 建注册表 + 灌 manifest
+  const registry = createRegistry();
+  registry.registerManifest(manifest);
+
+  // 4) 建搜索索引(基于 registry.entries,ref 共享)
+  const search = createSearchIndex(registry.entries);
+
+  // 5) 把每条组件详情路由注册到 vue-router
+  registerComponentRoutes(router, registry.listMetadata());
+
+  // 6) 构建 loaders(import.meta.glob 自动扫描 + manifest loaderUrl 覆写)
+  //     加组件 = 写 component.config.ts + index.vue,再无其他步骤
+  const loaders = setLoaders(manifest);
+
+  // 7) 创建 Vue app,provide 全局状态,挂路由,挂载
+  const app = createApp(App);
+  app.config.errorHandler = (err, _instance, info) => {
+    document.body.innerHTML = `<pre style="padding:24px;color:#b91c1c;background:#fee2e2;white-space:pre-wrap;">Vue error: ${String(err)}\n\nInfo: ${info}</pre>`;
+  };
+  app.provide(RegistryKey, registry);
+  app.provide(SearchKey, search);
+  app.provide(LoadersKey, loaders);
+  app.use(router);
+  app.mount('#app');
+}
+
+bootstrap().catch((err) => {
+  // 兜底:bootstrap 任何阶段崩了,直接在 body 里渲染错误信息
+  document.body.innerHTML = `<pre style="padding:24px;color:#b91c1c;background:#fee2e2;white-space:pre-wrap;">Failed to start: ${err.message}\n\n${err.stack ?? ''}</pre>`;
+});

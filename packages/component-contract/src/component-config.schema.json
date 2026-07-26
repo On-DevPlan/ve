@@ -1,0 +1,33 @@
+{
+  "$comment": "component-contract / ComponentConfig 的 JSON Schema (draft-07)。对应 spec §4.1 ComponentConfig 与 packages/component-contract/src/types.ts 的同名 interface,字段名严格对齐,不要随意改名。ajv 用 strict:false 编译,所以这里的 union/nullable 写法不会报错。$comment 仅用于人类阅读,ajv 不会消费。",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["id", "name", "title", "description", "version", "framework", "entry", "group", "category", "tags", "mount"],
+  "additionalProperties": true,
+  "properties": {
+    "id": { "$comment": "全局唯一,kebab-case。这里只校验小写字母数字与短横线,具体去重由 manifest-generator 在构建期检查。", "type": "string", "minLength": 1, "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "name": { "$comment": "稳定技术名称(类名风格,如 DataTable)。", "type": "string", "minLength": 1 },
+    "title": { "$comment": "卡片与详情页标题,可包含中文。", "type": "string", "minLength": 1 },
+    "description": { "$comment": "组件简介,出现在卡片与详情页头部。", "type": "string" },
+    "version": { "$comment": "SemVer,如 1.0.0。前缀用 pattern 兜底,完整校验由 manifest-generator 调用 semver 完成。", "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+" },
+    "framework": { "$comment": "只能是 vue 或 react;具体字段在 packages/mount-adapters 里继续被 framework 限定。", "type": "string", "enum": ["vue", "react"] },
+    "entry": { "$comment": "相对 component.config.ts 的实现入口(如 ./index.vue),manifest-generator 会校验路径存在。", "type": "string", "minLength": 1 },
+    "group": { "$comment": "一级分组(目录式分类),如 '数据展示'。", "type": "string", "minLength": 1 },
+    "category": { "$comment": "二级分类,如 '表格'。", "type": "string", "minLength": 1 },
+    "tags": { "$comment": "检索标签数组,SearchIndex 用于轻量匹配。", "type": "array", "items": { "type": "string" } },
+    "status": { "$comment": "stable / experimental / deprecated;省略时 manifest-generator 默认填 stable。", "type": "string", "enum": ["stable", "experimental", "deprecated"] },
+    "mount": {
+      "$comment": "挂载配置(spec §4.4);kind 必须与 framework 一致,这一致性校验由 manifest-generator 在构建期执行。",
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": { "type": "string", "enum": ["vue", "react"] }
+      }
+    },
+    "loaderUrl": {
+      "$comment": "可选远程 loader URL(Module Federation / CDN / 外部 npm 包)。未声明时 autoLoadersFor 按 packages/{vue,react}-components/src/<id>/index.{vue,tsx} 推导。声明后,manifest-generator 直接用 () => import(loaderUrl)。",
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

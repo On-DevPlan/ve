@@ -1,0 +1,1 @@
+// React fixture:目录在但没有 index.tsx,buildLoaderInventory 应该静默跳过。

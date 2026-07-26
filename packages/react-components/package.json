@@ -1,0 +1,22 @@
+{
+  "name": "@style-library/react-components",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": { "test": "vitest run" },
+  "dependencies": {
+    "@mkkellogg/gaussian-splats-3d": "^0.4.7",
+    "@style-library/component-contract": "workspace:*",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "three": "^0.170.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@types/three": "^0.170.0",
+    "typescript": "^5.4.0",
+    "vitest": "^2.1.0"
+  }
+}
