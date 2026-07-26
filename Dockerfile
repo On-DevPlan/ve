@@ -1,44 +1,79 @@
-# 使用多阶段构建
-# 第一阶段：构建应用
+# Use multi-stage build.
+# Stage 1 — install + build showcase in the monorepo.
+# Stage 2 — serve the built dist/ via nginx:alpine.
+#
+# Layout notes:
+#   - This repo is a pnpm workspace (apps/ + packages/).
+#   - Root package.json#scripts.build routes through
+#     \`pnpm --filter @style-library/showcase build\`.
+#   - pnpm corepack version is pinned to whatever root
+#     package.json#packageManager says, so CI and Docker stay in sync.
+#
+# Build context gotcha: COPY must hand pnpm every workspace manifest
+# before \`pnpm install --frozen-lockfile\` so it can resolve the
+# workspace graph and materialize @style-library/* node_modules links.
+
+# ---- Stage 1: builder ----
 FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-# 安装pnpm
-RUN corepack enable && corepack prepare pnpm@9 --activate
+# Pin pnpm to whatever root package.json#packageManager says.
+RUN corepack enable \
+ && corepack prepare pnpm@9.12.0 --activate
 
-# 复制package文件
-COPY package*.json pnpm-lock.yaml ./
+# Monorepo top-level manifests + lockfile. Order matters:
+# these three files let pnpm resolve the workspace graph and verify
+# `--frozen-lockfile` without yet touching any source.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY tsconfig.base.json vitest.workspace.ts ./
 
-# 安装依赖
+# Workspace subtree manifests. pnpm needs to see package.json for each
+# workspace package so it can install their deps and resolve workspace:*
+# links. Sources are copied next, but their package.json must be present
+# before install so the workspace protocol can resolve.
+COPY apps ./apps
+COPY packages ./packages
+
+# Install everything — root devDeps + every workspace.
+# This is what produces apps/showcase/node_modules/.bin/vite, which
+# `pnpm --filter @style-library/showcase build` will invoke.
 RUN pnpm install --frozen-lockfile
 
-# 复制源代码
+# Everything else: eslint config, scripts, eslint-rules, .gitignore etc.
+# Already-copied files are overwritten by this — pnpm install must have
+# run before this line so node_modules in apps/ and packages/ already
+# exist with the right pnpm symlink layout.
 COPY . .
 
-# 设置NODE_OPTIONS以处理crypto问题
+# Workaround legacy crypto provider complaints from a few transitive
+# webpack/terser plugins when Node 22 builds the old vue 3.4 demo.
+# Safe to keep: NODE_OPTIONS is forwarded into Vite's worker children.
 ENV NODE_OPTIONS="--openssl-legacy-provider"
 
-# 构建应用
+# Drives vite build via the workspace-aware root script.
 RUN pnpm run build
 
-# 第二阶段：nginx服务
+# ---- Stage 2: runtime ----
 FROM nginx:alpine
 
-# 复制自定义nginx站点配置（覆盖默认配置）
+# Custom nginx site config overriding the default.conf that ships in
+# nginx:alpine. Mounted at /etc/nginx/conf.d/default.conf so it actually
+# wins against the bundled /etc/nginx/nginx.conf.
 COPY default.conf /etc/nginx/conf.d/default.conf
 
-# 从构建阶段复制构建产物到nginx目录
-COPY --from=builder /app/dist /usr/share/nginx/html
+# Copy the built artifact. Note the path now lives under
+# apps/showcase/dist, not /app/dist, because the root is a workspace.
+COPY --from=builder /app/apps/showcase/dist /usr/share/nginx/html
 
-# 验证文件是否正确复制
-RUN ls -la /usr/share/nginx/html/ && \
-    if [ ! -f /usr/share/nginx/html/index.html ]; then \
-        echo "Error: index.html not found!" && exit 1; \
+# Sanity check — fail fast in the image build if vite didn't emit
+# index.html so the runtime container never serves an empty 404 page.
+RUN ls -la /usr/share/nginx/html/ \
+ && if [ ! -f /usr/share/nginx/html/index.html ]; then \
+      echo "Error: index.html not found!"; \
+      exit 1; \
     fi
 
-# 暴露端口
 EXPOSE 80
 
-# 启动nginx
 CMD ["nginx", "-g", "daemon off;"]
