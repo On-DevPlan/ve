@@ -1,0 +1,16 @@
+sha:        6594c3123b9345f188ec1ba03c87e2507301d190
+short:      6594c31
+author:     Style Library Bot <ai@style-library.local>
+date:       2026-07-27T00:22:58+08:00
+subject:    fix(car-battle): apply code review fixes
+
+--- body ---
+fix(car-battle): apply code review fixes
+
+- Use ctx.save()/restore() in drawArena border drawing instead of manual shadow reset
+- Use ctx.save()/restore() in drawCountdown instead of manual shadow reset
+- Remove out-of-scope platform field from component.config.ts
+
+--- files (2) ---
+packages/react-components/src/car-battle/component.config.ts
+packages/react-components/src/car-battle/src/Renderer.ts
