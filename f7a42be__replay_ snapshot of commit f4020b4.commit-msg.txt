@@ -1,0 +1,16 @@
+sha:        f7a42be3e0c9f1bcbed40a1ddb69531de6dea7cd
+short:      f7a42be
+author:     Style Library Bot <ai@style-library.local>
+date:       2026-07-27T00:44:04+08:00
+subject:    replay: snapshot of commit f4020b4
+
+--- body ---
+replay: snapshot of commit f4020b4
+
+original-subject: feat(car-battle): add React entry component with HUD and result panel
+original-author:  Style Library Bot <ai@style-library.local>
+original-date:    2026-07-27T00:44:04+08:00
+files:            2
+
+--- files (1) ---
+.commit-msgs/f4020b4__feat(car-battle)_ add React entry component with HUD and result panel.commit-msg.txt
