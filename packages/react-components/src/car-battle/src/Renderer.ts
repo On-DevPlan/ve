@@ -65,13 +65,13 @@ export class Renderer {
       ctx.stroke();
     }
 
-    // 边界围栏 (发光红线)
+    ctx.save();
     ctx.strokeStyle = '#e94560';
     ctx.lineWidth = 4;
     ctx.shadowColor = '#e94560';
     ctx.shadowBlur = 10;
     ctx.strokeRect(left - 2, top - 2, arena.width + 4, arena.height + 4);
-    ctx.shadowBlur = 0;
+    ctx.restore();
   }
 
   private drawCar(car: CarState): void {
@@ -121,6 +121,7 @@ export class Renderer {
   /** 绘制倒计时数字 */
   drawCountdown(number: number): void {
     const { ctx, canvas } = this;
+    ctx.save();
     ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
     ctx.font = 'bold 120px monospace';
     ctx.textAlign = 'center';
@@ -128,6 +129,6 @@ export class Renderer {
     ctx.shadowColor = 'rgba(255, 255, 255, 0.3)';
     ctx.shadowBlur = 20;
     ctx.fillText(String(Math.ceil(number)), canvas.width / 2, canvas.height / 2);
-    ctx.shadowBlur = 0;
+    ctx.restore();
   }
 }
