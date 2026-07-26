@@ -1,0 +1,14 @@
+{
+  "$comment": "component-contract / ComponentManifest 的 JSON Schema (draft-07)。对应 spec §5 ComponentManifest 与 packages/component-contract/src/types.ts 的同名 interface。manifest 是构建产物,不能由业务代码手工维护;此 schema 用于 ajv 校验 manifest-generator 的输出。$comment 仅用于人类阅读,ajv 不会消费。",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["schemaVersion", "generatedAt", "buildId", "components", "groups", "search"],
+  "properties": {
+    "schemaVersion": { "$comment": "固定为 '1.0';破坏性变更需升级到 1.x 并迁移 manifest 数据。", "type": "string", "enum": ["1.0"] },
+    "generatedAt": { "$comment": "ISO 字符串时间戳,manifest-generator 在构建开始时记录。", "type": "string" },
+    "buildId": { "$comment": "构建 id(可短 hash),便于 dev/prod 比对是否同一份构建产物。", "type": "string" },
+    "components": { "$comment": "ManifestEntry 列表;每条对应一个已构建完成的组件。", "type": "array" },
+    "groups": { "$comment": "ManifestGroup 列表;按 group 维度聚合 components。", "type": "array" },
+    "search": { "$comment": "SearchManifest;声明可被搜索的字段与是否标准化。", "type": "object" }
+  }
+}

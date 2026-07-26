@@ -26,3 +26,15 @@ dist-ssr
 # Docker
 .dockerignore
 .playwright-mcp
+
+# OMC tooling
+.omc/
+.superpowers/
+
+# Temp / scratch
+.tmp/
+
+# Lint & GH CLI output dumped at repo root
+eslint-report.json
+run.json
+run-help.json
