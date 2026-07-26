@@ -1,0 +1,16 @@
+sha:        199fd550b6ce10a7859e6620c89433b72b8b32d5
+short:      199fd55
+author:     Style Library Bot <ai@style-library.local>
+date:       2026-07-26T20:52:06+08:00
+subject:    replay: snapshot of commit 55a7f8b
+
+--- body ---
+replay: snapshot of commit 55a7f8b
+
+original-subject: fix(ci): build showcase before vitest so e2e-perf gate finds dist/component-manifest.json
+original-author:  Style Library Bot <ai@style-library.local>
+original-date:    2026-07-26T20:52:06+08:00
+files:            1
+
+--- files (1) ---
+.commit-msgs/55a7f8b__fix(ci)_ build showcase before vitest so e2e-perf gate finds dist_component-mani.commit-msg.txt
