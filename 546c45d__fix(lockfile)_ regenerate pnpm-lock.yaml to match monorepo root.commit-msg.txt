@@ -1,0 +1,26 @@
+sha:        546c45d34b135e63356a3d9f41193113deb245aa
+short:      546c45d
+author:     Style Library Bot <ai@style-library.local>
+date:       2026-07-26T20:17:03+08:00
+subject:    fix(lockfile): regenerate pnpm-lock.yaml to match monorepo root
+
+--- body ---
+fix(lockfile): regenerate pnpm-lock.yaml to match monorepo root
+
+The post-cherry-pick root package.json rewrite dropped the legacy
+@antv/g6 + @tldraw/tldraw runtime deps in favor of monorepo tooling
+(eslint + vitest flat config, pnpm workspaces), but pnpm-lock.yaml was
+left carrying specs that no longer appear in package.json. CI failed on
+
+  ERR_PNPM_OUTDATED_LOCKFILE
+    specifiers in the lockfile ({"@antv/g6":...,"@tldraw/tldraw":...})
+    don't match specs in package.json ({"@eslint/js":...,"eslint":...})
+
+aborting at step 5 (`pnpm install --frozen-lockfile`) so lint never ran.
+
+Regenerate via `pnpm install --no-frozen-lockfile` against the new root
+packageManager (pnpm@9.12.0) and stage the fresh lockfile. No source
+package.json change in this commit.
+
+--- files (1) ---
+pnpm-lock.yaml
