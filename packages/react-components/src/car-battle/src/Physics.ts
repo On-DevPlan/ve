@@ -15,7 +15,7 @@ export class Physics {
     const dx = b.position.x - a.position.x;
     const dy = b.position.y - a.position.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    const minDist = CAR_RADIUS * 2;
+    const minDist = MIN_SEPARATION;
 
     if (dist >= minDist || dist === 0) return null;
 

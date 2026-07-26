@@ -1,7 +1,5 @@
 import type { Car } from './Car';
 
-const BORDER_WIDTH = 40; // 围栏宽度
-
 export class Arena {
   readonly width: number;
   readonly height: number;
