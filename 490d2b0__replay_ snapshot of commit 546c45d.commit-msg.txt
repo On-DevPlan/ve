@@ -1,0 +1,16 @@
+sha:        490d2b083264ea711b846b1ef676a01bb2fc8c45
+short:      490d2b0
+author:     Style Library Bot <ai@style-library.local>
+date:       2026-07-26T20:17:03+08:00
+subject:    replay: snapshot of commit 546c45d
+
+--- body ---
+replay: snapshot of commit 546c45d
+
+original-subject: fix(lockfile): regenerate pnpm-lock.yaml to match monorepo root
+original-author:  Style Library Bot <ai@style-library.local>
+original-date:    2026-07-26T20:17:03+08:00
+files:            1
+
+--- files (1) ---
+.commit-msgs/546c45d__fix(lockfile)_ regenerate pnpm-lock.yaml to match monorepo root.commit-msg.txt
