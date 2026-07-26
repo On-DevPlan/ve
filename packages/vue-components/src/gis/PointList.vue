@@ -1,9 +1,9 @@
 <script setup>
 import { ref } from 'vue'
 
-// const props = defineProps({  // ve 源里 props 未使用,留作未来扩展点
-//   points: { type: Array, default: () => [] }
-// })
+const props = defineProps({
+  points: { type: Array, default: () => [] }
+})
 
 const emit = defineEmits(['edit', 'delete', 'select', 'preview'])
 
