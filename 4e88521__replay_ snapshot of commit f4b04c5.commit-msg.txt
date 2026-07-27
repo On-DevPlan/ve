@@ -1,0 +1,16 @@
+sha:        4e8852157d142653dc5aa97f0aa190befba9ab3c
+short:      4e88521
+author:     joke-lx <2196824165@qq.com>
+date:       2026-07-27T17:25:53+08:00
+subject:    replay: snapshot of commit f4b04c5
+
+--- body ---
+replay: snapshot of commit f4b04c5
+
+original-subject: feat(react-components): add shortcut-library + fix ESLint 9 react-hooks crash (#6)
+original-author:  joke-lx <2196824165@qq.com>
+original-date:    2026-07-27T17:25:53+08:00
+files:            14
+
+--- files (1) ---
+.commit-msgs/f4b04c5__feat(react-components)_ add shortcut-library + fix ESLint 9 react-hooks crash (#.commit-msg.txt
