@@ -1,0 +1,14 @@
+sha:        326f2984c576a7343eba65db4a9d1bf732d8207f
+short:      326f298
+author:     Style Library Bot <ai@style-library.local>
+date:       2026-07-27T16:07:12+08:00
+subject:    feat(car-battle): tag as pc-only platform
+
+--- body ---
+feat(car-battle): tag as pc-only platform
+
+Car-battle is a two-player keyboard game (WASD vs arrow keys) designed
+for desktop play; declare pc so the mobile filter drops it on phones.
+
+--- files (1) ---
+packages/react-components/src/car-battle/component.config.ts
