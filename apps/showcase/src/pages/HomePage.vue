@@ -2,7 +2,7 @@
 // HomePage.vue —— 组件展示中心首页(档案柜 B 风格,逐字复刻 __preview_home_B.html)。
 //
 // 职责:
-//   1) 左 sidebar:品牌 + 搜索 + 分组/框架筛选
+//   1) 左 sidebar:品牌 + 搜索 + 分组/框架筛选 + 平台切换
 //   2) 主区:衬线标题 + 卡片网格(走 CardGrid 虚拟滚动)
 //   3) 卡片"open"事件映射到 router.push
 //
@@ -11,6 +11,8 @@
 //   - 卡片视觉通过 :deep() 注入到 ComponentCard,与预览一致
 //   - 分组计数 + active 态由本组件本地驱动(SearchIndex 全局 query/group 由 GroupFilter 写;
 //     本组件只读 useSearch().group / .query 显示当前状态)
+//   - platform 切换:sidebar 底部提供按钮手动切换平台视图,覆盖自动检测
+//     主要用于开发时测试手机端组件在 PC 上的效果
 
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
@@ -18,10 +20,14 @@ import CardGrid from '../components/CardGrid.vue';
 import SearchBar from '../components/SearchBar.vue';
 import { useRegistry } from '../composables/useRegistry';
 import { useSearch } from '../composables/useSearch';
+import { usePlatform } from '../composables/usePlatform';
 
 const router = useRouter();
 const registry = useRegistry();
 const { group } = useSearch();
+// platform 是全局 ref(main.ts 里 provide 注入的),
+// usePlatform() 的 ref 与 main.ts 里初始化的平台共享同一引用。
+const { platform } = usePlatform();
 
 // 从全部 entry 的 group 字段派生唯一分组列表(去重 + 保持插入顺序)
 const groups = computed(() => {
@@ -49,6 +55,11 @@ function open(id: string) {
 // 分组项选中:写回全局 SearchIndex
 function selectGroup(g: string | undefined) {
   group.value = g;
+}
+
+// 手动切换平台视图
+function togglePlatform(p: 'pc' | 'mobile') {
+  platform.value = p;
 }
 </script>
 
@@ -99,8 +110,28 @@ function selectGroup(g: string | undefined) {
         </div>
       </div>
 
+      <div class="nav-group">
+        <div class="nav-title">
+          Platform
+        </div>
+        <div
+          class="nav-item"
+          :class="{ 'is-active': platform === 'pc' }"
+          @click="togglePlatform('pc')"
+        >
+          <span>PC</span>
+        </div>
+        <div
+          class="nav-item"
+          :class="{ 'is-active': platform === 'mobile' }"
+          @click="togglePlatform('mobile')"
+        >
+          <span>Mobile</span>
+        </div>
+      </div>
+
       <div class="sidebar__foot">
-        v0.1 · main
+        v0.1 · main · <span :class="'platform--' + platform">{{ platform }}</span>
       </div>
     </aside>
 
@@ -110,6 +141,7 @@ function selectGroup(g: string | undefined) {
         <h1>组件<em>展示</em></h1>
         <div class="crumb">
           Home · {{ group ?? 'All' }} · {{ filteredCount }}
+          <span :class="'crumb__platform crumb__platform--' + platform">{{ platform }}</span>
         </div>
       </header>
 
@@ -227,6 +259,8 @@ function selectGroup(g: string | undefined) {
   letter-spacing: 0.2em;
   color: var(--ink-mute);
 }
+.sidebar__foot .platform--pc { color: #2563eb; }
+.sidebar__foot .platform--mobile { color: #7c3aed; }
 
 /* === 主体 === */
 .main {
@@ -255,6 +289,23 @@ function selectGroup(g: string | undefined) {
   letter-spacing: 0.18em;
   color: var(--ink-mute);
   text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.crumb__platform {
+  font-size: 9px;
+  padding: 2px 6px;
+  border-radius: 2px;
+  letter-spacing: 0.12em;
+}
+.crumb__platform--pc {
+  background: #2563eb;
+  color: #fff;
+}
+.crumb__platform--mobile {
+  background: #7c3aed;
+  color: #fff;
 }
 
 /* === 卡片网格:稀疏 + 大间距 === */
