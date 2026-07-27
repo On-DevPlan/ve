@@ -1,0 +1,16 @@
+sha:        b6f3102a72a4526a8ce4e11a19848c4ed2d2a1d6
+short:      b6f3102
+author:     Style Library Bot <ai@style-library.local>
+date:       2026-07-27T16:07:12+08:00
+subject:    replay: snapshot of commit 326f298
+
+--- body ---
+replay: snapshot of commit 326f298
+
+original-subject: feat(car-battle): tag as pc-only platform
+original-author:  Style Library Bot <ai@style-library.local>
+original-date:    2026-07-27T16:07:12+08:00
+files:            1
+
+--- files (1) ---
+.commit-msgs/326f298__feat(car-battle)_ tag as pc-only platform.commit-msg.txt
