@@ -1,0 +1,15 @@
+sha:        c098afe835a3a1e4da39b2125b168affb72c1381
+short:      c098afe
+author:     Style Library Bot <ai@style-library.local>
+date:       2026-07-27T16:08:23+08:00
+subject:    11
+
+--- body ---
+
+
+--- files (5) ---
+.claude/skills/git-repo-cleanup/SKILL.md
+.claude/skills/mmx-research-gitclone/SKILL.md
+.gitignore
+docs/superpowers/plans/2026-07-26-car-battle-plan.md
+docs/superpowers/specs/2026-07-26-car-battle-design.md
