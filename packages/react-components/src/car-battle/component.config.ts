@@ -11,6 +11,7 @@ export default {
   group: '游戏娱乐',
   category: '双人竞技',
   tags: ['game', 'racing', 'multiplayer', 'canvas', 'car-battle', '2d'],
+  platform: 'pc',
   status: 'stable',
   route: { path: '/components/car-battle', title: '🏎️ 双人碰碰车' },
   mount: { kind: 'react', propsMode: 'none' },
