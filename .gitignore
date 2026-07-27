@@ -38,3 +38,4 @@ dist-ssr
 eslint-report.json
 run.json
 run-help.json
+.gstack/
