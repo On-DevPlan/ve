@@ -16,6 +16,7 @@
     "category": { "$comment": "二级分类,如 '表格'。", "type": "string", "minLength": 1 },
     "tags": { "$comment": "检索标签数组,SearchIndex 用于轻量匹配。", "type": "array", "items": { "type": "string" } },
     "status": { "$comment": "stable / experimental / deprecated;省略时 manifest-generator 默认填 stable。", "type": "string", "enum": ["stable", "experimental", "deprecated"] },
+    "platform": { "$comment": "目标运行平台:pc / mobile / both;省略时默认 both。HomePage 根据平台过滤卡片显示。", "type": "string", "enum": ["pc", "mobile", "both"] },
     "mount": {
       "$comment": "挂载配置(spec §4.4);kind 必须与 framework 一致,这一致性校验由 manifest-generator 在构建期执行。",
       "type": "object",

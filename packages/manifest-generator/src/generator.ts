@@ -53,6 +53,7 @@ export function generateManifest(
       category: cfg.category,
       tags: cfg.tags,
       status: cfg.status,
+      platform: cfg.platform ?? 'both',
       preview: cfg.preview,
       // route 未声明时按约定补 /components/<id>
       route: cfg.route ?? { path: `/components/${cfg.id}`, title: cfg.title },

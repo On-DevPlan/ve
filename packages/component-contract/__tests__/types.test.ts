@@ -63,6 +63,8 @@ describe('component-contract types', () => {
       route: { path: '/components/button', title: '按钮' },
       mount: { kind: 'vue' },
       isolation: { mode: 'shadow-dom' },
+      status: 'stable',
+      platform: 'both',
       assets: { entryChunk: 'assets/button.js' },
       loaderKey: 'button',
     };

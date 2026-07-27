@@ -114,6 +114,9 @@ export interface DocsConfig {
   changelog?: string; // CHANGELOG 路径
 }
 
+// 目标运行平台:仅 PC,仅手机端,或双端
+export type Platform = 'pc' | 'mobile' | 'both';
+
 // 组件配置:作者维护的源数据(spec §4.1)
 export interface ComponentConfig {
   id: string; // 全局唯一,kebab-case
@@ -126,6 +129,7 @@ export interface ComponentConfig {
   group: string; // 一级分组
   category: string; // 二级分类
   tags: string[]; // 检索标签
+  platform?: Platform; // 目标运行平台(默认 'both')
   status?: 'stable' | 'experimental' | 'deprecated'; // 状态
   preview?: PreviewConfig; // 卡片预览配置
   route?: RouteConfig; // 路由配置
@@ -189,6 +193,7 @@ export interface ManifestEntry {
   category: string;
   tags: string[];
   status: ComponentConfig['status'];
+  platform: Required<ComponentConfig>['platform'];
   preview?: PreviewConfig;
   route: RouteConfig;
   mount: MountConfig;
