@@ -12,6 +12,7 @@ export default {
   group: '数据可视化',
   category: '3D 场景',
   tags: ['three', 'gaussian-splat', '3dgs', 'cinematic', 'scroll-driven', 'fullscreen'],
+  platform: 'pc',
   status: 'stable',
   route: { path: '/components/gaussian-splat-viewer', title: '3D 高斯泼溅查看器' },
   mount: { kind: 'react', propsMode: 'default' },

@@ -22,6 +22,7 @@ export default {
   group: '数据可视化',
   category: '地图',
   tags: ['echarts', 'map', 'china', 'visualization', 'interactive'],
+  platform: 'pc',
   status: 'stable',
   route: { path: '/components/china-map', title: '中国地图', keepAlive: false },
   mount: { kind: 'vue', propsMode: 'default' },

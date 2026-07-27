@@ -25,6 +25,7 @@ export default {
   group: '导航',
   category: '移动端',
   tags: ['nav', 'bottom', 'mobile', 'tab', 'indicator', 'tabler'],
+  platform: 'both',
   status: 'stable',
   route: { path: '/components/mobile-nav-v5', title: '移动端圆点导航 v5' },
   mount: { kind: 'vue', propsMode: 'default' },

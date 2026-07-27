@@ -16,6 +16,7 @@ export default {
   group: '数据可视化',
   category: '地图',
   tags: ['ol', 'openlayers', 'map', 'travel', 'concert', '用户', '巡演'],
+  platform: 'pc',
   status: 'stable',
   route: { path: '/components/gis-user', title: '演唱会巡演路线(用户端)' },
   mount: { kind: 'vue', propsMode: 'default' },

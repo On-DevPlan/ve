@@ -11,6 +11,7 @@ export default {
   group: '地图可视化',
   category: '旅行记录',
   tags: ['travel', 'ol', 'openlayers', 'map', 'gis'],
+  platform: 'pc',
   status: 'experimental',
   route: { path: '/components/gis', title: '旅行地图(GIS)' },
   mount: { kind: 'vue', propsMode: 'default' },

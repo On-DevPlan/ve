@@ -24,6 +24,7 @@ export default {
   group: '导航',
   category: '移动端',
   tags: ['nav', 'bottom', 'mobile', 'tab', 'capsule', 'ios', 'tabler'],
+  platform: 'both',
   status: 'stable',
   route: { path: '/components/bottom-nav-capsule-v3', title: 'iOS 胶囊底部导航 v3' },
   mount: { kind: 'vue', propsMode: 'default' },
