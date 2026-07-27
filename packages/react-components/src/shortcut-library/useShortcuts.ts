@@ -3,6 +3,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Group, Shortcut, KeyStroke } from './types';
+import type { ImportParseResult } from './import-parser';
 
 const LS_KEY = 'sl-shortcut-library:v1';
 const DEBOUNCE_MS = 200;
@@ -29,6 +30,13 @@ function save(groups: Group[]): void {
   } catch {
     /* quota / private mode — ignore */
   }
+}
+
+interface ImportStats {
+  groupsAdded: number;
+  groupsAppended: number;
+  shortcutsAdded: number;
+  errors: string[];
 }
 
 export function useShortcuts() {
@@ -128,6 +136,52 @@ export function useShortcuts() {
     );
   }, []);
 
+  const importGroups = useCallback((data: ImportParseResult): ImportStats => {
+    const stats: ImportStats = { groupsAdded: 0, groupsAppended: 0, shortcutsAdded: 0, errors: [...data.errors] };
+
+    setGroups((prev) => {
+      const next = [...prev];
+      for (const g of data.groups) {
+        // Look up existing group by name (case-insensitive)
+        const existing = next.find((eg) => eg.name.toLowerCase() === g.name.toLowerCase());
+        if (existing) {
+          // Append shortcuts to existing group
+          const newShortcuts = g.shortcuts.map((s) => ({
+            id: freshId(),
+            combo: s.combo,
+            description: s.description,
+            createdAt: Date.now(),
+          }));
+          existing.shortcuts = [...existing.shortcuts, ...newShortcuts];
+          existing.updatedAt = Date.now();
+          stats.groupsAppended++;
+          stats.shortcutsAdded += newShortcuts.length;
+        } else {
+          // Create new group
+          const now = Date.now();
+          const newGroup: Group = {
+            id: freshId(),
+            name: g.name,
+            shortcuts: g.shortcuts.map((s) => ({
+              id: freshId(),
+              combo: s.combo,
+              description: s.description,
+              createdAt: now,
+            })),
+            createdAt: now,
+            updatedAt: now,
+          };
+          next.push(newGroup);
+          stats.groupsAdded++;
+          stats.shortcutsAdded += newGroup.shortcuts.length;
+        }
+      }
+      return next;
+    });
+
+    return stats;
+  }, []);
+
   return {
     groups,
     selectedGroupId,
@@ -141,8 +195,11 @@ export function useShortcuts() {
     addShortcut,
     updateShortcut,
     deleteShortcut,
+    importGroups,
   };
 }
+
+export type { ImportStats };
 
 // 序列化 combo 为可比较的字符串(用于冲突检测与搜索)
 export function comboKey(combo: KeyStroke[]): string {

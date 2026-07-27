@@ -14,6 +14,7 @@ interface Props {
   onUpdateShortcut: (shortcutId: string, patch: Partial<Pick<Shortcut, 'combo' | 'description'>>) => void;
   onDeleteShortcut: (shortcutId: string) => void;
   onCapture: (codes: Set<string>) => void;
+  onHover?: (codes: Set<string> | null) => void;
 }
 
 export default function ShortcutTable({
@@ -23,6 +24,7 @@ export default function ShortcutTable({
   onUpdateShortcut,
   onDeleteShortcut,
   onCapture,
+  onHover,
 }: Props) {
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -116,6 +118,8 @@ export default function ShortcutTable({
                     key={s.id}
                     className={`sl-sl-row ${isConflict ? 'sl-sl-row--conflict' : ''}`}
                     title={isConflict ? '同组内已有相同组合' : undefined}
+                    onMouseEnter={() => onHover?.(new Set(s.combo.map(k => k.code)))}
+                    onMouseLeave={() => onHover?.(null)}
                   >
                     <td className="sl-sl-table__col-combo">
                       <ComboDisplay combo={s.combo} />

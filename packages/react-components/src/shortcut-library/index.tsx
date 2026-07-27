@@ -4,6 +4,9 @@
 import { useEffect, useState } from 'react';
 import './index.css';
 import { useShortcuts } from './useShortcuts';
+import ImportModal from './ImportModal';
+import type { ImportParseResult } from './import-parser';
+import type { ImportStats } from './useShortcuts';
 import Sidebar from './Sidebar';
 import ShortcutTable from './ShortcutTable';
 import Keyboard from './Keyboard';
@@ -11,6 +14,12 @@ import Keyboard from './Keyboard';
 export default function ShortcutLibrary() {
   const store = useShortcuts();
   const [highlightedCodes, setHighlightedCodes] = useState<Set<string>>(new Set());
+  const [hoveredCodes, setHoveredCodes] = useState<Set<string>>(new Set());
+  const [showImport, setShowImport] = useState(false);
+
+  function handleImport(data: ImportParseResult): ImportStats {
+    return store.importGroups(data);
+  }
 
   // 高亮最近一次录入:3 秒后自动浅色
   useEffect(() => {
@@ -42,6 +51,12 @@ export default function ShortcutLibrary() {
             value={store.query}
             onChange={(e) => store.setQuery(e.target.value)}
           />
+          <button
+            className="sl-sl-btn sl-sl-btn--ghost"
+            onClick={() => setShowImport(true)}
+          >
+            导入
+          </button>
           <span className="sl-sl-topbar__meta">
             {store.groups.length} 个分组 · 共{' '}
             {store.groups.reduce((n, g) => n + g.shortcuts.length, 0)} 条
@@ -56,6 +71,7 @@ export default function ShortcutLibrary() {
             onUpdateShortcut={(id, patch) => store.updateShortcut(store.selectedGroup!.id, id, patch)}
             onDeleteShortcut={(id) => store.deleteShortcut(store.selectedGroup!.id, id)}
             onCapture={setHighlightedCodes}
+            onHover={(codes) => setHoveredCodes(codes ?? new Set())}
           />
         ) : (
           <div className="sl-sl-empty-state">
@@ -68,12 +84,23 @@ export default function ShortcutLibrary() {
           <div className="sl-sl-preview__head">
             <span className="sl-sl-preview__title">键盘预览</span>
             <span className="sl-sl-preview__hint">
-              {highlightedCodes.size > 0 ? '高亮的是最近一次录入的按键' : '录入或选择快捷键以高亮'}
+              {hoveredCodes.size > 0
+                ? '悬浮在表格行上'
+                : highlightedCodes.size > 0
+                  ? '高亮的是最近一次录入的按键'
+                  : '录入或选择快捷键以高亮'}
             </span>
           </div>
-          <Keyboard highlightedCodes={highlightedCodes} />
+          <Keyboard highlightedCodes={highlightedCodes} hoveredCodes={hoveredCodes} />
         </section>
       </main>
+
+      {showImport && (
+        <ImportModal
+          onImport={handleImport}
+          onClose={() => setShowImport(false)}
+        />
+      )}
     </div>
   );
 }

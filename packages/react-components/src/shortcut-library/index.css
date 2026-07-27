@@ -387,6 +387,13 @@
   color: #fff;
   transform: translateY(1px);
 }
+.sl-sl-kb__key.is-hover {
+  background: var(--sl-hover-bg, #fef3c7);
+  border-color: var(--sl-hover-border, #f59e0b);
+  color: var(--sl-hover-text, #92400e);
+  transform: translateY(1px);
+  box-shadow: 0 0 0 2px var(--sl-hover-glow, rgba(245, 158, 11, 0.25));
+}
 .sl-sl-kb__alias {
   position: absolute;
   top: -16px;
@@ -399,3 +406,141 @@
   display: none;
 }
 .sl-sl-kb__key.is-on .sl-sl-kb__alias { display: inline-block; }
+
+/* ===== Import Modal ===== */
+.sl-sl-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+.sl-sl-modal {
+  background: var(--sl-color-surface, #fff);
+  border-radius: 12px;
+  box-shadow: 0 20px 60px -12px rgba(0, 0, 0, 0.25);
+  width: min(640px, 90vw);
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.sl-sl-modal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px 0;
+}
+.sl-sl-modal__title { font-size: 16px; font-weight: 600; margin: 0; }
+.sl-sl-modal__tabs {
+  display: flex;
+  gap: 0;
+  margin: 16px 24px 0;
+  border-bottom: 1px solid var(--sl-color-border, #e4e4e7);
+}
+.sl-sl-modal__tab {
+  padding: 8px 16px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--sl-color-text-mute, #9ca3af);
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+}
+.sl-sl-modal__tab.is-active {
+  color: var(--sl-color-primary, #2563eb);
+  border-bottom-color: var(--sl-color-primary, #2563eb);
+}
+.sl-sl-modal__textarea {
+  margin: 16px 24px 0;
+  padding: 12px;
+  border: 1px solid var(--sl-color-border, #e4e4e7);
+  border-radius: 8px;
+  font-family: var(--sl-font-mono, ui-monospace, "JetBrains Mono", monospace);
+  font-size: 12px;
+  line-height: 1.6;
+  resize: vertical;
+  min-height: 180px;
+  outline: none;
+}
+.sl-sl-modal__textarea:focus {
+  border-color: var(--sl-color-primary, #2563eb);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+.sl-sl-modal__file-zone {
+  margin: 24px;
+  padding: 32px;
+  border: 2px dashed var(--sl-color-border, #e4e4e7);
+  border-radius: 8px;
+  text-align: center;
+}
+.sl-sl-modal__file-name { font-size: 12px; color: var(--sl-color-text-mute, #9ca3af); margin-top: 12px; }
+.sl-sl-modal__preview {
+  padding: 8px 24px;
+  font-size: 13px;
+}
+.sl-sl-modal__preview-text { color: var(--sl-color-text, #1f2328); }
+.sl-sl-modal__preview-warn { color: var(--sl-color-warning, #d97706); margin-left: 4px; }
+.sl-sl-modal__errors {
+  margin: 0 24px;
+  padding: 8px 12px;
+  background: var(--sl-color-error-bg, #fef2f2);
+  border-radius: 6px;
+  max-height: 120px;
+  overflow-y: auto;
+}
+.sl-sl-modal__error-item {
+  font-size: 12px;
+  color: var(--sl-color-error-text, #b91c1c);
+  line-height: 1.6;
+}
+.sl-sl-modal__format {
+  margin: 8px 24px 0;
+}
+.sl-sl-modal__format-toggle {
+  background: none;
+  border: none;
+  font-size: 12px;
+  color: var(--sl-color-primary, #2563eb);
+  cursor: pointer;
+  padding: 4px 0;
+}
+.sl-sl-modal__format-body {
+  margin-top: 8px;
+  padding: 12px;
+  background: var(--sl-color-surface-alt, #f4f4f5);
+  border-radius: 6px;
+  overflow-x: auto;
+}
+.sl-sl-modal__format-body pre {
+  margin: 0;
+  font-family: var(--sl-font-mono, ui-monospace, "JetBrains Mono", monospace);
+  font-size: 11px;
+  line-height: 1.6;
+  white-space: pre;
+  color: var(--sl-color-text, #1f2328);
+}
+.sl-sl-modal__result {
+  margin: 12px 24px 0;
+  padding: 12px;
+  background: var(--sl-color-success-bg, #ecfdf5);
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--sl-color-success-text, #065f46);
+}
+.sl-sl-modal__result-warn {
+  font-size: 12px;
+  color: var(--sl-color-warning-text, #92400e);
+  margin-top: 4px;
+}
+.sl-sl-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--sl-color-border, #e4e4e7);
+  margin-top: 16px;
+}
