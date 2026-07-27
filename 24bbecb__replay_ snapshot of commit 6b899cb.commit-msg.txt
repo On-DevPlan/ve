@@ -1,0 +1,16 @@
+sha:        24bbecbdbe47bf7154a15e3c72288ba11a08e9b9
+short:      24bbecb
+author:     joke-lx <2196824165@qq.com>
+date:       2026-07-27T19:38:00+08:00
+subject:    replay: snapshot of commit 6b899cb
+
+--- body ---
+replay: snapshot of commit 6b899cb
+
+original-subject: feat(shortcut-library): keyboard hover highlight + TOML import (#7)
+original-author:  joke-lx <2196824165@qq.com>
+original-date:    2026-07-27T19:38:00+08:00
+files:            11
+
+--- files (1) ---
+.commit-msgs/6b899cb__feat(shortcut-library)_ keyboard hover highlight + TOML import (#7).commit-msg.txt
