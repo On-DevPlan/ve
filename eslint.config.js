@@ -40,6 +40,18 @@ export default [
   ...react, // React/TSX 规则:hooks/rules-of-hooks、exhaustive-deps、react-refresh
   ...node, // Node 风格规则:关掉 tool/脚本目录的 no-console
   {
+    // apps/showcase 是 Vue 3 host,文件名虽然是 .ts,但里面调的是 Vue composables
+    // (useXxx 命名规则与 React 撞车),关掉 react-hooks 规则避免误报。
+    // 同理,Vue/React 专属规则对纯 Vue host 也不适用。
+    files: ['apps/showcase/**/*.{ts,tsx}'],
+    rules: {
+      'react-hooks/rules-of-hooks': 'off',
+      'react-hooks/exhaustive-deps': 'off',
+      'react/jsx-uses-react': 'off',
+      'react/react-in-jsx-scope': 'off',
+    },
+  },
+  {
     // 全局语言选项:浏览器 + Node globals 同时可用
     // 因为仓库同时存在 Vue 浏览器代码、Node 脚本、构建工具
     languageOptions: {
