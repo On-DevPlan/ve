@@ -1,0 +1,16 @@
+sha:        43da4725fdcfd3f2ecd120a07dbc2a525f7f10e0
+short:      43da472
+author:     Style Library Bot <ai@style-library.local>
+date:       2026-07-27T16:06:16+08:00
+subject:    replay: snapshot of commit 7b77400
+
+--- body ---
+replay: snapshot of commit 7b77400
+
+original-subject: feat(showcase): filter cards by current device platform
+original-author:  Style Library Bot <ai@style-library.local>
+original-date:    2026-07-27T16:06:16+08:00
+files:            4
+
+--- files (1) ---
+.commit-msgs/7b77400__feat(showcase)_ filter cards by current device platform.commit-msg.txt
