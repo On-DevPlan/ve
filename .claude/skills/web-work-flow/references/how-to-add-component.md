@@ -48,6 +48,9 @@ export default {
   framework: 'vue',                    // 'vue' | 'react';ESLint 强制与所在包匹配
   entry: './index.vue',                // 相对此 config 的实现路径
 
+  // 可选:目标运行平台(默认 'both')
+  platform: 'both',                    // 'pc' | 'mobile' | 'both';见 §2.1
+
   // 必填:目录结构
   group: '基础',                       // 一级分组
   category: '交互',                    // 二级分类
@@ -80,7 +83,24 @@ export default {
 
 **字段名严格对齐 spec**: 不要改 `id` → `componentId`、不要改 `framework` → `kind`,JSON Schema 会拒收。
 
-ESLint 规则 `style-library/valid-component-config`(`eslint/rules/valid-component-config.js`)在 `pnpm lint` 时自动校验字段格式与文件系统结构的一致性。**写错会直接 lint 报错,不需要等运行时才发现**。
+### 2.1 `platform` 字段语义
+
+`platform` 控制组件在 PC / 手机端的可见性,由 `apps/showcase/src/composables/usePlatform.ts` 自动检测:
+
+| 值 | PC 端可见 | 手机端可见 | 适用场景 |
+|---|---|---|---|
+| `'pc'` | ✅ | ❌ | 桌面大屏组件(如地图、3D 场景、双人游戏、快捷键管理) |
+| `'mobile'` | ❌ | ✅ | 手机端专属组件(如底部导航、触摸手势) |
+| `'both'`(默认) | ✅ | ✅ | 两端都适用的通用组件 |
+
+**检测策略**(`usePlatform.ts`):
+1. UA 匹配: `Android|iPhone|iPad|Mobile` 等关键词命中 → `'mobile'`
+2. 屏幕宽度: `<= 768px` → `'mobile'`
+3. UA 匹配优先于宽度
+
+**过滤机制**(`SearchIndex.ts`): PC 端只看 `platform='pc'|'both'` 的组件;手机端只看 `'mobile'|'both'`。`manifest-generator` 在构建时对未声明的字段默认补 `'both'`(`generator.ts:56`)。
+
+ESLint 规则目前不校验该字段,纯运行时过滤。
 
 ## 3. Vue 组件示例
 
