@@ -1,0 +1,16 @@
+sha:        fc5e4991b35e049b84029699061c338d04b0597f
+short:      fc5e499
+author:     Style Library Bot <ai@style-library.local>
+date:       2026-07-29T00:07:28+08:00
+subject:    replay: snapshot of commit 9bbb4e4
+
+--- body ---
+replay: snapshot of commit 9bbb4e4
+
+original-subject: docs(web-work-flow): add platform field to how-to-add-component reference
+original-author:  Style Library Bot <ai@style-library.local>
+original-date:    2026-07-29T00:07:28+08:00
+files:            1
+
+--- files (1) ---
+.commit-msgs/9bbb4e4__docs(web-work-flow)_ add platform field to how-to-add-component reference.commit-msg.txt
