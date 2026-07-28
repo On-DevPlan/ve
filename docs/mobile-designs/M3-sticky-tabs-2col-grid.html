@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>Mobile Design M3 · Sticky Tabs + 2-Col Grid</title>
+<script src="https://unpkg.com/lucide@latest">
+</script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:16px}
+body{
+  font-family:"Inter Tight","PingFang SC","Helvetica Neue",sans-serif;
+  background:#fff;color:#111;overflow-x:hidden;
+  -webkit-font-smoothing:antialiased;
+  padding-bottom:70px;
+}
+.icon{width:1em;height:1em;display:inline-block;vertical-align:middle;}
+
+/* ===== Top Area ===== */
+.top{
+  padding:44px 16px 0;
+  background:linear-gradient(180deg,#fafafa 0%,#fff 100%);
+}
+.top__row{
+  display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;
+}
+.top__brand{
+  display:flex;align-items:center;gap:6px;
+  font-family:"Cormorant Garamond","Songti SC",serif;
+  font-size:22px;font-weight:500;color:#111;
+}
+.top__brand i{width:22px;height:22px;}
+.top__brand span{color:#888;font-weight:400;}
+.top__util{display:flex;gap:6px;}
+.top__util button{
+  width:34px;height:34px;border-radius:8px;border:none;
+  background:transparent;cursor:pointer;color:#555;
+  display:flex;align-items:center;justify-content:center;
+}
+.top__util button:active{background:#eee;}
+.top__util button i{width:18px;height:18px;}
+
+/* Search */
+.search-mini{
+  display:flex;align-items:center;gap:8px;
+  background:#f5f5f5;border-radius:8px;padding:8px 12px;margin-bottom:10px;
+}
+.search-mini i{width:16px;height:16px;color:#999;}
+.search-mini input{
+  flex:1;border:none;background:transparent;font-size:13px;
+  font-family:inherit;outline:none;color:#111;
+}
+.search-mini input::placeholder{color:#bbb;}
+
+/* ===== Sticky Tabs (horizontal scroll) ===== */
+.tabs-sticky{
+  position:sticky;top:0;z-index:20;background:#fff;
+  padding:0 0 8px;margin:0 -16px;padding-left:16px;padding-right:16px;
+}
+.tabs-sticky::after{
+  content:'';position:absolute;bottom:0;left:16px;right:16px;height:1px;background:#eee;
+}
+.tabs-scroll{
+  display:flex;gap:20px;overflow-x:auto;scrollbar-width:none;
+  -webkit-overflow-scrolling:touch;position:relative;
+}
+.tabs-scroll::-webkit-scrollbar{display:none}
+.tab-sticky{
+  flex-shrink:0;display:flex;align-items:center;gap:5px;
+  padding:8px 0 12px;font-size:13px;color:#999;cursor:pointer;
+  border:none;background:transparent;font-family:inherit;
+  position:relative;transition:color .2s;white-space:nowrap;
+}
+.tab-sticky i{width:16px;height:16px;}
+.tab-sticky .badge{
+  font-size:10px;margin-left:2px;font-family:"JetBrains Mono",monospace;opacity:.5;
+}
+.tab-sticky.active{color:#111;font-weight:600;}
+.tab-sticky.active::after{
+  content:'';position:absolute;bottom:0;left:0;right:0;height:2px;
+  background:#111;border-radius:1px;
+}
+
+/* ===== Results Meta ===== */
+.results-meta{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:12px 16px 8px;
+}
+.results-meta__label{
+  display:flex;align-items:center;gap:6px;
+  font-size:12px;color:#999;
+}
+.results-meta__label i{width:14px;height:14px;}
+.results-meta__count{font-size:11px;font-family:"JetBrains Mono",monospace;color:#bbb;}
+
+/* ===== 2-Column Grid ===== */
+.grid-2c{
+  display:grid;grid-template-columns:1fr 1fr;gap:10px;
+  padding:0 16px 16px;
+}
+
+.card-2c{
+  background:#fff;border:1px solid #eee;border-radius:12px;
+  padding:14px;cursor:pointer;display:flex;flex-direction:column;gap:6px;
+  transition:transform .2s,box-shadow .2s;
+}
+.card-2c:active{transform:scale(.97);box-shadow:0 2px 8px rgba(0,0,0,.04);}
+
+.card-2c__icon{
+  width:32px;height:32px;border-radius:8px;display:flex;
+  align-items:center;justify-content:center;margin-bottom:2px;
+}
+.card-2c__icon i{width:18px;height:18px;}
+.card-2c__title{
+  font-size:13px;font-weight:600;color:#111;line-height:1.3;
+  display:flex;align-items:center;gap:4px;
+}
+.card-2c__title i{width:13px;height:13px;}
+.card-2c__desc{
+  font-size:11px;color:#888;line-height:1.5;
+  display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;
+  overflow:hidden;flex:1;
+}
+.card-2c__footer{
+  display:flex;justify-content:space-between;align-items:center;
+  margin-top:4px;padding-top:6px;border-top:1px dashed #f0f0f0;
+}
+.card-2c__frameworkss{
+  font-size:8px;font-family:"JetBrains Mono",monospace;
+  letter-spacing:.08em;padding:1px 5px;border-radius:3px;
+  background:#f5f5f5;color:#aaa;text-transform:uppercase;
+}
+.card-2c__version{
+  font-size:8px;color:#ccc;font-family:"JetBrains Mono",monospace;
+}
+.card-2c__meta-row{
+  display:flex;gap:4px;flex-wrap:wrap;
+}
+.card-2c__meta-row span{
+  display:flex;align-items:center;gap:3px;
+  font-size:9px;color:#bbb;font-family:"JetBrains Mono",monospace;
+}
+.card-2c__meta-row span i{width:10px;height:10px;}
+
+/* Icon colors */
+.ic-chart{background:#eef2ff;color:#4f46e5;}
+.ic-game{background:#fef2f2;color:#ef4444;}
+.ic-tool{background:#f0fdf4;color:#22c55e;}
+.ic-nav{background:#faf5ff;color:#a855f7;}
+.ic-map{background:#ecfdf5;color:#0ea5e9;}
+
+/* ===== Load More ===== */
+.load-more{
+  padding:16px;text-align:center;
+}
+.load-more button{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:8px 24px;border-radius:20px;border:1px solid #ddd;
+  background:#fff;font-size:12px;color:#666;cursor:pointer;font-family:inherit;
+}
+.load-more button:active{background:#f5f5f5;}
+.load-more button i{width:14px;height:14px;}
+
+/* ===== Bottom Nav ===== */
+.bottom-nav{
+  position:fixed;bottom:0;left:0;right:0;z-index:40;
+  display:flex;background:rgba(255,255,255,.95);
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border-top:1px solid #eee;
+  padding:4px 0 env(safe-area-inset-bottom,4px);
+  box-shadow:0 -2px 12px rgba(0,0,0,.03);
+}
+.nav-item{
+  flex:1;display:flex;flex-direction:column;align-items:center;
+  gap:1px;padding:6px 0;border:none;background:transparent;
+  font-size:9px;color:#999;cursor:pointer;font-family:inherit;
+  transition:color .2s;
+}
+.nav-item i{width:18px;height:18px;}
+.nav-item.active{color:#111;font-weight:500;}
+
+/* ===== Drawer ===== */
+.drawer-overlay{
+  position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.3);
+  opacity:0;pointer-events:none;transition:opacity .25s;
+}
+.drawer-overlay.open{opacity:1;pointer-events:auto;}
+.drawer-panel{
+  position:fixed;top:0;left:0;bottom:0;width:260px;z-index:90;
+  background:#fff;padding:20px;display:flex;flex-direction:column;
+  transform:translateX(-100%);transition:transform .3s cubic-bezier(.22,1,.36,1);
+  box-shadow:2px 0 20px rgba(0,0,0,.06);
+}
+.drawer-panel.open{transform:translateX(0);}
+.drawer-panel h3{
+  display:flex;align-items:center;gap:6px;
+  font-family:"Cormorant Garamond","Songti SC",serif;
+  font-size:20px;font-weight:500;padding-bottom:12px;
+  border-bottom:1px solid #111;margin-bottom:16px;
+}
+.drawer-panel h3 i{width:20px;height:20px;}
+.drawer-panel .d-item{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:8px 10px;border-radius:6px;font-size:13px;color:#555;
+  cursor:pointer;transition:all .15s;
+}
+.drawer-panel .d-item:active,
+.drawer-panel .d-item.active{background:#111;color:#fff;}
+.drawer-panel .d-item .d-label{display:flex;align-items:center;gap:8px;}
+.drawer-panel .d-item .d-label i{width:16px;height:16px;}
+.drawer-panel .d-item .d-count{font-size:10px;opacity:.5;}
+.drawer-panel hr{margin:16px 0;border:none;border-top:1px solid #eee;}
+.drawer-panel .d-foot{
+  margin-top:auto;font-size:9px;color:#ccc;
+  font-family:"JetBrains Mono",monospace;letter-spacing:.1em;
+}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <div class="top__row">
+    <div class="top__brand"><i data-lucide="palette"></i> showcase <span>· 组件库</span></div>
+    <div class="top__util">
+      <button id="drawerBtn"><i data-lucide="menu"></i></button>
+    </div>
+  </div>
+  <div class="search-mini">
+    <i data-lucide="search"></i>
+    <input type="text" placeholder="搜索组件..." />
+  </div>
+</div>
+
+<div class="drawer-overlay" id="drawerOverlay"></div>
+<div class="drawer-panel" id="drawerPanel">
+  <h3><i data-lucide="folder"></i> 分组</h3>
+  <div class="d-item active"><span class="d-label"><i data-lucide="layers"></i>全部</span><span class="d-count">8</span></div>
+  <div class="d-item"><span class="d-label"><i data-lucide="bar-chart-3"></i>数据可视化</span><span class="d-count">3</span></div>
+  <div class="d-item"><span class="d-label"><i data-lucide="zap"></i>效率</span><span class="d-count">1</span></div>
+  <div class="d-item"><span class="d-label"><i data-lucide="compass"></i>导航</span><span class="d-count">2</span></div>
+  <div class="d-item"><span class="d-label"><i data-lucide="gamepad-2"></i>游戏娱乐</span><span class="d-count">1</span></div>
+  <div class="d-item"><span class="d-label"><i data-lucide="map"></i>地图可视化</span><span class="d-count">1</span></div>
+  <hr>
+  <div class="d-item"><span class="d-label"><i data-lucide="star"></i>收藏</span><span class="d-count">0</span></div>
+  <div class="d-foot">v0.1 · main</div>
+</div>
+
+<div class="tabs-sticky">
+  <div class="tabs-scroll">
+    <button class="tab-sticky active"><i data-lucide="layers"></i>全部 <span class="badge">8</span></button>
+    <button class="tab-sticky"><i data-lucide="bar-chart-3"></i>数据可视化 <span class="badge">3</span></button>
+    <button class="tab-sticky"><i data-lucide="zap"></i>效率 <span class="badge">1</span></button>
+    <button class="tab-sticky"><i data-lucide="compass"></i>导航 <span class="badge">2</span></button>
+    <button class="tab-sticky"><i data-lucide="gamepad-2"></i>游戏娱乐 <span class="badge">1</span></button>
+    <button class="tab-sticky"><i data-lucide="map"></i>地图可视化 <span class="badge">1</span></button>
+  </div>
+</div>
+
+<div class="results-meta">
+  <span class="results-meta__label"><i data-lucide="layers"></i> 全部组件</span>
+  <span class="results-meta__count">8 items</span>
+</div>
+
+<div class="grid-2c">
+  <div class="card-2c">
+    <div class="card-2c__icon ic-chart"><i data-lucide="map"></i></div>
+    <div class="card-2c__title">中国地图可视化</div>
+    <p class="card-2c__desc">ECharts 交互式中国地图，散点标记、飞线动画与热力图</p>
+    <div class="card-2c__meta-row"><span><i data-lucide="bar-chart-3"></i> 可视化</span><span><i data-lucide="tag"></i> 地图</span></div>
+    <div class="card-2c__footer"><span class="card-2c__frameworkss">vue</span><span class="card-2c__version">v1.0.0</span></div>
+  </div>
+  <div class="card-2c">
+    <div class="card-2c__icon ic-chart"><i data-lucide="globe"></i></div>
+    <div class="card-2c__title">3D 高斯泼溅查看器</div>
+    <p class="card-2c__desc">Three.js 点云渲染，360° 漫游与实时参数调节</p>
+    <div class="card-2c__meta-row"><span><i data-lucide="bar-chart-3"></i> 可视化</span><span><i data-lucide="tag"></i> 3D</span></div>
+    <div class="card-2c__footer"><span class="card-2c__frameworkss">react</span><span class="card-2c__version">v1.0.0</span></div>
+  </div>
+  <div class="card-2c">
+    <div class="card-2c__icon ic-chart"><i data-lucide="mic"></i></div>
+    <div class="card-2c__title">演唱会巡演路线</div>
+    <p class="card-2c__desc">巡演城市、路线动画与演出详情展示</p>
+    <div class="card-2c__meta-row"><span><i data-lucide="bar-chart-3"></i> 可视化</span><span><i data-lucide="tag"></i> 地图</span></div>
+    <div class="card-2c__footer"><span class="card-2c__frameworkss">vue</span><span class="card-2c__version">v1.0.0</span></div>
+  </div>
+  <div class="card-2c">
+    <div class="card-2c__icon ic-tool"><i data-lucide="keyboard"></i></div>
+    <div class="card-2c__title">快捷键库</div>
+    <p class="card-2c__desc">按应用分组管理键盘快捷键，本地持久化存储</p>
+    <div class="card-2c__meta-row"><span><i data-lucide="zap"></i> 效率</span><span><i data-lucide="tag"></i> 快捷键</span></div>
+    <div class="card-2c__footer"><span class="card-2c__frameworkss">react</span><span class="card-2c__version">v1.0.0</span></div>
+  </div>
+  <div class="card-2c">
+    <div class="card-2c__icon ic-nav"><i data-lucide="smartphone"></i></div>
+    <div class="card-2c__title">iOS 胶囊底部导航 v3</div>
+    <p class="card-2c__desc">类 iOS 原生胶囊切换效果的底部导航栏</p>
+    <div class="card-2c__meta-row"><span><i data-lucide="compass"></i> 导航</span><span><i data-lucide="tag"></i> 移动端</span></div>
+    <div class="card-2c__footer"><span class="card-2c__frameworkss">vue</span><span class="card-2c__version">v1.0.0</span></div>
+  </div>
+  <div class="card-2c">
+    <div class="card-2c__icon ic-nav"><i data-lucide="circle"></i></div>
+    <div class="card-2c__title">移动端圆点导航 v5</div>
+    <p class="card-2c__desc">圆点指示器样式的移动端页面导航</p>
+    <div class="card-2c__meta-row"><span><i data-lucide="compass"></i> 导航</span><span><i data-lucide="tag"></i> 移动端</span></div>
+    <div class="card-2c__footer"><span class="card-2c__frameworkss">vue</span><span class="card-2c__version">v1.0.0</span></div>
+  </div>
+  <div class="card-2c">
+    <div class="card-2c__icon ic-game"><i data-lucide="sword"></i></div>
+    <div class="card-2c__title">双人碰碰车</div>
+    <p class="card-2c__desc">双人同屏竞技，碰撞得分</p>
+    <div class="card-2c__meta-row"><span><i data-lucide="gamepad-2"></i> 游戏</span><span><i data-lucide="tag"></i> 竞技</span></div>
+    <div class="card-2c__footer"><span class="card-2c__frameworkss">react</span><span class="card-2c__version">v1.0.0</span></div>
+  </div>
+  <div class="card-2c">
+    <div class="card-2c__icon ic-map"><i data-lucide="map-pin"></i></div>
+    <div class="card-2c__title">旅行地图 (GIS)</div>
+    <p class="card-2c__desc">OpenLayers 旅行日记，地点标注、路线绘制与轨迹回放</p>
+    <div class="card-2c__meta-row"><span><i data-lucide="map"></i> 地图</span><span><i data-lucide="tag"></i> 旅行</span></div>
+    <div class="card-2c__footer"><span class="card-2c__frameworkss">vue</span><span class="card-2c__version">v1.0.0</span></div>
+  </div>
+</div>
+
+<div class="load-more">
+  <button><i data-lucide="chevron-down"></i> 加载更多</button>
+</div>
+
+<nav class="bottom-nav">
+  <button class="nav-item active"><i data-lucide="home"></i><span>首页</span></button>
+  <button class="nav-item"><i data-lucide="folder"></i><span>分组</span></button>
+  <button class="nav-item"><i data-lucide="bookmark"></i><span>收藏</span></button>
+  <button class="nav-item"><i data-lucide="settings"></i><span>设置</span></button>
+</nav>
+
+<script>
+lucide.createIcons();
+
+document.querySelectorAll('.tab-sticky').forEach(t => {
+  t.addEventListener('click', () => {
+    document.querySelectorAll('.tab-sticky').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+  });
+});
+
+const drawerBtn = document.getElementById('drawerBtn');
+const drawerOverlay = document.getElementById('drawerOverlay');
+const drawerPanel = document.getElementById('drawerPanel');
+drawerBtn.addEventListener('click', () => {
+  drawerOverlay.classList.add('open');
+  drawerPanel.classList.add('open');
+});
+drawerOverlay.addEventListener('click', () => {
+  drawerOverlay.classList.remove('open');
+  drawerPanel.classList.remove('open');
+});
+document.querySelectorAll('.d-item').forEach(d => {
+  d.addEventListener('click', () => {
+    document.querySelectorAll('.d-item').forEach(x => x.classList.remove('active'));
+    d.classList.add('active');
+    drawerOverlay.classList.remove('open');
+    drawerPanel.classList.remove('open');
+  });
+});
+
+document.querySelectorAll('.nav-item').forEach(n => {
+  n.addEventListener('click', () => {
+    document.querySelectorAll('.nav-item').forEach(x => x.classList.remove('active'));
+    n.classList.add('active');
+  });
+});
+</script>
+</body>
+</html>

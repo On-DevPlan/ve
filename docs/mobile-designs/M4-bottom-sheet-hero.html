@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>Mobile Design M4 · Bottom Sheet + Hero Cards</title>
+<script src="https://unpkg.com/lucide@latest">
+</script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:16px}
+body{
+  font-family:"Inter Tight","PingFang SC","Helvetica Neue",sans-serif;
+  background:#0d0d0d;color:#eee;overflow-x:hidden;
+  -webkit-font-smoothing:antialiased;min-height:100vh;
+}
+.icon{width:1em;height:1em;display:inline-block;vertical-align:middle;}
+
+::selection{background:#333;color:#fff;}
+
+.status{display:flex;justify-content:space-between;padding:8px 20px 0;font-size:11px;color:#666;}
+.status i{width:14px;height:14px;}
+
+.header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:4px 16px 8px;
+}
+.header__brand{
+  display:flex;align-items:center;gap:8px;
+  font-family:"Cormorant Garamond","Songti SC",serif;
+  font-size:28px;font-weight:500;color:#fff;letter-spacing:-.02em;
+}
+.header__brand i{width:26px;height:26px;color:#a78bfa;}
+.header__actions{display:flex;gap:8px;}
+.header__btn{
+  width:36px;height:36px;border-radius:10px;border:none;
+  background:rgba(255,255,255,.08);color:#aaa;font-size:16px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  backdrop-filter:blur(8px);transition:background .2s;
+}
+.header__btn i{width:18px;height:18px;}
+.header__btn:active{background:rgba(255,255,255,.15);}
+
+.s-search{
+  margin:0 16px 16px;position:relative;
+}
+.s-search .s-inner{
+  display:flex;align-items:center;gap:10px;
+  padding:12px 16px;border-radius:12px;
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.06);
+  backdrop-filter:blur(8px);
+}
+.s-search .s-inner:focus-within{border-color:rgba(255,255,255,.15);}
+.s-search .s-inner i{width:16px;height:16px;color:#555;}
+.s-search input{
+  flex:1;border:none;background:transparent;color:#eee;font-size:14px;
+  font-family:inherit;outline:none;
+}
+.s-search input::placeholder{color:#555;}
+
+.featured{padding:0 16px 16px;}
+.featured__label{
+  display:flex;align-items:center;gap:6px;
+  font-size:11px;color:#555;font-family:"JetBrains Mono",monospace;
+  letter-spacing:.18em;text-transform:uppercase;margin-bottom:12px;
+}
+.featured__label i{width:14px;height:14px;}
+
+.hero-card{
+  position:relative;border-radius:20px;overflow:hidden;
+  padding:24px 20px;cursor:pointer;min-height:160px;
+  display:flex;flex-direction:column;justify-content:flex-end;
+  border:1px solid rgba(255,255,255,.06);
+}
+.hero-card__bg{
+  position:absolute;inset:0;opacity:.1;display:flex;
+  align-items:flex-end;justify-content:flex-end;
+  padding:16px;pointer-events:none;
+}
+.hero-card__bg i{width:72px;height:72px;}
+.hero-card__framework{
+  font-size:9px;font-family:"JetBrains Mono",monospace;color:rgba(255,255,255,.3);
+  letter-spacing:.15em;text-transform:uppercase;margin-bottom:4px;position:relative;
+}
+.hero-card__title{
+  font-size:22px;font-weight:600;color:#fff;position:relative;line-height:1.3;
+  display:flex;align-items:center;gap:8px;
+}
+.hero-card__title i{width:22px;height:22px;}
+.hero-card__desc{
+  font-size:12px;color:rgba(255,255,255,.5);margin-top:6px;position:relative;
+  line-height:1.5;max-width:80%;
+}
+.hero-card__meta{
+  display:flex;gap:12px;margin-top:12px;position:relative;
+  font-size:10px;font-family:"JetBrains Mono",monospace;color:rgba(255,255,255,.25);
+}
+.hero-card__meta span{display:flex;align-items:center;gap:4px;}
+.hero-card__meta i{width:12px;height:12px;}
+
+.hero-1{background:linear-gradient(135deg,#1a1a2e,#16213e);}
+.hero-2{background:linear-gradient(135deg,#2d1b69,#1a1a2e);}
+.hero-3{background:linear-gradient(135deg,#1e293b,#0f172a);}
+
+/* ===== Horizontal Row ===== */
+.h-row{
+  display:flex;gap:10px;overflow-x:auto;padding:0 16px 20px;
+  scrollbar-width:none;
+}
+.h-row::-webkit-scrollbar{display:none}
+
+.mini-card{
+  flex-shrink:0;width:140px;background:rgba(255,255,255,.04);
+  border-radius:14px;padding:14px;cursor:pointer;
+  border:1px solid rgba(255,255,255,.04);transition:all .2s;
+}
+.mini-card:active{background:rgba(255,255,255,.08);}
+.mini-card__icon{margin-bottom:8px;}
+.mini-card__icon i{width:24px;height:24px;color:#a78bfa;}
+.mini-card__title{font-size:13px;font-weight:500;color:#eee;}
+.mini-card__fw{
+  font-size:8px;font-family:"JetBrains Mono",monospace;color:#555;
+  letter-spacing:.1em;margin-top:4px;
+}
+
+/* ===== Section Title ===== */
+.section-title{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:0 16px 10px;
+}
+.section-title h3{
+  display:flex;align-items:center;gap:6px;
+  font-size:16px;font-weight:600;color:#fff;
+}
+.section-title h3 i{width:16px;height:16px;}
+.section-title span{
+  font-size:10px;color:#555;font-family:"JetBrains Mono",monospace;cursor:pointer;
+}
+
+/* ===== List ===== */
+.comp-list{padding:0 16px 100px;display:flex;flex-direction:column;gap:6px;}
+.comp-item{
+  display:flex;align-items:center;gap:12px;
+  padding:12px 14px;border-radius:12px;cursor:pointer;
+  transition:background .2s;
+}
+.comp-item:active{background:rgba(255,255,255,.04);}
+.comp-item__thumb{
+  width:40px;height:40px;border-radius:10px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+}
+.comp-item__thumb i{width:20px;height:20px;}
+.comp-item__body{flex:1;min-width:0;}
+.comp-item__title{
+  font-size:14px;font-weight:500;color:#eee;line-height:1.3;
+  display:flex;align-items:center;gap:6px;
+}
+.comp-item__title i{width:14px;height:14px;}
+.comp-item__desc{font-size:11px;color:#555;line-height:1.4;
+  display:-webkit-box;-webkit-line-clamp:1;line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;}
+.comp-item__meta{display:flex;gap:8px;margin-top:3px;}
+.comp-item__tag{
+  display:flex;align-items:center;gap:3px;
+  font-size:8px;font-family:"JetBrains Mono",monospace;color:#444;
+  letter-spacing:.08em;text-transform:uppercase;
+}
+.comp-item__tag i{width:10px;height:10px;}
+.comp-item__ver{font-size:8px;color:#333;font-family:"JetBrains Mono",monospace;}
+
+/* Thumb variants */
+.t-chart{background:rgba(79,70,229,.12);color:#818cf8;}
+.t-tool{background:rgba(34,197,94,.12);color:#4ade80;}
+.t-nav{background:rgba(168,85,247,.12);color:#c084fc;}
+.t-game{background:rgba(239,68,68,.12);color:#f87171;}
+.t-map{background:rgba(14,165,233,.12);color:#38bdf8;}
+
+/* ===== Bottom Sheet ===== */
+.sheet-overlay{
+  position:fixed;inset:0;z-index:80;
+  background:rgba(0,0,0,.6);opacity:0;pointer-events:none;
+  transition:opacity .3s;
+}
+.sheet-overlay.open{opacity:1;pointer-events:auto;}
+
+.sheet{
+  position:fixed;bottom:0;left:0;right:0;z-index:90;
+  background:#1a1a1a;border-radius:20px 20px 0 0;
+  padding:24px 20px env(safe-area-inset-bottom,20px);
+  transform:translateY(100%);transition:transform .4s cubic-bezier(.22,1,.36,1);
+  max-height:60vh;overflow-y:auto;
+}
+.sheet.open{transform:translateY(0);}
+.sheet__handle{
+  width:32px;height:4px;border-radius:2px;background:rgba(255,255,255,.15);
+  margin:0 auto 20px;
+}
+.sheet__title{
+  display:flex;align-items:center;gap:8px;
+  font-size:16px;font-weight:600;color:#fff;margin-bottom:16px;
+}
+.sheet__title i{width:18px;height:18px;}
+.sheet__group{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:12px 0;border-bottom:1px solid rgba(255,255,255,.04);
+  cursor:pointer;color:#999;font-size:14px;transition:color .2s;
+}
+.sheet__group .g-label{display:flex;align-items:center;gap:8px;}
+.sheet__group .g-label i{width:16px;height:16px;}
+.sheet__group.active{color:#fff;font-weight:500;}
+.sheet__group .count{font-size:11px;color:#555;}
+.sheet hr{border:none;border-top:1px solid rgba(255,255,255,.06);margin:16px 0;}
+
+/* ===== FAB ===== */
+.fab{
+  position:fixed;bottom:24px;right:20px;z-index:30;
+  width:48px;height:48px;border-radius:16px;border:none;
+  background:#fff;color:#0d0d0d;cursor:pointer;
+  box-shadow:0 4px 16px rgba(0,0,0,.3);
+  display:flex;align-items:center;justify-content:center;
+  transition:transform .2s;
+}
+.fab:active{transform:scale(.9);}
+.fab i{width:22px;height:22px;}
+</style>
+</head>
+<body>
+
+<div class="status"><span>9:41</span><span style="display:flex;gap:4px;align-items:center;"><i data-lucide="signal"></i><i data-lucide="battery-charging"></i></span></div>
+
+<header class="header">
+  <div class="header__brand"><i data-lucide="sparkles"></i> showcase</div>
+  <div class="header__actions">
+    <button class="header__btn"><i data-lucide="search"></i></button>
+    <button class="header__btn" id="filterBtn"><i data-lucide="sliders-horizontal"></i></button>
+  </div>
+</header>
+
+<div class="s-search">
+  <div class="s-inner">
+    <i data-lucide="search"></i>
+    <input type="text" placeholder="搜索组件..." />
+  </div>
+</div>
+
+<div class="featured">
+  <div class="featured__label"><i data-lucide="sparkles"></i> Featured</div>
+  <div class="hero-card hero-1">
+    <div class="hero-card__bg"><i data-lucide="sword"></i></div>
+    <span class="hero-card__framework">react · 游戏娱乐</span>
+    <div class="hero-card__title"><i data-lucide="sword" style="color:#f43f5e;"></i> 双人碰碰车</div>
+    <p class="hero-card__desc">双人同屏竞技游戏，在竞技场内互相撞击得分！</p>
+    <div class="hero-card__meta"><span><i data-lucide="gamepad-2"></i> 双人竞技</span><span>v1.0.0</span></div>
+  </div>
+</div>
+
+<div class="h-row">
+  <div class="mini-card">
+    <div class="mini-card__icon"><i data-lucide="map"></i></div>
+    <div class="mini-card__title">中国地图</div>
+    <div class="mini-card__fw">vue · 可视化</div>
+  </div>
+  <div class="mini-card">
+    <div class="mini-card__icon"><i data-lucide="keyboard"></i></div>
+    <div class="mini-card__title">快捷键库</div>
+    <div class="mini-card__fw">react · 效率</div>
+  </div>
+  <div class="mini-card">
+    <div class="mini-card__icon"><i data-lucide="globe"></i></div>
+    <div class="mini-card__title">3D 高斯查看器</div>
+    <div class="mini-card__fw">react · 可视化</div>
+  </div>
+  <div class="mini-card">
+    <div class="mini-card__icon"><i data-lucide="smartphone"></i></div>
+    <div class="mini-card__title">胶囊导航 v3</div>
+    <div class="mini-card__fw">vue · 导航</div>
+  </div>
+</div>
+
+<div class="section-title">
+  <h3><i data-lucide="layers"></i> 全部组件</h3>
+  <span>8 个</span>
+</div>
+
+<div class="comp-list">
+  <div class="comp-item">
+    <div class="comp-item__thumb t-chart"><i data-lucide="map"></i></div>
+    <div class="comp-item__body">
+      <div class="comp-item__title">中国地图可视化</div>
+      <p class="comp-item__desc">ECharts 交互式中国地图，散点标记、飞线动画与热力图模式</p>
+      <div class="comp-item__meta"><span class="comp-item__tag"><i data-lucide="bar-chart-3"></i> 数据可视化 · 地图</span><span class="comp-item__ver">v1.0.0</span></div>
+    </div>
+  </div>
+  <div class="comp-item">
+    <div class="comp-item__thumb t-chart"><i data-lucide="globe"></i></div>
+    <div class="comp-item__body">
+      <div class="comp-item__title">3D 高斯泼溅查看器</div>
+      <p class="comp-item__desc">Three.js 点云渲染，360° 漫游与实时调节</p>
+      <div class="comp-item__meta"><span class="comp-item__tag"><i data-lucide="bar-chart-3"></i> 数据可视化 · 3D 场景</span><span class="comp-item__ver">v1.0.0</span></div>
+    </div>
+  </div>
+  <div class="comp-item">
+    <div class="comp-item__thumb t-chart"><i data-lucide="mic"></i></div>
+    <div class="comp-item__body">
+      <div class="comp-item__title">演唱会巡演路线</div>
+      <p class="comp-item__desc">巡演城市、路线动画与演出详情展示</p>
+      <div class="comp-item__meta"><span class="comp-item__tag"><i data-lucide="bar-chart-3"></i> 数据可视化 · 地图</span><span class="comp-item__ver">v1.0.0</span></div>
+    </div>
+  </div>
+  <div class="comp-item">
+    <div class="comp-item__thumb t-tool"><i data-lucide="keyboard"></i></div>
+    <div class="comp-item__body">
+      <div class="comp-item__title">快捷键库</div>
+      <p class="comp-item__desc">按应用分组管理键盘快捷键，本地持久化存储</p>
+      <div class="comp-item__meta"><span class="comp-item__tag"><i data-lucide="zap"></i> 效率 · 快捷键管理</span><span class="comp-item__ver">v1.0.0</span></div>
+    </div>
+  </div>
+  <div class="comp-item">
+    <div class="comp-item__thumb t-nav"><i data-lucide="smartphone"></i></div>
+    <div class="comp-item__body">
+      <div class="comp-item__title">iOS 胶囊底部导航 v3</div>
+      <p class="comp-item__desc">类 iOS 原生胶囊切换效果的底部导航栏</p>
+      <div class="comp-item__meta"><span class="comp-item__tag"><i data-lucide="compass"></i> 导航 · 移动端</span><span class="comp-item__ver">v1.0.0</span></div>
+    </div>
+  </div>
+  <div class="comp-item">
+    <div class="comp-item__thumb t-nav"><i data-lucide="circle"></i></div>
+    <div class="comp-item__body">
+      <div class="comp-item__title">移动端圆点导航 v5</div>
+      <p class="comp-item__desc">圆点指示器样式的移动端页面导航</p>
+      <div class="comp-item__meta"><span class="comp-item__tag"><i data-lucide="compass"></i> 导航 · 移动端</span><span class="comp-item__ver">v1.0.0</span></div>
+    </div>
+  </div>
+  <div class="comp-item">
+    <div class="comp-item__thumb t-game"><i data-lucide="sword"></i></div>
+    <div class="comp-item__body">
+      <div class="comp-item__title">双人碰碰车</div>
+      <p class="comp-item__desc">双人同屏竞技游戏 — WASD vs 方向键</p>
+      <div class="comp-item__meta"><span class="comp-item__tag"><i data-lucide="gamepad-2"></i> 游戏娱乐 · 双人竞技</span><span class="comp-item__ver">v1.0.0</span></div>
+    </div>
+  </div>
+  <div class="comp-item">
+    <div class="comp-item__thumb t-map"><i data-lucide="map-pin"></i></div>
+    <div class="comp-item__body">
+      <div class="comp-item__title">旅行地图 (GIS)</div>
+      <p class="comp-item__desc">Vue 3 + OpenLayers 旅行日记，地点标注与轨迹回放</p>
+      <div class="comp-item__meta"><span class="comp-item__tag"><i data-lucide="map"></i> 地图可视化 · 旅行记录</span><span class="comp-item__ver">v1.0.0</span></div>
+    </div>
+  </div>
+</div>
+
+<button class="fab"><i data-lucide="x"></i></button>
+
+<div class="sheet-overlay" id="sheetOverlay"></div>
+
+<div class="sheet" id="sheet">
+  <div class="sheet__handle"></div>
+  <div class="sheet__title"><i data-lucide="sliders-horizontal"></i> 分类筛选</div>
+  <div class="sheet__group active"><span class="g-label"><i data-lucide="layers"></i>全部组件</span><span class="count">8</span></div>
+  <div class="sheet__group"><span class="g-label"><i data-lucide="bar-chart-3"></i>数据可视化</span><span class="count">3</span></div>
+  <div class="sheet__group"><span class="g-label"><i data-lucide="zap"></i>效率</span><span class="count">1</span></div>
+  <div class="sheet__group"><span class="g-label"><i data-lucide="compass"></i>导航</span><span class="count">2</span></div>
+  <div class="sheet__group"><span class="g-label"><i data-lucide="gamepad-2"></i>游戏娱乐</span><span class="count">1</span></div>
+  <div class="sheet__group"><span class="g-label"><i data-lucide="map"></i>地图可视化</span><span class="count">1</span></div>
+  <hr>
+  <div class="sheet__group"><span class="g-label"><i data-lucide="star"></i>收藏夹</span><span class="count">0</span></div>
+</div>
+
+<script>
+lucide.createIcons();
+
+const filterBtn = document.getElementById('filterBtn');
+const sheetOverlay = document.getElementById('sheetOverlay');
+const sheet = document.getElementById('sheet');
+
+filterBtn.addEventListener('click', () => {
+  sheetOverlay.classList.add('open');
+  sheet.classList.add('open');
+});
+sheetOverlay.addEventListener('click', () => {
+  sheetOverlay.classList.remove('open');
+  sheet.classList.remove('open');
+});
+
+document.querySelectorAll('.sheet__group').forEach(g => {
+  g.addEventListener('click', () => {
+    document.querySelectorAll('.sheet__group').forEach(x => x.classList.remove('active'));
+    g.classList.add('active');
+    sheetOverlay.classList.remove('open');
+    sheet.classList.remove('open');
+  });
+});
+</script>
+</body>
+</html>

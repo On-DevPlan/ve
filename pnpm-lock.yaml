@@ -44,6 +44,9 @@ importers:
 
   apps/showcase:
     dependencies:
+      '@lucide/vue':
+        specifier: ^1.27.0
+        version: 1.27.0(vue@3.5.28(typescript@5.9.3))
       '@style-library/component-contract':
         specifier: workspace:*
         version: link:../../packages/component-contract
@@ -623,6 +626,11 @@ packages:
 
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
+
+  '@lucide/vue@1.27.0':
+    resolution: {integrity: sha512-LKDEZJ0Uo9UaT4vxBMYVwXeK/0dGcWCTdav1AK/aGD/jYsDPtiVvOgfM7jPlx9BVeyGZ1Uf0aQhHA++rmbe7rw==}
+    peerDependencies:
+      vue: '>=3.0.1'
 
   '@mkkellogg/gaussian-splats-3d@0.4.7':
     resolution: {integrity: sha512-0vy9/i9sJLFH/v3WJZ4axCsqjkToe8UsV3xY7bvK5EUC0akiRsWZODoCiSzpxhTLNyzSKTsyQKozIFeNA5RWRA==}
@@ -3028,6 +3036,10 @@ snapshots:
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
+
+  '@lucide/vue@1.27.0(vue@3.5.28(typescript@5.9.3))':
+    dependencies:
+      vue: 3.5.28(typescript@5.9.3)
 
   '@mkkellogg/gaussian-splats-3d@0.4.7(three@0.170.0)':
     dependencies:
