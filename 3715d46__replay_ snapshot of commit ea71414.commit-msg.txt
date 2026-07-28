@@ -1,0 +1,16 @@
+sha:        3715d46d95b588448f0e2cd88bd940da6c71a561
+short:      3715d46
+author:     Style Library Bot <ai@style-library.local>
+date:       2026-07-29T00:12:22+08:00
+subject:    replay: snapshot of commit ea71414
+
+--- body ---
+replay: snapshot of commit ea71414
+
+original-subject: feat(home): M1 mobile layout with platform-aware routing
+original-author:  Style Library Bot <ai@style-library.local>
+original-date:    2026-07-29T00:12:22+08:00
+files:            11
+
+--- files (1) ---
+.commit-msgs/ea71414__feat(home)_ M1 mobile layout with platform-aware routing.commit-msg.txt
