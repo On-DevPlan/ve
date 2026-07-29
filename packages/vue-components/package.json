@@ -4,8 +4,11 @@
   "private": true,
   "type": "module",
   "main": "./src/index.ts",
-  "scripts": { "test": "vitest run" },
+  "scripts": {
+    "test": "vitest run"
+  },
   "dependencies": {
+    "@chenglou/pretext": "0.0.8",
     "@style-library/component-contract": "workspace:*",
     "echarts": "^5.5.0",
     "ol": "^9.2.4",
