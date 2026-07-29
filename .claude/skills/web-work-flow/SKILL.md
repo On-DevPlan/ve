@@ -17,6 +17,7 @@ description: Use when working on the wb project (D:\DevProjects\my\github\wb) �
 |---|---|
 | 想理解 wb 整体架构(为什么 Vue 当 host / 怎么跨框架 / Vite 角色 / 设计模式 / 自动发现机制 / 样式 adoption) | [[architecture-and-design-philosophy]] |
 | 想新增 / 删除一个 Vue 或 React 组件到 wb | [[how-to-add-component]] |
+| 组件比较大(`index.{vue,tsx}` > 300 行 / 多子视图 / 多业务模块),需要拆目录 | [[large-component-layout]] |
 | lint 报错 / 想自动修复 lint / 提交前清理 lint | [[fix-lint-loop]] |
 
 ### 故障排查
@@ -41,6 +42,7 @@ description: Use when working on the wb project (D:\DevProjects\my\github\wb) �
 |---|---|---|
 | [[architecture-and-design-philosophy]] | references/architecture-and-design-philosophy.md | 大 |
 | [[how-to-add-component]] | references/how-to-add-component.md | 中 |
+| [[large-component-layout]] | references/large-component-layout.md | 中 |
 | [[fix-lint-loop]] | references/fix-lint-loop.md | 小 |
 | [[component-decision-tree]] | references/component-decision-tree.md | 中 |
 | [[dev-server-watcher]] | references/dev-server-watcher.md | 小 |
