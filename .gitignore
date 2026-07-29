@@ -34,6 +34,10 @@ dist-ssr
 # Temp / scratch
 .tmp/
 
+# Cloned reference repositories (nested git repos / dangling gitlinks).
+# These must never be committed — see git-repo-cleanup skill.
+.claude/repo/
+
 # Lint & GH CLI output dumped at repo root
 eslint-report.json
 run.json
