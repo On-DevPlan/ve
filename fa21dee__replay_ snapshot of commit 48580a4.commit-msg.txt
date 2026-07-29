@@ -1,0 +1,16 @@
+sha:        fa21deec61088e98fcc84007cc0a8eade187f41e
+short:      fa21dee
+author:     Style Library Bot <ai@style-library.local>
+date:       2026-07-29T22:55:04+08:00
+subject:    replay: snapshot of commit 48580a4
+
+--- body ---
+replay: snapshot of commit 48580a4
+
+original-subject: fix(shortcut-library): is-pressed transition: none + reset box-shadow
+original-author:  Style Library Bot <ai@style-library.local>
+original-date:    2026-07-29T22:55:04+08:00
+files:            4
+
+--- files (1) ---
+.commit-msgs/48580a4__fix(shortcut-library)_ is-pressed transition_ none + reset box-shadow.commit-msg.txt
