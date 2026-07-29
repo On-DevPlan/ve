@@ -1,0 +1,19 @@
+{
+  "name": "@style-library/vue-components",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": { "test": "vitest run" },
+  "dependencies": {
+    "@style-library/component-contract": "workspace:*",
+    "echarts": "^5.5.0",
+    "ol": "^9.2.4",
+    "vue": "^3.4.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "vitest": "^2.1.0",
+    "vue-tsc": "^2.0.0"
+  }
+}

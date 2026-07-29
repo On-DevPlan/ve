@@ -1,0 +1,219 @@
+/* car-battle — 双人碰碰车竞技场样式 */
+
+.sl-cb-root {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  background: #0f0f23;
+  overflow: hidden;
+  font-family: 'Courier New', monospace;
+}
+
+.sl-cb-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ---- HUD ---- */
+
+.sl-cb-hud {
+  position: fixed;
+  top: 20px;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.sl-cb-score {
+  position: absolute;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.sl-cb-score--blue {
+  left: 30px;
+  color: #4361ee;
+}
+
+.sl-cb-score--red {
+  right: 30px;
+  color: #e63946;
+}
+
+.sl-cb-score__value {
+  font-size: 48px;
+  font-weight: bold;
+  text-shadow: 0 0 20px currentColor;
+}
+
+.sl-cb-score__label {
+  font-size: 12px;
+  opacity: 0.7;
+  letter-spacing: 1px;
+}
+
+.sl-cb-timer {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 32px;
+  font-weight: bold;
+  color: rgba(255, 255, 255, 0.8);
+  text-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
+}
+
+.sl-cb-timer--warning {
+  color: #e94560;
+  animation: sl-cb-pulse 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes sl-cb-pulse {
+  from { opacity: 0.6; transform: translateX(-50%) scale(1); }
+  to   { opacity: 1;   transform: translateX(-50%) scale(1.1); }
+}
+
+/* ---- Hit 动画 ---- */
+
+.sl-cb-hit {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 60px;
+  font-weight: bold;
+  pointer-events: none;
+  z-index: 20;
+  animation: sl-cb-hit-anim 0.8s ease-out forwards;
+}
+
+.sl-cb-hit--blue { color: #4361ee; }
+.sl-cb-hit--red  { color: #e63946; }
+
+@keyframes sl-cb-hit-anim {
+  0%   { opacity: 1; transform: translate(-50%, -50%) scale(0.5); }
+  50%  { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+  100% { opacity: 0; transform: translate(-50%, -60%) scale(1); }
+}
+
+/* ---- 结果面板 ---- */
+
+.sl-cb-result-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 30;
+  animation: sl-cb-fade-in 0.3s ease;
+}
+
+@keyframes sl-cb-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.sl-cb-result {
+  background: #1a1a2e;
+  border: 2px solid #e94560;
+  border-radius: 16px;
+  padding: 40px 60px;
+  text-align: center;
+  box-shadow: 0 0 40px rgba(233, 69, 96, 0.3);
+}
+
+.sl-cb-result__title {
+  font-size: 36px;
+  font-weight: bold;
+  color: #fff;
+  margin-bottom: 20px;
+}
+
+.sl-cb-result__scores {
+  display: flex;
+  gap: 60px;
+  justify-content: center;
+  margin-bottom: 30px;
+}
+
+.sl-cb-result__player {
+  text-align: center;
+}
+
+.sl-cb-result__player-name {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 8px;
+}
+
+.sl-cb-result__player-score {
+  font-size: 48px;
+  font-weight: bold;
+}
+
+.sl-cb-result__btn {
+  padding: 12px 36px;
+  font-size: 18px;
+  font-family: inherit;
+  background: #e94560;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+  pointer-events: auto;
+}
+
+.sl-cb-result__btn:hover {
+  background: #ff6b6b;
+}
+
+.sl-cb-result__winner {
+  font-size: 24px;
+  color: #ffd93d;
+  margin-bottom: 20px;
+  text-shadow: 0 0 10px rgba(255, 217, 61, 0.5);
+}
+
+.sl-cb-result__draw {
+  font-size: 24px;
+  color: #aaa;
+  margin-bottom: 20px;
+}
+
+/* ---- 赛事说明 ---- */
+
+.sl-cb-instructions {
+  position: fixed;
+  bottom: 15px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 40px;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 12px;
+  z-index: 10;
+  pointer-events: none;
+  letter-spacing: 1px;
+}
+
+.sl-cb-instructions span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sl-cb-key {
+  display: inline-block;
+  padding: 2px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+  font-size: 10px;
+}

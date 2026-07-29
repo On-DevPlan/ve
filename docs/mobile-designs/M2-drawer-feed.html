@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>Mobile Design M2 · Drawer + Feed Cards</title>
+<script src="https://unpkg.com/lucide@latest">
+</script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:16px;min-height:100vh;}
+body{
+  font-family:"Inter Tight","PingFang SC","Helvetica Neue",sans-serif;
+  background:#fff;color:#111;overflow-x:hidden;
+  -webkit-font-smoothing:antialiased;
+  min-height:100vh;position:relative;
+}
+.icon{width:1em;height:1em;display:inline-block;vertical-align:middle;}
+
+/* ===== Top Bar ===== */
+.top-bar{
+  position:sticky;top:0;z-index:50;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 16px;background:rgba(255,255,255,.85);
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border-bottom:1px solid #f0f0f0;
+}
+.menu-btn{
+  width:36px;height:36px;border:none;background:transparent;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  color:#111;border-radius:8px;
+}
+.menu-btn:active{background:#f0f0f0;}
+.top-bar__brand{
+  font-family:"Cormorant Garamond","Songti SC",serif;
+  font-size:20px;font-weight:500;
+}
+.top-bar__actions{display:flex;gap:8px;}
+.icon-btn{
+  width:36px;height:36px;border:none;background:transparent;
+  cursor:pointer;border-radius:8px;color:#555;
+  display:flex;align-items:center;justify-content:center;
+}
+.icon-btn:active{background:#f0f0f0;}
+
+/* ===== Drawer Overlay ===== */
+.drawer-overlay{
+  position:fixed;inset:0;z-index:80;
+  background:rgba(0,0,0,.4);
+  opacity:0;pointer-events:none;transition:opacity .3s;
+}
+.drawer-overlay.open{opacity:1;pointer-events:auto;}
+
+.drawer{
+  position:fixed;top:0;left:0;bottom:0;width:280px;z-index:90;
+  background:#fff;padding:24px 20px;display:flex;flex-direction:column;
+  transform:translateX(-100%);transition:transform .35s cubic-bezier(.22,1,.36,1);
+  box-shadow:4px 0 24px rgba(0,0,0,.08);
+}
+.drawer.open{transform:translateX(0);}
+.drawer__brand{
+  font-family:"Cormorant Garamond","Songti SC",serif;
+  font-size:24px;font-weight:500;padding-bottom:16px;
+  border-bottom:1px solid #111;margin-bottom:20px;
+}
+.drawer__brand small{display:block;font-size:9px;font-family:"JetBrains Mono",monospace;
+  letter-spacing:0.2em;color:#999;margin-top:2px;}
+.drawer__nav{display:flex;flex-direction:column;gap:2px;flex:1;}
+.drawer__item{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:10px 12px;border-radius:8px;font-size:14px;color:#555;
+  cursor:pointer;font-weight:500;transition:all .15s;
+}
+.drawer__item i{width:18px;height:18px;margin-right:10px;}
+.drawer__item .item-label{display:flex;align-items:center;}
+.drawer__item:hover,
+.drawer__item.active{background:#111;color:#fff;}
+.drawer__item .count{
+  font-family:"JetBrains Mono",monospace;font-size:10px;
+  color:inherit;opacity:.5;
+}
+
+.drawer__divider{height:1px;background:#eee;margin:12px 0;}
+.drawer__foot{
+  font-size:10px;font-family:"JetBrains Mono",monospace;
+  letter-spacing:0.15em;color:#bbb;padding-top:16px;
+  border-top:1px solid #eee;margin-top:auto;
+}
+
+/* ===== Search Bar ===== */
+.search-row{padding:12px 16px;}
+.search-box{
+  display:flex;align-items:center;gap:10px;
+  background:#f3f4f6;border-radius:10px;padding:10px 14px;
+}
+.search-box i{width:16px;height:16px;color:#999;flex-shrink:0;}
+.search-box input{
+  flex:1;border:none;background:transparent;font-size:14px;
+  font-family:inherit;outline:none;color:#111;
+}
+.search-box input::placeholder{color:#aaa;}
+
+/* ===== Sub-header: active group + count ===== */
+.sub-header{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:4px 16px 12px;
+}
+.sub-header__group{
+  display:flex;align-items:center;gap:6px;
+  font-size:13px;color:#999;font-family:"JetBrains Mono",monospace;letter-spacing:.05em;
+}
+.sub-header__group i{width:14px;height:14px;}
+.sub-header__group strong{color:#111;font-weight:600;}
+.sub-header__count{font-size:12px;color:#ccc;font-family:"JetBrains Mono",monospace;}
+
+/* ===== Chip Filters ===== */
+.chip-row{
+  padding:0 16px;margin-bottom:8px;
+  display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;
+}
+.chip-row::-webkit-scrollbar{display:none}
+.chip{
+  flex-shrink:0;display:flex;align-items:center;gap:5px;
+  padding:6px 14px;border-radius:8px;
+  background:#f3f4f6;font-size:12px;color:#555;cursor:pointer;
+  transition:all .2s;white-space:nowrap;border:1px solid transparent;
+}
+.chip i{width:14px;height:14px;}
+.chip.active{background:#111;color:#fff;border-color:#111;}
+.chip:not(.active):active{background:#e5e7eb;}
+
+/* ===== Feed Style Cards ===== */
+.feed{padding:0 16px 96px;display:flex;flex-direction:column;gap:12px;}
+
+.feed-card{
+  display:flex;gap:14px;padding:16px;border-radius:16px;
+  background:#fff;border:1px solid #f0f0f0;cursor:pointer;
+  transition:all .2s;align-items:flex-start;
+}
+.feed-card:active{background:#f9f9fb;border-color:#ddd;}
+
+.feed-card__thumb{
+  width:52px;height:52px;border-radius:12px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+}
+.feed-card__thumb i{width:24px;height:24px;}
+.feed-card__body{flex:1;min-width:0;}
+.feed-card__row1{
+  display:flex;align-items:center;gap:8px;margin-bottom:4px;
+}
+.feed-card__title{
+  font-size:15px;font-weight:600;color:#111;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.feed-card__framework{
+  font-size:9px;font-family:"JetBrains Mono",monospace;
+  padding:2px 6px;border-radius:4px;background:#f3f4f6;color:#888;
+  letter-spacing:.08em;text-transform:uppercase;flex-shrink:0;
+}
+.feed-card__desc{
+  font-size:12px;color:#888;line-height:1.5;
+  display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;
+  overflow:hidden;margin-bottom:6px;
+}
+.feed-card__meta{
+  display:flex;gap:12px;font-size:10px;color:#bbb;
+  font-family:"JetBrains Mono",monospace;
+}
+.feed-card__meta span{display:flex;align-items:center;gap:3px;}
+.feed-card__meta span i{width:12px;height:12px;}
+
+/* ===== Bottom Tab ===== */
+.bottom-tab{
+  position:fixed;bottom:0;left:0;right:0;z-index:40;
+  display:flex;background:rgba(255,255,255,.95);
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border-top:1px solid #f0f0f0;padding:6px 0 env(safe-area-inset-bottom,6px);
+}
+.bottom-tab__item{
+  flex:1;display:flex;flex-direction:column;align-items:center;
+  gap:2px;padding:6px 0;border:none;background:transparent;
+  font-size:9px;color:#999;cursor:pointer;font-family:inherit;
+}
+.bottom-tab__item i{width:20px;height:20px;}
+.bottom-tab__item.active{color:#111;font-weight:600;}
+</style>
+</head>
+<body>
+
+<header class="top-bar">
+  <button class="menu-btn" id="menuToggle"><i data-lucide="menu" style="width:22px;height:22px;"></i></button>
+  <span class="top-bar__brand">wb / showcase</span>
+  <div class="top-bar__actions">
+    <button class="icon-btn"><i data-lucide="settings" style="width:18px;height:18px;"></i></button>
+  </div>
+</header>
+
+<!-- Drawer Overlay -->
+<div class="drawer-overlay" id="drawerOverlay"></div>
+
+<!-- Drawer -->
+<nav class="drawer" id="drawer">
+  <div class="drawer__brand">
+    wb / showcase
+    <small>Style Library — 2026</small>
+  </div>
+  <div class="drawer__nav">
+    <div class="drawer__item active"><span class="item-label"><i data-lucide="layers"></i>全部组件</span><span class="count">8</span></div>
+    <div class="drawer__item"><span class="item-label"><i data-lucide="bar-chart-3"></i>数据可视化</span><span class="count">3</span></div>
+    <div class="drawer__item"><span class="item-label"><i data-lucide="zap"></i>效率</span><span class="count">1</span></div>
+    <div class="drawer__item"><span class="item-label"><i data-lucide="compass"></i>导航</span><span class="count">2</span></div>
+    <div class="drawer__item"><span class="item-label"><i data-lucide="gamepad-2"></i>游戏娱乐</span><span class="count">1</span></div>
+    <div class="drawer__item"><span class="item-label"><i data-lucide="map"></i>地图可视化</span><span class="count">1</span></div>
+    <div class="drawer__divider"></div>
+    <div class="drawer__item"><span class="item-label"><i data-lucide="star"></i>收藏夹</span><span class="count">0</span></div>
+  </div>
+  <div class="drawer__foot">v0.1 · main · platform:mobile</div>
+</nav>
+
+<div class="search-row">
+  <div class="search-box">
+    <i data-lucide="search"></i>
+    <input type="text" placeholder="搜索组件..." />
+  </div>
+</div>
+
+<div class="chip-row">
+  <span class="chip active"><i data-lucide="layers"></i>全部 8</span>
+  <span class="chip"><i data-lucide="code-2"></i>Vue 5</span>
+  <span class="chip"><i data-lucide="code-2"></i>React 3</span>
+</div>
+
+<div class="sub-header">
+  <div class="sub-header__group"><i data-lucide="layers"></i> Showing <strong>全部组件</strong></div>
+  <div class="sub-header__count">8 components</div>
+</div>
+
+<div class="feed">
+  <div class="feed-card">
+    <div class="feed-card__thumb" style="background:#eef2ff;"><i data-lucide="map" style="color:#4f46e5;"></i></div>
+    <div class="feed-card__body">
+      <div class="feed-card__row1"><span class="feed-card__title">中国地图可视化</span><span class="feed-card__framework">vue</span></div>
+      <p class="feed-card__desc">基于 ECharts 的交互式中国地图，支持散点标记、飞线动画与热力图模式。</p>
+      <div class="feed-card__meta"><span><i data-lucide="bar-chart-3"></i> 数据可视化</span><span><i data-lucide="tag"></i> 地图</span><span>v1.0.0</span></div>
+    </div>
+  </div>
+  <div class="feed-card">
+    <div class="feed-card__thumb" style="background:#eef2ff;"><i data-lucide="globe" style="color:#4f46e5;"></i></div>
+    <div class="feed-card__body">
+      <div class="feed-card__row1"><span class="feed-card__title">3D 高斯泼溅查看器</span><span class="feed-card__framework">react</span></div>
+      <p class="feed-card__desc">Three.js 点云渲染，支持 360° 漫游与实时调节参数。</p>
+      <div class="feed-card__meta"><span><i data-lucide="bar-chart-3"></i> 数据可视化</span><span><i data-lucide="tag"></i> 3D 场景</span><span>v1.0.0</span></div>
+    </div>
+  </div>
+  <div class="feed-card">
+    <div class="feed-card__thumb" style="background:#eef2ff;"><i data-lucide="mic" style="color:#4f46e5;"></i></div>
+    <div class="feed-card__body">
+      <div class="feed-card__row1"><span class="feed-card__title">演唱会巡演路线 (用户端)</span><span class="feed-card__framework">vue</span></div>
+      <p class="feed-card__desc">展示巡演城市、路线动画与演出详情的地图可视化组件。</p>
+      <div class="feed-card__meta"><span><i data-lucide="bar-chart-3"></i> 数据可视化</span><span><i data-lucide="tag"></i> 地图</span><span>v1.0.0</span></div>
+    </div>
+  </div>
+  <div class="feed-card">
+    <div class="feed-card__thumb" style="background:#f0fdf4;"><i data-lucide="keyboard" style="color:#22c55e;"></i></div>
+    <div class="feed-card__body">
+      <div class="feed-card__row1"><span class="feed-card__title">快捷键库</span><span class="feed-card__framework">react</span></div>
+      <p class="feed-card__desc">按应用分组管理键盘快捷键，支持增删改查与可视化预览。</p>
+      <div class="feed-card__meta"><span><i data-lucide="zap"></i> 效率</span><span><i data-lucide="tag"></i> 快捷键管理</span><span>v1.0.0</span></div>
+    </div>
+  </div>
+  <div class="feed-card">
+    <div class="feed-card__thumb" style="background:#faf5ff;"><i data-lucide="smartphone" style="color:#a855f7;"></i></div>
+    <div class="feed-card__body">
+      <div class="feed-card__row1"><span class="feed-card__title">iOS 胶囊底部导航 v3</span><span class="feed-card__framework">vue</span></div>
+      <p class="feed-card__desc">类 iOS 原生胶囊切换效果的底部导航栏。</p>
+      <div class="feed-card__meta"><span><i data-lucide="compass"></i> 导航</span><span><i data-lucide="tag"></i> 移动端</span><span>v1.0.0</span></div>
+    </div>
+  </div>
+  <div class="feed-card">
+    <div class="feed-card__thumb" style="background:#faf5ff;"><i data-lucide="circle" style="color:#a855f7;"></i></div>
+    <div class="feed-card__body">
+      <div class="feed-card__row1"><span class="feed-card__title">移动端圆点导航 v5</span><span class="feed-card__framework">vue</span></div>
+      <p class="feed-card__desc">圆点指示器样式的移动端页面导航。</p>
+      <div class="feed-card__meta"><span><i data-lucide="compass"></i> 导航</span><span><i data-lucide="tag"></i> 移动端</span><span>v1.0.0</span></div>
+    </div>
+  </div>
+  <div class="feed-card">
+    <div class="feed-card__thumb" style="background:#fef2f2;"><i data-lucide="sword" style="color:#ef4444;"></i></div>
+    <div class="feed-card__body">
+      <div class="feed-card__row1"><span class="feed-card__title">双人碰碰车</span><span class="feed-card__framework">react</span></div>
+      <p class="feed-card__desc">双人同屏竞技游戏 — WASD vs 方向键，竞技场内互相撞击得分！</p>
+      <div class="feed-card__meta"><span><i data-lucide="gamepad-2"></i> 游戏娱乐</span><span><i data-lucide="tag"></i> 双人竞技</span><span>v1.0.0</span></div>
+    </div>
+  </div>
+  <div class="feed-card">
+    <div class="feed-card__thumb" style="background:#ecfdf5;"><i data-lucide="map-pin" style="color:#0ea5e9;"></i></div>
+    <div class="feed-card__body">
+      <div class="feed-card__row1"><span class="feed-card__title">旅行地图 (GIS)</span><span class="feed-card__framework">vue</span></div>
+      <p class="feed-card__desc">基于 Vue 3 + OpenLayers 的旅行日记：地点标注、路线绘制与轨迹回放。</p>
+      <div class="feed-card__meta"><span><i data-lucide="map"></i> 地图可视化</span><span><i data-lucide="tag"></i> 旅行记录</span><span>v1.0.0</span></div>
+    </div>
+  </div>
+</div>
+
+<nav class="bottom-tab">
+  <button class="bottom-tab__item active"><i data-lucide="home"></i><span>首页</span></button>
+  <button class="bottom-tab__item"><i data-lucide="folder"></i><span>浏览</span></button>
+  <button class="bottom-tab__item"><i data-lucide="search"></i><span>发现</span></button>
+  <button class="bottom-tab__item"><i data-lucide="user"></i><span>我的</span></button>
+</nav>
+
+<script>
+lucide.createIcons();
+
+const menuBtn = document.getElementById('menuToggle');
+const overlay = document.getElementById('drawerOverlay');
+const drawer = document.getElementById('drawer');
+
+function openDrawer(){overlay.classList.add('open');drawer.classList.add('open');}
+function closeDrawer(){overlay.classList.remove('open');drawer.classList.remove('open');}
+
+menuBtn.addEventListener('click', openDrawer);
+overlay.addEventListener('click', closeDrawer);
+
+document.querySelectorAll('.drawer__item').forEach(item => {
+  item.addEventListener('click', () => {
+    document.querySelectorAll('.drawer__item').forEach(x => x.classList.remove('active'));
+    item.classList.add('active');
+    closeDrawer();
+  });
+});
+
+document.querySelectorAll('.chip').forEach(c => {
+  c.addEventListener('click', () => {
+    document.querySelectorAll('.chip').forEach(x => x.classList.remove('active'));
+    c.classList.add('active');
+  });
+});
+
+document.querySelectorAll('.bottom-tab__item').forEach(t => {
+  t.addEventListener('click', () => {
+    document.querySelectorAll('.bottom-tab__item').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+  });
+});
+</script>
+</body>
+</html>

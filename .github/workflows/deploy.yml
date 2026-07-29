@@ -1,0 +1,114 @@
+name: Deploy
+
+on:
+  push:
+    branches: [ deploy ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Build Docker image
+      run: |
+        docker build -t ve:latest .
+
+    - name: Save Docker image
+      run: |
+        docker save ve:latest | gzip > app.tar.gz
+
+    - name: Diagnose secrets (length only)
+      if: always()
+      env:
+        HOST_LEN:      ${{ secrets.HOST }}
+        USERNAME_LEN:  ${{ secrets.USERNAME }}
+        SSH_KEY_LEN:   ${{ secrets.SSH_KEY }}
+        PORT_LEN:      ${{ secrets.PORT }}
+      run: |
+        echo "HOST length: ${#HOST_LEN}"
+        echo "USERNAME length: ${#USERNAME_LEN}"
+        echo "SSH_KEY length: ${#SSH_KEY_LEN}"
+        echo "PORT length: ${#PORT_LEN}"
+
+    - name: Copy files to server
+      uses: appleboy/scp-action@v0.1.7
+      with:
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USERNAME }}
+        key: ${{ secrets.SSH_KEY }}
+        port: ${{ secrets.PORT || 22 }}
+        source: "app.tar.gz"
+        target: "~/app/"
+        strip_components: 0
+
+    - name: Deploy using Docker
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USERNAME }}
+        key: ${{ secrets.SSH_KEY }}
+        port: ${{ secrets.PORT || 22 }}
+        timeout: 30s
+        command_timeout: 10m
+        script: |
+          bash -c '
+          # 设置变量
+          APP_DIR="$HOME/app"
+          CONTAINER_NAME="ve_app"
+          IMAGE_NAME="ve"
+          PORT=80
+
+          # 创建应用目录
+          mkdir -p $APP_DIR
+          cd $APP_DIR
+
+          # 加载Docker镜像
+          echo "Loading Docker image..."
+          docker load < app.tar.gz
+
+          # 清理压缩文件
+          rm app.tar.gz
+
+          # 停止并删除旧容器
+          echo "Stopping old container..."
+          docker stop $CONTAINER_NAME 2>/dev/null || true
+          docker rm $CONTAINER_NAME 2>/dev/null || true
+
+          # 启动新容器
+          echo "Starting new container..."
+          docker run -d \
+            --name $CONTAINER_NAME \
+            --restart unless-stopped \
+            -p $PORT:80 \
+            -e NODE_ENV=production \
+            $IMAGE_NAME:latest
+
+          # 等待服务启动
+          echo "Waiting for service to start..."
+          sleep 15
+
+          # 显示容器状态
+          echo "Container status:"
+          docker ps | grep $CONTAINER_NAME
+
+          # 健康检查
+          echo "Performing health check..."
+          for i in {1..6}; do
+            if curl -f http://localhost:$PORT/health; then
+              echo "✅ Deployment successful!"
+              echo "🌐 Application is running at: http://your-server-ip:$PORT"
+              exit 0
+            fi
+            echo "Health check attempt $i/6 failed, retrying in 10s..."
+            sleep 10
+          done
+
+          # 如果所有健康检查都失败，显示日志并退出
+          echo "❌ Health check failed after 6 attempts!"
+          docker logs $CONTAINER_NAME
+          exit 1
+          '
