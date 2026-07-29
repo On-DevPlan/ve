@@ -22,8 +22,6 @@ const FLASH_DURATION_MS = 280;
 // flash 节流:同一个 code 在 50ms 内重复触发,不重新启动 setTimeout。
 // 自动连发(R-repeat 60Hz)时,这是必要的视觉去抖。
 const FLASH_THROTTLE_MS = 50;
-// 长按阈值 —— 鼠标按下到 popup 出现之间的等待时间
-const LONG_PRESS_MS = 250;
 // 长按 popup 最多展示的映射数,超出显示「…还有 N 条」
 const LONG_PRESS_MAX = 5;
 

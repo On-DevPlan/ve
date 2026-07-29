@@ -24,12 +24,17 @@ import { House, Search, ArrowLeft } from '@lucide/vue';
         <span class="nf-icon"><Search :size="40" /></span>
         <span class="nf-code">4</span>
       </div>
-      <h1 class="nf-title">这里没有组件。</h1>
+      <h1 class="nf-title">
+        这里没有组件。
+      </h1>
       <p class="nf-desc">
         您访问的 URL 不属于任何已注册的路由。
         <br>回到首页，浏览组件清单。
       </p>
-      <RouterLink to="/" class="nf-btn">
+      <RouterLink
+        to="/"
+        class="nf-btn"
+      >
         <ArrowLeft :size="16" />
         返回首页
       </RouterLink>

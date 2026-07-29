@@ -54,28 +54,62 @@ function togglePlatform(p: 'pc' | 'mobile') {
         <small>Style Library — 2026</small>
       </div>
 
-      <div class="search"><SearchBar /></div>
+      <div class="search">
+        <SearchBar />
+      </div>
 
       <div class="nav-group">
-        <div class="nav-title">Groups</div>
-        <div class="nav-item" :class="{ 'is-active': !group }" @click="selectGroup(undefined)">
+        <div class="nav-title">
+          Groups
+        </div>
+        <div
+          class="nav-item"
+          :class="{ 'is-active': !group }"
+          @click="selectGroup(undefined)"
+        >
           <span>All</span><span class="count">{{ totalCount }}</span>
         </div>
-        <div v-for="g in groups" :key="g" class="nav-item" :class="{ 'is-active': group === g }" @click="selectGroup(g)">
+        <div
+          v-for="g in groups"
+          :key="g"
+          class="nav-item"
+          :class="{ 'is-active': group === g }"
+          @click="selectGroup(g)"
+        >
           <span>{{ g }}</span><span class="count">{{ groupCounts.get(g) ?? 0 }}</span>
         </div>
       </div>
 
       <div class="nav-group">
-        <div class="nav-title">Framework</div>
-        <div class="nav-item"><span>Vue</span><span class="count">{{ vueCount }}</span></div>
-        <div class="nav-item"><span>React</span><span class="count">{{ reactCount }}</span></div>
+        <div class="nav-title">
+          Framework
+        </div>
+        <div class="nav-item">
+          <span>Vue</span><span class="count">{{ vueCount }}</span>
+        </div>
+        <div class="nav-item">
+          <span>React</span><span class="count">{{ reactCount }}</span>
+        </div>
       </div>
 
       <div class="nav-group">
-        <div class="nav-title">Platform</div>
-        <div class="nav-item" :class="{ 'is-active': platform === 'pc' }" @click="togglePlatform('pc')"><span>PC</span></div>
-        <div class="nav-item" :class="{ 'is-active': platform === 'mobile' }" @click="togglePlatform('mobile')"><span>Mobile</span></div>
+        <div class="nav-title">
+          Platform
+        </div>
+        <div
+          class="nav-item"
+          :class="{ 'is-active': platform === 'pc' }"
+          @click="togglePlatform('pc')"
+        >
+          <span>PC</span>
+        </div>
+        <div
+          class="nav-item"
+          :class="{ 'is-active': platform === 'mobile' }"
+          @click="togglePlatform('mobile')"
+        >
+          <span>Mobile</span>
+        </div>
       </div>
 
       <div class="sidebar__foot">

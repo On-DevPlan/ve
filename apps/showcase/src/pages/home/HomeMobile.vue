@@ -19,6 +19,7 @@ import {
   Layers, ChartBar, Zap, Compass, Gamepad, Map as MapIcon,
   Tag, ArrowRight,
 } from '@lucide/vue';
+import type { Component } from 'vue';
 
 const router = useRouter();
 const registry = useRegistry();
@@ -46,8 +47,8 @@ const sections = computed(() => {
   return [...map.entries()];
 });
 
-function groupIcon(groupName: string): any {
-  const iconMap: Record<string, any> = {
+function groupIcon(groupName: string): Component {
+  const iconMap: Record<string, Component> = {
     '数据可视化': ChartBar,
     '效率': Zap,
     '导航': Compass,
@@ -81,24 +82,40 @@ function shortDesc(desc: string): string {
     <!-- Search -->
     <div class="search-wrap">
       <div class="search-inner">
-        <SearchIcon :size="16" class="search-icon" />
-        <input v-model="query" type="search" placeholder="搜索组件名称、关键词..." />
+        <SearchIcon
+          :size="16"
+          class="search-icon"
+        />
+        <input
+          v-model="query"
+          type="search"
+          placeholder="搜索组件名称、关键词..."
+        >
       </div>
     </div>
 
     <!-- Pills -->
     <div class="pills-wrap">
       <div class="pills">
-        <button class="pill" :class="{ active: !group }" @click="selectGroup(undefined)">
+        <button
+          class="pill"
+          :class="{ active: !group }"
+          @click="selectGroup(undefined)"
+        >
           <Layers :size="14" />
           <span>全部 <span class="count">{{ totalCount }}</span></span>
         </button>
         <button
-          v-for="g in groups" :key="g"
-          class="pill" :class="{ active: group === g }"
+          v-for="g in groups"
+          :key="g"
+          class="pill"
+          :class="{ active: group === g }"
           @click="selectGroup(g)"
         >
-          <component :is="groupIcon(g)" :size="14" />
+          <component
+            :is="groupIcon(g)"
+            :size="14"
+          />
           <span>{{ g }} <span class="count">{{ groupCounts.get(g) ?? 0 }}</span></span>
         </button>
       </div>
@@ -106,28 +123,47 @@ function shortDesc(desc: string): string {
 
     <!-- Sections -->
     <div v-if="sections.length > 0">
-      <div v-for="[groupName, entries] in sections" :key="groupName" class="section">
+      <div
+        v-for="[groupName, entries] in sections"
+        :key="groupName"
+        class="section"
+      >
         <div class="section__header">
           <div class="section__title">
-            <component :is="groupIcon(groupName)" :size="16" />
+            <component
+              :is="groupIcon(groupName)"
+              :size="16"
+            />
             {{ groupName }}
           </div>
-          <span class="section__more" @click="selectGroup(groupName)">
+          <span
+            class="section__more"
+            @click="selectGroup(groupName)"
+          >
             All <ArrowRight :size="12" />
           </span>
         </div>
         <div class="scroll-x">
           <article
-            v-for="entry in entries" :key="entry.id"
-            class="card-h" tabindex="0" role="button"
-            @click="open(entry.id)" @keydown.enter="open(entry.id)"
+            v-for="entry in entries"
+            :key="entry.id"
+            class="card-h"
+            tabindex="0"
+            role="button"
+            @click="open(entry.id)"
+            @keydown.enter="open(entry.id)"
           >
             <span class="card-h__framework">{{ entry.framework }}</span>
             <div class="card-h__title">
-              <component :is="groupIcon(entry.group)" :size="16" />
+              <component
+                :is="groupIcon(entry.group)"
+                :size="16"
+              />
               {{ entry.title }}
             </div>
-            <p class="card-h__desc">{{ shortDesc(entry.description) }}</p>
+            <p class="card-h__desc">
+              {{ shortDesc(entry.description) }}
+            </p>
             <div class="card-h__meta">
               <span class="card-h__tag"><Tag :size="10" /> {{ entry.category }}</span>
               <span class="card-h__version">v{{ entry.version }}</span>
@@ -138,10 +174,21 @@ function shortDesc(desc: string): string {
     </div>
 
     <!-- Empty State -->
-    <div v-else class="empty-state">
-      <SearchIcon :size="24" class="empty-icon" />
+    <div
+      v-else
+      class="empty-state"
+    >
+      <SearchIcon
+        :size="24"
+        class="empty-icon"
+      />
       <p>没有匹配的组件。</p>
-      <button class="empty-btn" @click="query = ''; group = undefined">清除筛选条件</button>
+      <button
+        class="empty-btn"
+        @click="query = ''; group = undefined"
+      >
+        清除筛选条件
+      </button>
     </div>
   </div>
 </template>
