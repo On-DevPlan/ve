@@ -1,0 +1,16 @@
+sha:        8265c6ad13cb5e81e2585853306e9a5200a60562
+short:      8265c6a
+author:     Style Library Bot <ai@style-library.local>
+date:       2026-07-29T23:06:59+08:00
+subject:    replay: snapshot of commit 4bfb60a
+
+--- body ---
+replay: snapshot of commit 4bfb60a
+
+original-subject: chore(replay): stop ignoring .commit-msgs/ so snapshot commits work
+original-author:  Style Library Bot <ai@style-library.local>
+original-date:    2026-07-29T23:06:59+08:00
+files:            2
+
+--- files (1) ---
+.commit-msgs/4bfb60a__chore(replay)_ stop ignoring .commit-msgs_ so snapshot commits work.commit-msg.txt
