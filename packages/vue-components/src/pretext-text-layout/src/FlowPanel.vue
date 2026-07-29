@@ -255,7 +255,7 @@ onBeforeUnmount(() => {
           @pointerup="onPointerUp"
           @pointercancel="onPointerUp"
         >
-          <span class="sl-flow__shape-icon">🖼️</span>
+          <span class="sl-flow__shape-icon">图片</span>
           <span class="sl-flow__shape-text">拖我</span>
         </div>
       </div>

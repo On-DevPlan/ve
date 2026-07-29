@@ -254,8 +254,8 @@ function formatMismatchError(
   }
   lines.push('');
   lines.push('These would cause runtime errors like:');
-  lines.push('  ✗ "No loader registered for X" when opening detail page');
-  lines.push('  ✗ silent invisibility — card never shows up');
+  lines.push('  "No loader registered for X" when opening detail page');
+  lines.push('  silent invisibility — card never shows up');
   lines.push('');
   lines.push('Fix:');
   lines.push('  - Create index.{vue,tsx} in the component directory (matching the framework in its config)');

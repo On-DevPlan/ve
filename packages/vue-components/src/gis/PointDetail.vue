@@ -105,7 +105,7 @@ onUnmounted(() => {
             class="close-btn"
             @click="handleClose"
           >
-            ✕
+            ×
           </button>
 
           <div class="detail-content">
@@ -168,7 +168,7 @@ onUnmounted(() => {
               class="no-image-placeholder"
             >
               <div class="placeholder-icon">
-                📷
+                照片
               </div>
               <p>暂无照片</p>
             </div>
@@ -181,7 +181,7 @@ onUnmounted(() => {
 
               <div class="info-section">
                 <div class="info-label">
-                  📍 坐标
+                  坐标
                 </div>
                 <div class="info-value">
                   {{ point.lat?.toFixed(6) || 'N/A' }}°N, {{ point.lon?.toFixed(6) || 'N/A' }}°E
@@ -193,7 +193,7 @@ onUnmounted(() => {
                 class="info-section"
               >
                 <div class="info-label">
-                  📝 描述
+                  描述
                 </div>
                 <div class="info-value description">
                   {{ point.description }}
@@ -205,7 +205,7 @@ onUnmounted(() => {
                 class="info-section"
               >
                 <div class="info-label">
-                  🕐 时间
+                  时间
                 </div>
                 <div class="info-value">
                   {{ point.time }}
@@ -217,7 +217,7 @@ onUnmounted(() => {
                 class="info-section"
               >
                 <div class="info-label">
-                  🖼️ 照片
+                  照片
                 </div>
                 <div class="info-value">
                   {{ imageCount }} 张

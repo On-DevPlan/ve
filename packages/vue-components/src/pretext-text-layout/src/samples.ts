@@ -2,6 +2,10 @@ import type { SampleText } from './types';
 
 // 多语言样例:刻意混排 CJK / 阿拉伯语 RTL / Emoji —— pretext 的卖点之一就是
 // "支持你都没听说过的所有语言"。每段都是若干句完整文本,方便观察断行。
+//
+// emoji-as-data: 下面样例里的 emoji(如 🚀 🌅)是 pretext 断行算法的"输入数据",
+// 用于演示对 Emoji 的测量与排版,并非 UI 装饰。按 project-style 规则 1 的"数据主题"
+// 例外保留,不得删除。
 export const SAMPLES: SampleText[] = [
   {
     id: 'mixed',

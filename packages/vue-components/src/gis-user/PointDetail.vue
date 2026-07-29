@@ -179,7 +179,7 @@ onUnmounted(() => {
 
               <div class="gisusr-info-section">
                 <div class="gisusr-info-label">
-                  📍 坐标
+                  坐标
                 </div>
                 <div class="gisusr-info-value">
                   {{ point?.lat?.toFixed(6) }}°N, {{ point?.lon?.toFixed(6) }}°E
@@ -191,7 +191,7 @@ onUnmounted(() => {
                 class="gisusr-info-section"
               >
                 <div class="gisusr-info-label">
-                  🕐 时间
+                  时间
                 </div>
                 <div class="gisusr-info-value">
                   {{ point.time }}
@@ -203,7 +203,7 @@ onUnmounted(() => {
                 class="gisusr-info-section"
               >
                 <div class="gisusr-info-label">
-                  📝 描述
+                  描述
                 </div>
                 <div class="gisusr-info-value gisusr-info-description">
                   {{ point.description }}
@@ -215,7 +215,7 @@ onUnmounted(() => {
                 class="gisusr-info-section"
               >
                 <div class="gisusr-info-label">
-                  📷 照片
+                  照片
                 </div>
                 <div class="gisusr-info-value">
                   {{ imageCount }} 张

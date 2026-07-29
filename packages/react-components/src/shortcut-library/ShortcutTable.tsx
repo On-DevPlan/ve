@@ -160,7 +160,7 @@ export default function ShortcutTable({
                           setEditingId(s.id);
                         }}
                       >
-                        ✎
+                        编辑
                       </button>
                       <button
                         className="sl-sl-icon-btn sl-sl-icon-btn--danger"

@@ -12,7 +12,7 @@ export function IntroBox({ visible }: { visible: boolean }): JSX.Element {
         <br />
         Game Starts Now!!
       </div>
-      <div className="sl-gsv-intro__tag">★★★</div>
+      <div className="sl-gsv-intro__tag">推荐</div>
     </div>
   );
 }

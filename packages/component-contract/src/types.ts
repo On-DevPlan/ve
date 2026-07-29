@@ -2,7 +2,7 @@
 // 对应 spec §4 ComponentConfig / §4.2 PreviewConfig / §4.3 RouteConfig /
 //   §4.4 MountConfig / §4.5 IsolationConfig / §4.6 ThemeConfig / §5 Manifest。
 //
-// ⚠️ 字段名与 spec 严格对齐 —— 不要随意改名或加字段。
+// 注意:字段名与 spec 严格对齐 —— 不要随意改名或加字段。
 // 一旦类型变了,component-config.schema.json、manifest.schema.json、
 //   packages/manifest-generator、packages/mount-adapters 都得跟着改。
 

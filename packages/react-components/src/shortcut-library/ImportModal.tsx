@@ -289,7 +289,7 @@ export default function ImportModal({ onImport, onClose }: Props) {
               className="sl-sl-modal__format-toggle"
               onClick={() => setShowFormat(!showFormat)}
             >
-              📄 {showFormat ? '收起格式说明' : '查看格式说明'}
+              {showFormat ? '收起格式说明' : '查看格式说明'}
             </button>
             <button
               type="button"
@@ -297,7 +297,7 @@ export default function ImportModal({ onImport, onClose }: Props) {
               onClick={handleCopyFormat}
               title="复制格式说明到剪贴板"
             >
-              {copied ? '✓ 已复制' : '复制格式提示词'}
+              {copied ? '已复制' : '复制格式提示词'}
             </button>
           </div>
           {showFormat && (
@@ -310,7 +310,7 @@ export default function ImportModal({ onImport, onClose }: Props) {
         {/* Result summary after import */}
         {resultSummary && (
           <div className="sl-sl-modal__result">
-            ✅ 导入完成: 新增 {resultSummary.groupsAdded} 个分组,
+            导入完成: 新增 {resultSummary.groupsAdded} 个分组,
             追加 {resultSummary.groupsAppended} 个现有分组,
             合计 {resultSummary.shortcutsAdded} 条快捷键
             {resultSummary.errors.length > 0 && (

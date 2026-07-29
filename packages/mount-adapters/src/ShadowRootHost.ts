@@ -8,7 +8,7 @@
 //   4) 把 theme tokens 写到 portal target 的 inline style,让组件 CSS Variables 能直接读到
 //   5) 提供 destroy() 在路由离开时拆掉整个容器,避免泄漏
 //
-// ⚠️ 卡片层永远不要走这里:spec §10.1 明确"CardGrid 永远 Light DOM",
+// 注意 卡片层永远不要走这里:spec §10.1 明确"CardGrid 永远 Light DOM",
 //   Shadow DOM 只在 DetailPage 由本工厂创建。
 
 // 工厂选项

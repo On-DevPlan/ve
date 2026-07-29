@@ -76,10 +76,10 @@
     <!-- 交互提示 -->
     <div class="interaction-hint">
       <p v-if="!selectedProvince">
-        🖱️ 点击省份查看详情 | 滚轮缩放 | 拖拽平移
+        点击省份查看详情 | 滚轮缩放 | 拖拽平移
       </p>
       <p v-else>
-        🖱️ 点击城市高亮显示 | 点击返回按钮回到全国地图
+        点击城市高亮显示 | 点击返回按钮回到全国地图
       </p>
     </div>
   </div>
@@ -284,7 +284,7 @@ const getChartOption = (): echarts.EChartsCoreOption => {
           </div>`;
         } else if (p.seriesType === 'lines') {
           return `<div style="padding: 8px;">
-            <div>🛫 航线</div>
+            <div>航线</div>
             <div style="font-size: 12px; color: #aaa;">${p.data?.name || ''}</div>
           </div>`;
         } else if (p.seriesType === 'map') {

@@ -82,14 +82,14 @@ onMounted(async () => {
   <div class="gisusr-panel">
     <div class="gisusr-section">
       <div class="gisusr-section-header">
-        <h3>🎵 2025年宇宙无敌号演唱会</h3>
+        <h3>2025年宇宙无敌号演唱会</h3>
         <button
           class="gisusr-toggle-lines"
           :class="{ active: showRouteLines }"
           :title="showRouteLines ? '隐藏路线' : '显示路线'"
           @click="toggleRouteLines"
         >
-          {{ showRouteLines ? '📍 隐藏路线' : '🛤️ 显示路线' }}
+          {{ showRouteLines ? '隐藏路线' : '显示路线' }}
         </button>
       </div>
 
@@ -124,7 +124,7 @@ onMounted(async () => {
               </span>
               <span class="gisusr-route-title">{{ route.name || route.title }}</span>
             </div>
-            <span class="gisusr-route-length">📏 {{ route.length }}</span>
+            <span class="gisusr-route-length">{{ route.length }}</span>
           </div>
 
           <p
@@ -148,7 +148,7 @@ onMounted(async () => {
               class="gisusr-action-btn gisusr-zoom-btn"
               @click.stop="handleZoomToRoute(route.id)"
             >
-              🔍 定位
+              定位
             </button>
           </div>
 
@@ -156,7 +156,7 @@ onMounted(async () => {
             v-if="route.points && route.points.length > 0 && expandedRoutes.has(route.id)"
             class="gisusr-city-stations"
           >
-            <h4>🎤 演出站点 ({{ route.points.length }})</h4>
+            <h4>演出站点 ({{ route.points.length }})</h4>
             <div class="gisusr-stations-list">
               <div
                 v-for="(point, index) in route.points"
@@ -178,7 +178,7 @@ onMounted(async () => {
                     v-if="point.images && point.images.length > 0"
                     class="gisusr-station-images"
                   >
-                    📷 {{ point.images.length }} 张照片
+                    {{ point.images.length }} 张照片
                   </div>
                 </div>
               </div>
@@ -191,7 +191,7 @@ onMounted(async () => {
         v-else
         class="gisusr-empty-text"
       >
-        🎵 暂无巡演路线数据
+        暂无巡演路线数据
       </div>
     </div>
   </div>

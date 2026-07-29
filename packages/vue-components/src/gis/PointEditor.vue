@@ -27,11 +27,11 @@ const formData = ref({
 
 // 计算对话框标题
 const dialogTitle = computed(() => {
-  if (props.mode === 'view') return '📍 查看记录'
-  if (props.mode === 'route') return '🛣️ 编辑路线'
-  if (props.mode === 'route-point') return '📍 编辑转折点'
-  if (props.point) return '✏️ 编辑记录'
-  return '📍 新建记录'
+  if (props.mode === 'view') return '查看记录'
+  if (props.mode === 'route') return '编辑路线'
+  if (props.mode === 'route-point') return '编辑转折点'
+  if (props.point) return '编辑记录'
+  return '新建记录'
 })
 
 // 是否为只读模式
@@ -108,7 +108,7 @@ const handleClose = () => {
           class="close-btn"
           @click="handleClose"
         >
-          ✕
+          ×
         </button>
       </div>
 
@@ -118,7 +118,7 @@ const handleClose = () => {
           v-if="point && point.lon"
           class="location-info"
         >
-          <span class="location-label">📍 位置</span>
+          <span class="location-label">位置</span>
           <span class="location-coords">{{ point.lat?.toFixed(4) }}, {{ point.lon?.toFixed(4) }}</span>
           <span
             v-if="point.time"
@@ -155,7 +155,7 @@ const handleClose = () => {
           <label>图片</label>
           <div class="image-upload">
             <label class="upload-btn">
-              <span>📷 添加图片</span>
+              <span>添加图片</span>
               <input
                 type="file"
                 accept="image/*"
@@ -185,7 +185,7 @@ const handleClose = () => {
                 class="remove-image"
                 @click="removeImage(index)"
               >
-                ✕
+                ×
               </button>
             </div>
           </div>

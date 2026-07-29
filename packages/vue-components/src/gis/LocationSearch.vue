@@ -141,7 +141,7 @@ const handleFocus = () => {
         title="清空"
         @click="clearSearch"
       >
-        ✕
+        ×
       </button>
       <div
         v-if="isLoading"
@@ -175,7 +175,7 @@ const handleFocus = () => {
             {{ place.name }}
           </div>
           <div class="result-address">
-            <span class="address-icon">📍</span>
+            <span class="address-icon">位置</span>
             {{ place.address }}
           </div>
           <div

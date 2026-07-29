@@ -48,7 +48,7 @@ const closeImagePreview = () => {
 <template>
   <div class="point-list-container">
     <h3 class="list-title">
-      📝 我的记录
+      我的记录
     </h3>
 
     <div
@@ -72,7 +72,7 @@ const closeImagePreview = () => {
           @click="toggleExpand(point.id)"
         >
           <div class="point-title-row">
-            <span class="point-icon">📍</span>
+            <span class="point-icon">位置</span>
             <span class="point-title">{{ point.title || '未命名记录' }}</span>
             <span class="expand-icon">{{ expandedPoints.has(point.id) ? '▼' : '▶' }}</span>
           </div>
@@ -115,19 +115,19 @@ const closeImagePreview = () => {
               class="action-btn locate"
               @click.stop="handleSelect(point)"
             >
-              🎯 定位
+              定位
             </button>
             <button
               class="action-btn edit"
               @click.stop="handleEdit(point)"
             >
-              ✏️ 编辑
+              编辑
             </button>
             <button
               class="action-btn delete"
               @click.stop="handleDelete(point.id)"
             >
-              🗑️ 删除
+              删除
             </button>
           </div>
         </div>

@@ -138,7 +138,7 @@ const handleFileChange = async (event) => {
   <div class="control-panel">
     <!-- 地点搜索 -->
     <div class="panel-section">
-      <h3>🔍 搜索地点</h3>
+      <h3>搜索地点</h3>
       <LocationSearch @select="handleSearchLocation" />
     </div>
 
@@ -153,7 +153,7 @@ const handleFileChange = async (event) => {
 
     <!-- 路线管理 -->
     <div class="panel-section">
-      <h3>🛣️ 我的路线</h3>
+      <h3>我的路线</h3>
 
       <div
         v-if="!isDrawingRoute"
@@ -163,7 +163,7 @@ const handleFileChange = async (event) => {
           class="btn-primary full-width"
           @click="emit('startDrawRoute')"
         >
-          ✏️ 开始绘制路线
+          开始绘制路线
         </button>
       </div>
 
@@ -175,13 +175,13 @@ const handleFileChange = async (event) => {
           class="btn-success"
           @click="emit('finishRoute')"
         >
-          ✓ 完成绘制
+          完成绘制
         </button>
         <button
           class="btn-cancel"
           @click="emit('cancelDrawRoute')"
         >
-          ✕ 取消
+          取消
         </button>
       </div>
 
@@ -189,7 +189,7 @@ const handleFileChange = async (event) => {
         v-if="isDrawingRoute"
         class="drawing-hint"
       >
-        💡 已添加 {{ tempRoutePointsCount }} 个点
+        已添加 {{ tempRoutePointsCount }} 个点
       </div>
 
       <div
@@ -210,19 +210,19 @@ const handleFileChange = async (event) => {
               title="播放动画"
               @click="emit('playRouteAnimation', route.id)"
             >
-              🚗
+              播放
             </button>
             <button
               title="定位"
               @click="emit('zoomToRoute', route.id)"
             >
-              🎯
+              定位
             </button>
             <button
               title="删除"
               @click="emit('deleteRoute', route.id)"
             >
-              🗑️
+              删除
             </button>
           </div>
         </div>
@@ -238,7 +238,7 @@ const handleFileChange = async (event) => {
 
     <!-- 图层切换 -->
     <div class="panel-section">
-      <h3>🗺️ 地图图层</h3>
+      <h3>地图图层</h3>
       <div class="layer-buttons">
         <button
           v-for="(layer, index) in layers"
@@ -254,25 +254,25 @@ const handleFileChange = async (event) => {
 
     <!-- 数据管理 -->
     <div class="panel-section">
-      <h3>💾 数据管理</h3>
+      <h3>数据管理</h3>
       <div class="data-buttons">
         <button
           class="data-btn export-btn"
           @click="handleExport"
         >
-          📤 导出数据
+          导出数据
         </button>
         <button
           class="data-btn preset-btn"
           @click="handleImportPreset"
         >
-          📦 加载预设
+          加载预设
         </button>
         <button
           class="data-btn import-btn"
           @click="handleImportFile"
         >
-          📥 导入文件
+          导入文件
         </button>
       </div>
       <!-- 隐藏的文件输入 -->

@@ -85,14 +85,14 @@ onMounted(async () => {
     <!-- 演唱会巡演路线 -->
     <div class="panel-section">
       <div class="section-header">
-        <h3>🎵 2025年宇宙无敌号演唱会</h3>
+        <h3>2025年宇宙无敌号演唱会</h3>
         <button
           class="toggle-lines-btn"
           :class="{ active: showRouteLines }"
           :title="showRouteLines ? '隐藏路线' : '显示路线'"
           @click="toggleRouteLines"
         >
-          {{ showRouteLines ? '📍 隐藏路线' : '🛤️ 显示路线' }}
+          {{ showRouteLines ? '隐藏路线' : '显示路线' }}
         </button>
       </div>
 
@@ -107,7 +107,7 @@ onMounted(async () => {
         >
           <div class="route-header">
             <span class="route-title">{{ route.name || route.title }}</span>
-            <span class="route-length">📏 {{ route.length }}</span>
+            <span class="route-length">{{ route.length }}</span>
           </div>
 
           <p
@@ -122,7 +122,7 @@ onMounted(async () => {
             v-if="route.points && route.points.length > 0"
             class="city-stations"
           >
-            <h4>🎤 演出站点 ({{ route.points.length }})</h4>
+            <h4>演出站点 ({{ route.points.length }})</h4>
             <div class="stations-list">
               <div
                 v-for="(point, index) in route.points"
@@ -150,7 +150,7 @@ onMounted(async () => {
                     v-if="point.images && point.images.length > 0"
                     class="station-images"
                   >
-                    📷 {{ point.images.length }} 张照片
+                    {{ point.images.length }} 张照片
                   </div>
                 </div>
               </div>
@@ -163,13 +163,13 @@ onMounted(async () => {
               class="action-btn play-btn"
               @click="handlePlayAnimation(route.id)"
             >
-              🚀 播放巡演路线
+              播放巡演路线
             </button>
             <button
               class="action-btn zoom-btn"
               @click="handleZoomToRoute(route.id)"
             >
-              🎯 定位路线
+              定位路线
             </button>
           </div>
         </div>

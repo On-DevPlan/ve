@@ -108,11 +108,11 @@ export default function CarBattle(): JSX.Element {
         <div className="sl-cb-result-overlay">
           <div className="sl-cb-result">
             {gameState.cars[0].score > gameState.cars[1].score ? (
-              <div className="sl-cb-result__winner">🏆 玩家1 获胜！</div>
+              <div className="sl-cb-result__winner">玩家1 获胜！</div>
             ) : gameState.cars[1].score > gameState.cars[0].score ? (
-              <div className="sl-cb-result__winner">🏆 玩家2 获胜！</div>
+              <div className="sl-cb-result__winner">玩家2 获胜！</div>
             ) : (
-              <div className="sl-cb-result__draw">🤝 平局！</div>
+              <div className="sl-cb-result__draw">平局！</div>
             )}
             <div className="sl-cb-result__scores">
               <div className="sl-cb-result__player">

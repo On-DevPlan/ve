@@ -119,7 +119,7 @@ export default function Sidebar({
                       setEditingName(g.name);
                     }}
                   >
-                    ✎
+                    编辑
                   </button>
                   <button
                     className="sl-sl-icon-btn sl-sl-icon-btn--danger"

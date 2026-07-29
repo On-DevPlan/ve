@@ -1209,7 +1209,7 @@ onUnmounted(() => {
           title="切换面板模式"
           @click="togglePanelMode"
         >
-          {{ panelMode === 'admin' ? '👤 用户面板' : '⚙️ 管理面板' }}
+          {{ panelMode === 'admin' ? '用户面板' : '管理面板' }}
         </button>
       </div>
     </div>
