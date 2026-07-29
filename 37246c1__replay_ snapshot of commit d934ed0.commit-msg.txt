@@ -1,0 +1,16 @@
+sha:        37246c1f3ba7cd44c9b554295e219afe0c9b635a
+short:      37246c1
+author:     Style Library Bot <ai@style-library.local>
+date:       2026-07-29T23:27:28+08:00
+subject:    replay: snapshot of commit d934ed0
+
+--- body ---
+replay: snapshot of commit d934ed0
+
+original-subject: chore(replay): preserve original author/time, drop _history.json
+original-author:  Style Library Bot <ai@style-library.local>
+original-date:    2026-07-29T23:27:28+08:00
+files:            1
+
+--- files (1) ---
+.commit-msgs/d934ed0__chore(replay)_ preserve original author_time, drop _history.json.commit-msg.txt
