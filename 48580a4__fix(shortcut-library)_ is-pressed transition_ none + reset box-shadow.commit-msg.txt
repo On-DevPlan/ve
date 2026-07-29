@@ -1,0 +1,46 @@
+sha:        48580a4295a1776ad4b7399865e58df4b2d0d048
+short:      48580a4
+author:     Style Library Bot <ai@style-library.local>
+date:       2026-07-29T22:55:04+08:00
+subject:    fix(shortcut-library): is-pressed transition: none + reset box-shadow
+
+--- body ---
+fix(shortcut-library): is-pressed transition: none + reset box-shadow
+
+Following user report that the long-press visual still "flashed"
+after the previous commit added a 0.05s transition. Two issues:
+
+1. .sl-sl-kb__key has transition: background 0.24s ease-out at the
+   base level. Even an is-pressed rule with 0.05s transition means
+   a brief color fade on press. The fix is transition: none — the
+   only way to guarantee a truly instant color flip.
+
+2. .is-pressed didn't reset box-shadow, so during a hold that
+   started on a hovered key the yellow is-hover glow remained
+   underneath the blue background. Releasing the key then animated
+   the glow away over 0.24s, which read as the key "flashing back"
+   to its base color. box-shadow: none in .is-pressed short-circuits
+   this.
+
+Tests:
+- shortcut-library-features.test.ts updated to assert
+  transition: none on .is-pressed (vs the previous 0.0X s regex).
+- shortcut-library-pressed.test.tsx: 3 new assertions — className
+  applied synchronously on pointerdown, transition: none enforced,
+  box-shadow reset enforced.
+- shortcut-library-real-mount.test.tsx: integration smoke that
+  renders the real component without mocking CSS and verifies the
+  className still lands on the actual DOM node.
+
+Note for dev-server users: this package's CSS is cloned into the
+shadow root once at mount time (see mount-adapters/style-adoption.ts),
+so HMR does NOT push the new CSS rule. Hard-refresh the detail
+page (Ctrl+Shift+R) after pulling this commit.
+
+Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
+
+--- files (4) ---
+packages/react-components/__tests__/shortcut-library-features.test.ts
+packages/react-components/__tests__/shortcut-library-pressed.test.tsx
+packages/react-components/__tests__/shortcut-library-real-mount.test.tsx
+packages/react-components/src/shortcut-library/index.css
