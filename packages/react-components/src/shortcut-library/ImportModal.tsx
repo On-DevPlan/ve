@@ -10,6 +10,31 @@ interface Props {
 
 type TabMode = 'paste' | 'file';
 
+// 格式说明 —— 用作内联展示 + 一键复制的内容
+const FORMAT_PROMPT = `# ShortcutLibrary 导入格式 (TOML)
+# UTF-8 编码
+
+[[groups]]
+name = "分组名称"
+
+[[groups.shortcuts]]
+combo = "Ctrl+R"     # 组合键,用 + 连接
+desc  = "打开目录"    # 说明(可选)
+
+# 支持多个分组和快捷键
+[[groups]]
+name = "Chrome"
+
+[[groups.shortcuts]]
+combo = "Ctrl+T"
+desc = "新建标签页"
+
+# 支持的修饰键: Ctrl, Shift, Alt, ⌘
+# 支持的方向键: ↑, ↓, ←, →
+# 支持的字母/数字: A-Z, 0-9
+# 支持的功能键: F1-F12
+# 文件大小限制: 1 MB`;
+
 export default function ImportModal({ onImport, onClose }: Props) {
   const [mode, setMode] = useState<TabMode>('paste');
   const [text, setText] = useState('');
@@ -17,7 +42,42 @@ export default function ImportModal({ onImport, onClose }: Props) {
   const [parsed, setParsed] = useState(false);
   const [resultSummary, setResultSummary] = useState<ReturnType<typeof onImport> | null>(null);
   const [showFormat, setShowFormat] = useState(false);
+  const [copied, setCopied] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const copyTimerRef = useRef<number | null>(null);
+
+  // 复制格式说明到剪贴板
+  async function handleCopyFormat() {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(FORMAT_PROMPT);
+      } else {
+        // 旧浏览器 fallback: textarea + execCommand
+        const ta = document.createElement('textarea');
+        ta.value = FORMAT_PROMPT;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      setCopied(true);
+      if (copyTimerRef.current) window.clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = window.setTimeout(() => setCopied(false), 1800);
+    } catch (err) {
+      alert('复制失败,请手动选择文本');
+      console.error(err);
+    }
+  }
+
+  // 卸载时清理 timer
+  function handleCleanup() {
+    if (copyTimerRef.current) {
+      window.clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = null;
+    }
+  }
 
   function handleConfirm() {
     if (!parseResult) return;
@@ -66,11 +126,11 @@ export default function ImportModal({ onImport, onClose }: Props) {
   const isValid = parseResult && totalGroups > 0 && totalShortcuts > 0;
 
   return (
-    <div className="sl-sl-overlay" onClick={onClose}>
+    <div className="sl-sl-overlay" onClick={() => { handleCleanup(); onClose(); }}>
       <div className="sl-sl-modal" onClick={(e) => e.stopPropagation()}>
         <header className="sl-sl-modal__head">
           <h2 className="sl-sl-modal__title">导入快捷键</h2>
-          <button className="sl-sl-icon-btn" onClick={onClose}>×</button>
+          <button className="sl-sl-icon-btn" onClick={() => { handleCleanup(); onClose(); }}>×</button>
         </header>
 
         {/* Tab switch */}
@@ -152,37 +212,25 @@ export default function ImportModal({ onImport, onClose }: Props) {
 
         {/* Format reference (collapsible) */}
         <div className="sl-sl-modal__format">
-          <button
-            className="sl-sl-modal__format-toggle"
-            onClick={() => setShowFormat(!showFormat)}
-          >
-            📄 {showFormat ? '收起格式说明' : '查看格式说明'}
-          </button>
+          <div className="sl-sl-modal__format-head">
+            <button
+              className="sl-sl-modal__format-toggle"
+              onClick={() => setShowFormat(!showFormat)}
+            >
+              📄 {showFormat ? '收起格式说明' : '查看格式说明'}
+            </button>
+            <button
+              type="button"
+              className={`sl-sl-modal__format-copy ${copied ? 'is-copied' : ''}`}
+              onClick={handleCopyFormat}
+              title="复制格式说明到剪贴板"
+            >
+              {copied ? '✓ 已复制' : '复制格式提示词'}
+            </button>
+          </div>
           {showFormat && (
             <div className="sl-sl-modal__format-body">
-              <pre>{`# ShortcutLibrary 导入格式 (TOML)
-# UTF-8 编码
-
-[[groups]]
-name = "分组名称"
-
-[[groups.shortcuts]]
-combo = "Ctrl+R"     # 组合键,用 + 连接
-desc  = "打开目录"    # 说明(可选)
-
-# 支持多个分组和快捷键
-[[groups]]
-name = "Chrome"
-
-[[groups.shortcuts]]
-combo = "Ctrl+T"
-desc = "新建标签页"
-
-# 支持的修饰键: Ctrl, Shift, Alt, ⌘
-# 支持的方向键: ↑, ↓, ←, →
-# 支持的字母/数字: A-Z, 0-9
-# 支持的功能键: F1-F12
-# 文件大小限制: 1 MB`}</pre>
+              <pre>{FORMAT_PROMPT}</pre>
             </div>
           )}
         </div>
@@ -205,7 +253,7 @@ desc = "新建标签页"
         <div className="sl-sl-modal__actions">
           {!resultSummary ? (
             <>
-              <button className="sl-sl-btn sl-sl-btn--ghost" onClick={onClose}>取消</button>
+              <button className="sl-sl-btn sl-sl-btn--ghost" onClick={() => { handleCleanup(); onClose(); }}>取消</button>
               <button
                 className="sl-sl-btn sl-sl-btn--primary"
                 disabled={!isValid}
@@ -215,7 +263,7 @@ desc = "新建标签页"
               </button>
             </>
           ) : (
-            <button className="sl-sl-btn sl-sl-btn--primary" onClick={onClose}>
+            <button className="sl-sl-btn sl-sl-btn--primary" onClick={() => { handleCleanup(); onClose(); }}>
               关闭
             </button>
           )}

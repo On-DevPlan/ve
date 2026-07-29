@@ -5,6 +5,7 @@
 interface Props {
   highlightedCodes: Set<string>;
   hoveredCodes: Set<string>;
+  flashCodes?: Set<string>;
 }
 
 // 物理布局——按物理行而非逻辑 row(用户的 Ctrl 是 ControlLeft)
@@ -74,7 +75,7 @@ function ModifierAlias({ code }: { code: string }) {
   return null;
 }
 
-export default function Keyboard({ highlightedCodes, hoveredCodes }: Props) {
+export default function Keyboard({ highlightedCodes, hoveredCodes, flashCodes }: Props) {
   // 单元宽 56px,gap 4px
   const UNIT = 56;
   const GAP = 4;
@@ -86,11 +87,12 @@ export default function Keyboard({ highlightedCodes, hoveredCodes }: Props) {
           {row.map((key) => {
             const isOn = highlightedCodes.has(key.code);
             const isHover = hoveredCodes.has(key.code);
+            const isFlash = flashCodes?.has(key.code) ?? false;
             const w = (key.w ?? 1) * UNIT + (key.w ? (key.w - 1) * GAP : 0);
             return (
               <div
                 key={key.code}
-                className={`sl-sl-kb__key ${isOn ? 'is-on' : ''} ${isHover ? 'is-hover' : ''}`}
+                className={`sl-sl-kb__key ${isOn ? 'is-on' : ''} ${isHover ? 'is-hover' : ''} ${isFlash ? 'is-flash' : ''}`}
                 style={{ width: w, height: UNIT }}
                 title={key.code}
               >

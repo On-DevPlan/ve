@@ -377,7 +377,7 @@
   font-family: var(--sl-font-mono, ui-monospace, "JetBrains Mono", monospace);
   font-size: 12px;
   color: #6b7280;
-  transition: background 0.12s, color 0.12s, transform 0.08s, border-color 0.12s;
+  transition: background 0.24s ease-out, color 0.24s ease-out, transform 0.08s, border-color 0.24s ease-out, box-shadow 0.24s ease-out;
   position: relative;
   user-select: none;
 }
@@ -393,6 +393,14 @@
   color: var(--sl-hover-text, #92400e);
   transform: translateY(1px);
   box-shadow: 0 0 0 2px var(--sl-hover-glow, rgba(245, 158, 11, 0.25));
+}
+/* 物理按键瞬时高亮 —— 比 is-on 略浅,让"已录入"和"刚刚按过"视觉上分开 */
+.sl-sl-kb__key.is-flash {
+  background: var(--sl-color-primary, #2563eb);
+  border-color: var(--sl-color-primary, #2563eb);
+  color: #fff;
+  transform: translateY(2px);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
 }
 .sl-sl-kb__alias {
   position: absolute;
@@ -500,6 +508,12 @@
 .sl-sl-modal__format {
   margin: 8px 24px 0;
 }
+.sl-sl-modal__format-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
 .sl-sl-modal__format-toggle {
   background: none;
   border: none;
@@ -507,6 +521,28 @@
   color: var(--sl-color-primary, #2563eb);
   cursor: pointer;
   padding: 4px 0;
+}
+.sl-sl-modal__format-copy {
+  background: transparent;
+  border: 1px solid var(--sl-color-border, #e4e4e7);
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--sl-color-text-soft, #6b7280);
+  cursor: pointer;
+  padding: 4px 10px;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  font-family: inherit;
+}
+.sl-sl-modal__format-copy:hover {
+  background: var(--sl-color-surface-alt, #f4f4f5);
+  border-color: var(--sl-color-primary, #2563eb);
+  color: var(--sl-color-primary, #2563eb);
+}
+.sl-sl-modal__format-copy.is-copied {
+  background: var(--sl-color-success-bg, #ecfdf5);
+  border-color: var(--sl-color-success-text, #065f46);
+  color: var(--sl-color-success-text, #065f46);
+  cursor: default;
 }
 .sl-sl-modal__format-body {
   margin-top: 8px;
