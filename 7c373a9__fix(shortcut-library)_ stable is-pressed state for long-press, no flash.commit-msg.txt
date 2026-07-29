@@ -1,0 +1,31 @@
+sha:        7c373a968c27dca7318a67253bcebfdd05701032
+short:      7c373a9
+author:     Style Library Bot <ai@style-library.local>
+date:       2026-07-29T22:42:34+08:00
+subject:    fix(shortcut-library): stable is-pressed state for long-press, no flash
+
+--- body ---
+fix(shortcut-library): stable is-pressed state for long-press, no flash
+
+Root cause: the .sl-sl-kb__key base rule had transition: background 0.24s
+ease-out. When the user pressed a key down (mouse hold, no keydown yet),
+the key element transitioned from #f4f4f5 (light gray) toward the blue
+is-on color over 240ms — which visually reads as "先闪一下再进入按下态".
+
+The fix introduces a dedicated is-pressed visual class that:
+  - Uses 0.05s linear transitions (vs the base 0.24s ease-out)
+  - Has no outer glow (vs is-flash's 3px box-shadow), so it reads as a
+    stable "currently held" state rather than a transient flash
+  - Visually matches is-on so the transition from base to pressed feels
+    instant without changing the recorded-shortcut semantics
+
+Wired through Key's local state: setPressed(true) on pointerDown, false
+on pointerUp/Leave/Cancel. Local state keeps the visual update off the
+parent's render path so spamming keys doesn't trigger full-tree reconciles.
+
+Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
+
+--- files (3) ---
+packages/react-components/__tests__/shortcut-library-features.test.ts
+packages/react-components/src/shortcut-library/Keyboard.tsx
+packages/react-components/src/shortcut-library/index.css
