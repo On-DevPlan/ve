@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // 文字绕流面板:pretext use case 2 的展示。
-// 文字围绕一个可拖拽图形逐行流动,每行宽度由"该行是否与图形纵向重叠"决定。
+// 文字"四周环绕"一个可拖拽图形:与图形重叠的行被拆成左右两段(图形左侧 + 右侧),
+// 图形上方/下方的行占满整宽。pretext 逐行变宽游标 API 让"同一视觉行排两段"成为可能。
 // 核心 API:prepareWithSegments(一次性) → layoutNextLineRange / materializeLineRange(逐行)。
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import {
@@ -36,45 +37,50 @@ const prepared = computed(() =>
   prepareWithSegments(sampleText.value.text, canvasFont(fontSize.value)),
 );
 
-// 浮动侧:图形中心在左半区 → 文字绕到右侧(left float);否则绕到左侧(right float)。
-const side = computed<'left' | 'right'>(() => {
-  const s = shape.value;
-  return s.x + s.w / 2 < containerWidth.value / 2 ? 'left' : 'right';
-});
-
-// 给定某行顶端 y,算出该行在内容区里的左偏移与可用宽度(是否需要避让图形)。
-function geometryAt(yTop: number): { indent: number; width: number } {
-  const cw = containerWidth.value;
-  const s = shape.value;
-  const lineBottom = yTop + lineHeightPx.value;
-  const overlaps = lineBottom > s.y && yTop < s.y + s.h;
-  if (!overlaps || cw <= 0) return { indent: 0, width: cw };
-  if (side.value === 'left') {
-    const indent = Math.min(s.x + s.w, cw);
-    return { indent, width: Math.max(MIN_LINE_WIDTH, cw - indent) };
-  }
-  // right float:文字占据图形左侧
-  const width = Math.max(MIN_LINE_WIDTH, Math.min(s.x, cw));
-  return { indent: 0, width };
-}
-
-// 逐行排版:游标迭代,每行可用宽度可变(绕流的关键)。
+// 四周环绕排版。与图形纵向重叠的行 → 拆成左右两段:先用宽 = shape.x 排左侧段,
+// 再用"同一游标"接续排右侧段(宽 = 容器宽 - 图形右边)。图形上方/下方的行 → 整宽。
+// 同一视觉行用两个不同宽度各排一段,是 CSS float / shape-outside 做不到的真正环绕。
 const rows = computed<LineRow[]>(() => {
   const p = prepared.value;
   const cw = containerWidth.value;
   if (!p || cw <= 0) return [];
+  const s = shape.value;
+  const lh = lineHeightPx.value;
   const out: LineRow[] = [];
   let cursor: LayoutCursor = { segmentIndex: 0, graphemeIndex: 0 };
   let y = 0;
-  // 安全上限,防止畸形 shape 把文字挤成极多行导致死循环。
-  for (let guard = 0; guard < 5000; guard++) {
-    const geo = geometryAt(y);
-    const range = layoutNextLineRange(p, cursor, geo.width);
-    if (range === null) break;
-    const line = materializeLineRange(p, range);
-    out.push({ text: line.text, x: geo.indent, width: geo.width, y });
-    cursor = range.end;
-    y += lineHeightPx.value;
+  // 安全上限,防止畸形 shape 挤出巨量行;正常文本会在游标耗尽时自然终止。
+  for (let guard = 0; guard < 8000; guard++) {
+    const overlaps = y + lh > s.y && y < s.y + s.h;
+    if (!overlaps) {
+      // 图形上方 / 下方:整宽一行
+      const range = layoutNextLineRange(p, cursor, cw);
+      if (range === null) break;
+      out.push({ text: materializeLineRange(p, range).text, x: 0, width: cw, y });
+      cursor = range.end;
+    } else {
+      const leftW = s.x;
+      const rightX = s.x + s.w;
+      const rightW = cw - rightX;
+      // 左侧段(图形左边)
+      if (leftW >= MIN_LINE_WIDTH) {
+        const left = layoutNextLineRange(p, cursor, leftW);
+        if (left) {
+          out.push({ text: materializeLineRange(p, left).text, x: 0, width: leftW, y });
+          cursor = left.end;
+        }
+      }
+      // 右侧段(同一视觉行,接续左侧段游标)
+      if (rightW >= MIN_LINE_WIDTH) {
+        const right = layoutNextLineRange(p, cursor, rightW);
+        if (right) {
+          out.push({ text: materializeLineRange(p, right).text, x: rightX, width: rightW, y });
+          cursor = right.end;
+        }
+      }
+      // 两侧都 < MIN(图形几乎占满宽)或文字已尽:不消耗文字,仅下移到图形下方再续排
+    }
+    y += lh;
   }
   return out;
 });
@@ -117,7 +123,11 @@ function onPointerUp(e: PointerEvent): void {
 }
 
 function resetShape(): void {
-  shape.value = { ...DEFAULT_SHAPE };
+  const w = containerWidth.value;
+  shape.value = {
+    ...DEFAULT_SHAPE,
+    x: Math.max(0, Math.round((w - DEFAULT_SHAPE.w) / 2)),
+  };
 }
 
 // ---- 尺寸观测 ----
@@ -125,7 +135,13 @@ let ro: ResizeObserver | null = null;
 onMounted(() => {
   const el = contentRef.value;
   if (!el) return;
-  containerWidth.value = el.getBoundingClientRect().width;
+  const w = el.getBoundingClientRect().width;
+  containerWidth.value = w;
+  // 初始把图形水平居中,直接展示四周环绕(左右两段 + 上下整行)
+  shape.value = {
+    ...shape.value,
+    x: Math.max(0, Math.round((w - shape.value.w) / 2)),
+  };
   ro = new ResizeObserver((entries) => {
     const rect = entries[0]?.contentRect;
     if (rect) containerWidth.value = rect.width;
@@ -213,8 +229,7 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="sl-flow__hint">
-      拖动方块,文字逐行避让重排 · 当前浮动侧:
-      <strong>{{ side === 'left' ? '左侧(文字绕右)' : '右侧(文字绕左)' }}</strong>
+      拖动方块,文字四周环绕重排(上方 · 左侧 · 右侧 · 下方) —— CSS float 做不到的真正环绕
     </div>
 
     <!-- 外层是带 padding 的"画框";内层 .sl-flow__canvas 才是绝对定位上下文,
