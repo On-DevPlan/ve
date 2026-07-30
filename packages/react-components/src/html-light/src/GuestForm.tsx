@@ -8,7 +8,7 @@
 // 每次按键 → React 改 DOM → 下一帧 paint 重新上传纹理 → 卡片上的文字实时更新。
 
 import type { CSSProperties, FormEvent, Ref } from 'react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   COLOR_PRESETS,
   INITIAL_LIGHT,
@@ -56,9 +56,54 @@ export function GuestForm({
     setSubmitted(false);
   }
 
+  // 三 html-in-canvas polyfill 把表单搬到 document.body 的 host div 里,
+  // 脱出了 React root container 的 DOM 子树,导致 React 18 事件代理
+  // 收不到 click —— 这里在组件根 div 上挂原生 listener 把灯光面板的
+  // 全部交互显式路由到 setState,绕过 React 事件系统。
+  const formRootRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const root = formRootRef.current ?? (sourceRef as { current: HTMLDivElement | null } | undefined)?.current;
+    if (!root) return;
+    const cleanups: Array<() => void> = [];
+    const bind = <K extends keyof HTMLElementEventMap>(
+      el: Element | null,
+      evt: K,
+      fn: (e: HTMLElementEventMap[K]) => void,
+    ) => {
+      if (!el) return;
+      el.addEventListener(evt, fn);
+      cleanups.push(() => el.removeEventListener(evt, fn));
+    };
+    // 色板按钮 → 切色
+    root.querySelectorAll<HTMLButtonElement>('button[data-hl-color]').forEach((el) => {
+      const color = el.getAttribute('data-hl-color');
+      if (!color) return;
+      bind(el, 'click', () => onLightingChange({ color }));
+    });
+    // 自定义颜色 → 切色
+    const customColor = root.querySelector<HTMLInputElement>('input[data-hl-custom-color]');
+    bind(customColor, 'input', (e) => onLightingChange({ color: (e.target as HTMLInputElement).value }));
+    // 电源开关
+    const power = root.querySelector<HTMLButtonElement>('button[data-hl-power]');
+    bind(power, 'click', () => onLightingChange({ enabled: !lighting.enabled }));
+    // 光束 / 亮度滑块
+    const beam = root.querySelector<HTMLInputElement>('input[data-hl-beam]');
+    bind(beam, 'input', (e) => onLightingChange({ angle: Number((e.target as HTMLInputElement).value) }));
+    const brightness = root.querySelector<HTMLInputElement>('input[data-hl-brightness]');
+    bind(brightness, 'input', (e) => onLightingChange({ brightness: Number((e.target as HTMLInputElement).value) }));
+    // 灯光重置
+    const reset = root.querySelector<HTMLButtonElement>('button[data-hl-reset]');
+    bind(reset, 'click', () => onReset());
+    return () => cleanups.forEach((fn) => fn());
+  }, [onLightingChange, onReset, lighting.enabled, sourceRef, formRootRef]);
+
   return (
     <div
-      ref={sourceRef}
+      ref={(node) => {
+        formRootRef.current = node;
+        if (typeof sourceRef === 'function') sourceRef(node);
+        else if (sourceRef) (sourceRef as { current: HTMLDivElement | null }).current = node;
+      }}
       className="sl-hl-source"
       style={{ '--lamp-color': lighting.color } as CSSProperties}
     >
@@ -180,6 +225,7 @@ export function GuestForm({
             </div>
             <button
               type="button"
+              data-hl-power
               className={`sl-hl-power${lighting.enabled ? ' is-on' : ''}`}
               onClick={() => onLightingChange({ enabled: !lighting.enabled })}
               aria-pressed={lighting.enabled}
@@ -198,6 +244,7 @@ export function GuestForm({
             </span>
             <input
               type="range"
+              data-hl-beam
               min="16"
               max="58"
               step="1"
@@ -215,6 +262,7 @@ export function GuestForm({
             </span>
             <input
               type="range"
+              data-hl-brightness
               min="300"
               max="2600"
               step="50"
@@ -235,6 +283,7 @@ export function GuestForm({
                 <button
                   key={color}
                   type="button"
+                  data-hl-color={color}
                   className={lighting.color.toLowerCase() === color ? 'is-active' : ''}
                   style={{ '--swatch': color } as CSSProperties}
                   onClick={() => onLightingChange({ color })}
@@ -246,6 +295,7 @@ export function GuestForm({
               <label className="sl-hl-custom" aria-label="Choose a custom light color">
                 <input
                   type="color"
+                  data-hl-custom-color
                   value={lighting.color}
                   onChange={(e) => onLightingChange({ color: e.currentTarget.value })}
                   tabIndex={tabIndex}
@@ -255,7 +305,7 @@ export function GuestForm({
             </div>
           </div>
 
-          <button type="button" className="sl-hl-reset" onClick={onReset} tabIndex={tabIndex}>
+          <button type="button" data-hl-reset className="sl-hl-reset" onClick={onReset} tabIndex={tabIndex}>
             RESET LIGHT <span aria-hidden="true">↗</span>
           </button>
         </aside>

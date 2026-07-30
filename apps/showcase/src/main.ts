@@ -28,7 +28,7 @@ import { setLoaders, LoadersKey } from './registry/loaders';
 import { RegistryKey } from './composables/useRegistry';
 import { SearchKey } from './composables/useSearch';
 import { usePlatform } from './composables/usePlatform';
-import { defaultTokens } from './theme/tokens';
+import { defaultTokens } from './theme/tokens';    
 import { applyThemeToDocument } from './theme/apply-theme';
 
 async function bootstrap() {

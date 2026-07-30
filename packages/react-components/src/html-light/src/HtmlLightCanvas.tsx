@@ -89,6 +89,7 @@ export function HtmlLightCanvas() {
     let frame = 0;
     let animationFrame = 0;
     let resizeFrame = 0;
+    let wakeBudget = 0; // 每次 wake 跑这么多帧后停止,除非再次 wake
     let pulling = false;
     let pullPointerId = -1;
     let beamPointerId = -1;
@@ -295,12 +296,16 @@ export function HtmlLightCanvas() {
 
     lightRigRef.current = { spot, bulbLight, bulbMaterial, glowMaterial, undersideMaterial };
 
-    // HTML-in-Canvas 集成:把表单 DOM 绘制到卡片 mesh 上。
-    // connect 设置 canvas.onpaint 上传纹理;addObject 注册元素并在其上隔离指针事件;
-    // 每帧 update() 重新把表单 matrix3d 定位到 mesh 屏幕投影 + requestPaint。
+    // HTML-in-Canvas 集成 —— 不调 ThreeHTMLRenderer.addObject(它会给所有表单
+    // 后代添加 click/pointerdown 的 stopPropagation,会吞掉 React 合成事件,
+    // 导致灯光面板/表单无法点击)。改为:
+    //   - ThreeHTMLRenderer 仅负责纹理上传(canvas.onpaint → _uploadTextures)
+    //   - HtmlOverlayRenderer 单独把表单 matrix3d 定位到卡片 mesh 的屏幕投影,
+    //     这样表单 DOM 仍在屏幕上的 mesh 位置,鼠标能直接命中真实控件。
     const htmlRenderer = new ThreeHTMLRenderer();
     htmlRenderer.connect(canvas, camera, renderer);
-    htmlRenderer.addObject(pageSource, pageMesh);
+    // 用 overlayRenderer.add 取代 addObject —— 仅加入定位列表,不装事件。
+    htmlRenderer.overlayRenderer.add(pageSource, pageMesh);
 
     function createGlowTexture() {
       const textureCanvas = document.createElement('canvas');
@@ -372,12 +377,22 @@ export function HtmlLightCanvas() {
     function updateRig() {
       let moved = 0;
       if (pulling) {
-        // 手电筒:灯体直接跟随指针,悬浮在指针正上方;光束朝向指针点。
+        // 手电筒:灯体跟随指针,但限制活动范围——
+        //  X 不超出卡片水平范围,Y 不能低于卡片顶端(灯始终悬于卡片上方),
+        //  Y 不超过锚点(天花板),与锚点的距离不超过绳索最大长度。
+        const maxRope = 3.6; // 拖动时绳索最大允许长度
         targetPosition.set(
           THREE.MathUtils.clamp(aimTarget.x, -cardHalfW, cardHalfW),
-          THREE.MathUtils.clamp(aimTarget.y + lampHover, cardBottom + lampHover, anchor.y),
+          THREE.MathUtils.clamp(aimTarget.y + lampHover, cardTop, anchor.y),
           anchor.z,
         );
+        // 距离锚点超过 maxRope 时,把目标拉回到 maxRope 球面内(保留方向)。
+        const offset = tempB.copy(targetPosition).sub(anchor);
+        const dist = offset.length();
+        if (dist > maxRope) {
+          offset.multiplyScalar(maxRope / dist);
+          targetPosition.copy(anchor).add(offset);
+        }
         tempB.copy(position);
         position.lerp(targetPosition, 0.18);
         moved += position.distanceTo(tempB);
@@ -403,21 +418,27 @@ export function HtmlLightCanvas() {
     function animate() {
       animationFrame = 0;
       if (disposed) return;
-      const moved = updateRig();
+      updateRig();
       htmlRenderer.update();
       renderer.render(scene, camera);
       frame += 1;
-      // 只在拖动跟随期间或前几帧渲染;松手即静止,空转让位给空闲。
-      if (moved > 0.0015 || frame < 4) {
+      // 持续渲染:正在拖动,或 wake 还有剩余预算(灯光变化/输入触发);
+      // 不依赖拖动位移(灯静止时灯光控件变化也必须生效)。
+      if (pulling || wakeBudget > 0 || frame < 4) {
+        if (wakeBudget > 0) wakeBudget -= 1;
         animationFrame = requestAnimationFrame(animate);
       }
     }
 
-    function wake() {
+    function wake(frames = 2) {
+      wakeBudget = Math.max(wakeBudget, frames);
       if (!animationFrame && !disposed) {
         animationFrame = requestAnimationFrame(animate);
       }
     }
+
+    // 首次 mount 设够预算以稳定首帧。
+    wake(8);
 
     wakeRef.current = wake;
 
@@ -631,7 +652,9 @@ export function HtmlLightCanvas() {
 
     const canvas = canvasRef.current as HtmlCanvas | null;
     canvas?.requestPaint?.();
-    wakeRef.current?.();
+    // 给几次渲染预算,让灯光面板的颜色/亮度/光束/开关变化真正落到画面上
+    // (循环只在 `pulling || wakeBudget > 0` 时续帧,这里必须充值)。
+    wakeRef.current?.(4);
   }, [lighting]);
 
   function updateLighting(patch: Partial<LightingSettings>) {
