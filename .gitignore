@@ -34,6 +34,9 @@ dist-ssr
 # Temp / scratch
 .tmp/
 
+# Isolated dev tools (Python/ npm scripts) — see tool-isolation skill.
+.tool/
+
 # Cloned reference repositories (nested git repos / dangling gitlinks).
 # These must never be committed — see git-repo-cleanup skill.
 .claude/repo/
