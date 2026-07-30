@@ -252,10 +252,12 @@ onBeforeUnmount(() => {
 <style scoped>
 .sl-pg {
   /* 展示中心把组件挂进 position:fixed / overflow:hidden 的容器(见 DetailPage),
-     窗口本身不会滚动 —— 组件根必须自己做滚动层。对齐 pretext-text-layout 的
-     `height:100% + overflow:auto` 写法。 */
+     窗口本身不会滚动 —— 组件根必须自己做滚动层。
+     用视口高(100dvh,回退 100vh)而不是 height:100%:ShadowRoot 宿主元素是
+     height:auto,百分比链会断,只有视口单位能稳定撑满。 */
   width: 100%;
-  height: 100%;
+  height: 100vh;
+  height: 100dvh;
   overflow-y: auto;
   overflow-x: hidden;
   padding: 3rem 1.5rem;

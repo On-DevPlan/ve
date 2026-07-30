@@ -478,8 +478,10 @@ export function HtmlLightCanvas() {
     }
 
     function onPointerDown(event: PointerEvent) {
-      // 点在表单(或其子元素)上时不拉灯——让输入框正常聚焦/输入。
-      if (event.target !== canvas) return;
+      // 监听挂在 window 上(polyfill 把表单搬到了 document.body 的 host div,
+      // canvas 不一定是事件目标)。点在表单内(输入框/按钮等)时不拉灯,让控件正常工作。
+      const target = event.target;
+      if (target instanceof Element && target.closest('.sl-hl-source')) return;
 
       if (event.button === 2) {
         beamPointerId = event.pointerId;
@@ -605,9 +607,9 @@ export function HtmlLightCanvas() {
       contextEvent.preventDefault();
     }
 
-    canvas.addEventListener('pointerdown', onPointerDown);
     canvas.addEventListener('dblclick', resetMotion);
     canvas.addEventListener('contextmenu', onContextMenu);
+    window.addEventListener('pointerdown', onPointerDown);
     window.addEventListener('pointermove', onPointerMove, { passive: true });
     window.addEventListener('pointerup', onPointerUp);
     window.addEventListener('pointercancel', onPointerUp);
@@ -627,7 +629,7 @@ export function HtmlLightCanvas() {
       disposed = true;
       cancelAnimationFrame(animationFrame);
       cancelAnimationFrame(resizeFrame);
-      canvas.removeEventListener('pointerdown', onPointerDown);
+      window.removeEventListener('pointerdown', onPointerDown);
       canvas.removeEventListener('dblclick', resetMotion);
       canvas.removeEventListener('contextmenu', onContextMenu);
       window.removeEventListener('pointermove', onPointerMove);

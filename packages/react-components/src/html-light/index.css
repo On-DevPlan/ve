@@ -112,11 +112,13 @@
 }
 
 /* 指针事件策略(关键):
-   three-html-render 的 addObject 会把 .sl-hl-source 的 inline pointer-events 设为 auto,
-   并在其上 stopPropagation —— 这会让覆盖在卡片上的整张表单吃掉所有指针事件,
-   导致 canvas 收不到 pointerdown,灯根本拖不动。
-   这里用 !important 把容器压回 none,让空白区域透传给 canvas 去拖灯;
-   只有真正的交互控件(输入框/按钮/标签)重新接收事件,可正常输入/调光。 */
+   three-html-render 的 polyfill 会把表单从 <canvas> 里搬到 document.body 上一个
+   独立的 host div([data-html-in-canvas-host],inline pointer-events:auto),这个 host
+   覆盖在 canvas 之上会吞掉所有指针事件,导致 canvas 收不到 pointerdown、灯拖不动。
+   这里用 !important 把 host 与 .sl-hl-source 都压回 none,让非控件区域落到 canvas
+   去拖灯;只有真正的交互控件(输入框/按钮/标签)重新接收事件,可正常输入/调光。
+   (pointer-events:none 不阻挡 auto 子元素,故控件仍可命中。) */
+[data-html-in-canvas-host],
 .sl-hl-source {
   pointer-events: none !important;
 }
