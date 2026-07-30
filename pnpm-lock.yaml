@@ -187,7 +187,7 @@ importers:
         specifier: ^0.170.0
         version: 0.170.0
       three-html-render:
-        specifier: 0.1.2
+        specifier: ^0.1.2
         version: 0.1.2(three@0.170.0)
     devDependencies:
       '@types/react':
