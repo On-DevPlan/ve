@@ -40,7 +40,6 @@ type LightRig = {
 
 const DOWN = new THREE.Vector3(0, -1, 0);
 const UP = new THREE.Vector3(0, 1, 0);
-const BASE_LIGHT_DIRECTION = DOWN.clone();
 
 export function HtmlLightCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -90,43 +89,36 @@ export function HtmlLightCanvas() {
     let frame = 0;
     let animationFrame = 0;
     let resizeFrame = 0;
-    let lastTime = performance.now();
-    let accumulator = 0;
-    let stableFrames = 0;
     let pulling = false;
     let pullPointerId = -1;
-    let lastPointerTime = 0;
-    let pullStrength = 0;
     let beamPointerId = -1;
     let beamStartX = 0;
     let beamStartY = 0;
     let beamStartAngle = INITIAL_LIGHT.angle;
     let beamDragged = false;
 
-    const fixedStep = 1 / 120;
-    const ropeLength = 1.22;
+    // 手电筒模型:灯没有绳索/重力/摆动,LMB 拖拽时灯体直接跟随指针,松手即停。
+    const ropeLength = 1.22; // 静止/复位时灯距锚点的高度
     const pageTopToAnchor = 1.18;
-    const gravity = new THREE.Vector3(0, -9.81, 0);
+    const lampHover = 1.2; // 拖动时灯悬浮在指针正上方的高度(光束打在指针处)
     const anchor = new THREE.Vector3(0, 4.72, 1.18);
-    const position = new THREE.Vector3(0.16, anchor.y - ropeLength, anchor.z + 0.08);
-    const previous = position.clone().add(new THREE.Vector3(0.018, 0, -0.012));
-    const aimTarget = new THREE.Vector3(0, 0.3, 0.08);
-    const pointerVelocity = new THREE.Vector3();
-    const lastPointerTarget = aimTarget.clone();
+    const position = new THREE.Vector3(0, anchor.y - ropeLength, anchor.z); // 灯当前位置
+    const targetPosition = position.clone(); // 拖动目标(灯平滑跟随,无摆动)
+    const aimTarget = new THREE.Vector3(0, 0, 0.08); // 指针在卡片平面上的投射点
 
-    const temp = new THREE.Vector3();
+    // 卡片范围(夹取 aimTarget 用),resize 里更新
+    let cardHalfW = 6;
+    let cardTop = 4;
+    let cardBottom = -4;
+
     const tempB = new THREE.Vector3();
-    const tempC = new THREE.Vector3();
-    const velocity = new THREE.Vector3();
     const ropeDirection = new THREE.Vector3();
     const lightDirection = new THREE.Vector3();
-    const currentLightDirection = BASE_LIGHT_DIRECTION.clone();
+    const currentLightDirection = DOWN.clone();
     const midpoint = new THREE.Vector3();
-    const swingQuaternion = new THREE.Quaternion();
     const lampQuaternion = new THREE.Quaternion();
     const cableQuaternion = new THREE.Quaternion();
     const pointer = new THREE.Vector2();
-    const lampNdc = new THREE.Vector3();
     const interactionPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -0.08);
     const raycaster = new THREE.Raycaster();
 
@@ -351,12 +343,14 @@ export function HtmlLightCanvas() {
       ceilingCap.position.copy(anchor);
       ceilingCap.position.y += 0.08;
 
+      cardHalfW = pageWidth / 2;
+      cardTop = pageGroup.position.y + pageHeight / 2;
+      cardBottom = pageGroup.position.y - pageHeight / 2;
       if (!pulling) {
-        const constrained = temp.copy(position).sub(anchor);
-        if (constrained.lengthSq() < 0.001) constrained.copy(DOWN);
-        constrained.normalize().multiplyScalar(ropeLength);
-        position.copy(anchor).add(constrained);
-        previous.copy(position);
+        // 静止时灯居中悬停、朝下;resize 后回到默认位。
+        position.set(0, anchor.y - ropeLength, anchor.z);
+        targetPosition.copy(position);
+        currentLightDirection.copy(DOWN);
       }
 
       const fitHeight = pageHeight + 3.1;
@@ -376,82 +370,51 @@ export function HtmlLightCanvas() {
     }
 
     function updateRig() {
-      ropeDirection.copy(position).sub(anchor).normalize();
-      midpoint.copy(anchor).add(position).multiplyScalar(0.5);
-      cable.position.copy(midpoint);
-      cable.scale.set(1, ropeLength, 1);
-      cableQuaternion.setFromUnitVectors(UP, ropeDirection);
-      cable.quaternion.copy(cableQuaternion);
-
+      let moved = 0;
       if (pulling) {
+        // 手电筒:灯体直接跟随指针,悬浮在指针正上方;光束朝向指针点。
+        targetPosition.set(
+          THREE.MathUtils.clamp(aimTarget.x, -cardHalfW, cardHalfW),
+          THREE.MathUtils.clamp(aimTarget.y + lampHover, cardBottom + lampHover, anchor.y),
+          anchor.z,
+        );
+        tempB.copy(position);
+        position.lerp(targetPosition, 0.18);
+        moved += position.distanceTo(tempB);
         lightDirection.copy(aimTarget).sub(position).normalize();
+        moved += currentLightDirection.angleTo(lightDirection);
         currentLightDirection.lerp(lightDirection, 0.32).normalize();
-      } else {
-        swingQuaternion.setFromUnitVectors(DOWN, ropeDirection);
-        lightDirection.copy(BASE_LIGHT_DIRECTION).applyQuaternion(swingQuaternion).normalize();
-        currentLightDirection.lerp(lightDirection, 0.14).normalize();
       }
+
       lampQuaternion.setFromUnitVectors(DOWN, currentLightDirection);
       lampRoot.position.copy(position);
       lampRoot.quaternion.copy(lampQuaternion);
+
+      // 电缆从锚点(天花板)连到灯当前位置(长度随位置变化)。
+      ropeDirection.copy(position).sub(anchor).normalize();
+      midpoint.copy(anchor).add(position).multiplyScalar(0.5);
+      cable.position.copy(midpoint);
+      cable.scale.set(1, anchor.distanceTo(position), 1);
+      cableQuaternion.setFromUnitVectors(UP, ropeDirection);
+      cable.quaternion.copy(cableQuaternion);
+      return moved;
     }
 
-    function stepPhysics() {
-      velocity.copy(position).sub(previous).multiplyScalar(pulling ? 0.985 : 0.9948);
-      previous.copy(position);
-      position.add(velocity).addScaledVector(gravity, fixedStep * fixedStep);
-
-      if (pulling) {
-        // 指针定义一个 3D 平衡方向,距离控制施加比例(像拉伸一根隐形弹簧)。
-        tempB.copy(aimTarget).sub(anchor).normalize();
-        tempB.lerp(DOWN, 1 - pullStrength * 0.82).normalize();
-        tempC.copy(tempB).multiplyScalar(ropeLength).add(anchor).sub(position);
-        temp.copy(position).sub(anchor).normalize();
-        tempC.addScaledVector(temp, -tempC.dot(temp));
-        position.addScaledVector(tempC, 52 * fixedStep * fixedStep);
-      }
-
-      temp.copy(position).sub(anchor);
-      if (temp.lengthSq() < 1e-8) temp.copy(DOWN);
-      temp.normalize().multiplyScalar(ropeLength);
-      position.copy(anchor).add(temp);
-
-      velocity.copy(position).sub(previous);
-      if (pulling) {
-        stableFrames = 0;
-      } else if (velocity.lengthSq() < 0.000000014) {
-        stableFrames += 1;
-      } else {
-        stableFrames = 0;
-      }
-    }
-
-    function animate(time: number) {
+    function animate() {
       animationFrame = 0;
       if (disposed) return;
-
-      const delta = Math.min((time - lastTime) / 1000, 0.05);
-      lastTime = time;
-      accumulator = Math.min(accumulator + delta, fixedStep * 5);
-      while (accumulator >= fixedStep) {
-        stepPhysics();
-        accumulator -= fixedStep;
-      }
-
-      updateRig();
+      const moved = updateRig();
       htmlRenderer.update();
       renderer.render(scene, camera);
       frame += 1;
-
-      if (pulling || stableFrames < 80 || frame < 4) {
+      // 只在拖动跟随期间或前几帧渲染;松手即静止,空转让位给空闲。
+      if (moved > 0.0015 || frame < 4) {
         animationFrame = requestAnimationFrame(animate);
       }
     }
 
     function wake() {
-      stableFrames = 0;
       if (!animationFrame && !disposed) {
-        lastTime = performance.now();
         animationFrame = requestAnimationFrame(animate);
       }
     }
@@ -468,12 +431,8 @@ export function HtmlLightCanvas() {
     function updatePointerTarget(event: PointerEvent) {
       pointerNdc(event);
       if (!raycaster.ray.intersectPlane(interactionPlane, aimTarget)) return false;
-
-      lampNdc.copy(position).project(camera);
-      const distanceX = (pointer.x - lampNdc.x) * camera.aspect;
-      const distanceY = pointer.y - lampNdc.y;
-      const pointerDistance = Math.sqrt(distanceX * distanceX + distanceY * distanceY);
-      pullStrength = THREE.MathUtils.smoothstep(pointerDistance, 0.08, 1.15);
+      aimTarget.x = THREE.MathUtils.clamp(aimTarget.x, -cardHalfW, cardHalfW);
+      aimTarget.y = THREE.MathUtils.clamp(aimTarget.y, cardBottom, cardTop);
       return true;
     }
 
@@ -497,9 +456,6 @@ export function HtmlLightCanvas() {
 
       pulling = true;
       pullPointerId = event.pointerId;
-      lastPointerTime = performance.now();
-      lastPointerTarget.copy(aimTarget);
-      pointerVelocity.set(0, 0, 0);
       canvas.classList.add('is-pulling-light');
       wake();
     }
@@ -524,12 +480,6 @@ export function HtmlLightCanvas() {
       }
       if (!pulling || event.pointerId !== pullPointerId) return;
       if (!updatePointerTarget(event)) return;
-      const now = performance.now();
-      const elapsed = Math.max(0.008, Math.min(0.05, (now - lastPointerTime) / 1000));
-      temp.copy(aimTarget).sub(lastPointerTarget).multiplyScalar(1 / elapsed);
-      pointerVelocity.lerp(temp, 0.34);
-      lastPointerTarget.copy(aimTarget);
-      lastPointerTime = now;
       wake();
     }
 
@@ -553,26 +503,9 @@ export function HtmlLightCanvas() {
       }
       if (!pulling || event.pointerId !== pullPointerId) return;
 
-      // 保留当前运动,叠加指针动量,再加一点回弹脉冲;拉得越远,释放能量越大。
-      velocity.copy(position).sub(previous).multiplyScalar(1 / fixedStep);
-      temp.copy(position).sub(anchor).normalize();
-      pointerVelocity.addScaledVector(temp, -pointerVelocity.dot(temp)).clampLength(0, 6);
-      const pointerTransfer = THREE.MathUtils.lerp(0.055, 0.12, pullStrength);
-      velocity.addScaledVector(pointerVelocity, pointerTransfer);
-
-      tempB.copy(anchor).addScaledVector(DOWN, ropeLength).sub(position);
-      tempB.addScaledVector(temp, -tempB.dot(temp));
-      if (tempB.lengthSq() > 0.0001) {
-        tempB.normalize();
-        const returnImpulse = THREE.MathUtils.lerp(0.32, 1.6, pullStrength);
-        velocity.addScaledVector(tempB, returnImpulse);
-      }
-      velocity.clampLength(0, 4.25);
-      previous.copy(position).addScaledVector(velocity, -fixedStep);
-
+      // 手电筒:松手即停在这里,无回弹、无摆动。
       pulling = false;
       pullPointerId = -1;
-      pullStrength = 0;
       canvas.classList.remove('is-pulling-light');
       wake();
     }
@@ -580,11 +513,10 @@ export function HtmlLightCanvas() {
     function resetMotion() {
       pulling = false;
       pullPointerId = -1;
-      pullStrength = 0;
-      position.copy(anchor).addScaledVector(DOWN, ropeLength);
-      previous.copy(position);
-      pointerVelocity.set(0, 0, 0);
-      currentLightDirection.copy(BASE_LIGHT_DIRECTION);
+      // 复位到居中静止位、朝下。
+      position.set(0, anchor.y - ropeLength, anchor.z);
+      targetPosition.copy(position);
+      currentLightDirection.copy(DOWN);
       canvas.classList.remove('is-pulling-light');
       beamPointerId = -1;
       beamDragged = false;
@@ -615,6 +547,9 @@ export function HtmlLightCanvas() {
     window.addEventListener('pointercancel', onPointerUp);
     window.addEventListener('resize', onResize, { passive: true });
     canvas.addEventListener('paint', onPaint);
+    // 输入时唤醒渲染循环,让表单按键实时回流到 canvas 纹理(避免空闲期看不到输入)。
+    pageSource.addEventListener('input', wake);
+    pageSource.addEventListener('change', wake);
 
     void document.fonts.ready.then(() => {
       if (disposed) return;
@@ -637,6 +572,8 @@ export function HtmlLightCanvas() {
       window.removeEventListener('pointercancel', onPointerUp);
       window.removeEventListener('resize', onResize);
       canvas.removeEventListener('paint', onPaint);
+      pageSource.removeEventListener('input', wake);
+      pageSource.removeEventListener('change', wake);
       // ThreeHTMLRenderer 没有 disconnect();清掉 overlay 对 canvas/camera 的引用即可,
       // 纹理由 WeakMap 持有,随 pageSource / pageMesh 一起回收。
       htmlRenderer.overlayRenderer.disconnect();

@@ -268,8 +268,8 @@ export function GuestForm({
             <i />
           </span>
           <div>
-            <b>LMB PULL · RMB LIGHT</b>
-            <span>Right-drag beam · Right-click color · Double-click reset</span>
+            <b>LMB MOVE · RMB LIGHT</b>
+            <span>Drag the lamp · Right-drag beam · Right-click color · Double-click reset</span>
           </div>
         </div>
         <p>FOUNDATION FIRST — TYPE BELOW</p>
