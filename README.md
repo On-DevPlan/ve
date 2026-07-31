@@ -1,82 +1,145 @@
-# Vue 3 Demo Showcase
+# @style-library/ve
 
-一个基于 Vue 3 + Vite 的组件演示系统，支持组件自动发现和动态路由。
+基于 **Vue 3 + Vite** 的 Vue-host + **React-compatible 微前端**组件演示系统。
+组件由 `component.config.ts` 描述,build 时由 Vite 插件扫盘生成 manifest,
+showcase 应用自动发现、注册、产出路由 —— 加组件 = 写两个文件。
 
-## 特性
+## 仓库结构(pnpm workspace monorepo)
 
-- **组件自动发现**：无需手动配置，自动扫描并注册组件
-- **动态路由**：根据组件配置自动生成路由
-- **全屏展示**：组件以全屏模式展示，无干扰
-- **筛选搜索**：支持按分组、类别和关键词筛选
-- **灰色主题**：简洁的中性灰色界面
+```
+.
+├── apps/
+│   └── showcase/              # 唯一宿主 app:Vue 3 + Vite,同时承载 React 组件
+│                              #   (React 走 packages/mount-adapters 桥接进 ShadowRoot)
+├── packages/
+│   ├── vue-components/        # 全部 Vue 组件 demo,每个 demo 一个目录
+│   ├── react-components/      # 全部 React 组件 demo,每个 demo 一个目录
+│   ├── manifest-generator/    # Vite 插件:扫 component.config.ts → ComponentManifest
+│   ├── mount-adapters/        # Vue/React mount 适配 + ShadowRoot 隔离
+│   └── component-contract/    # TypeScript 类型 + JSON schema("组件协议")
+├── eslint/                    # ESLint 9 flat config 分层:base / vue / react / node / rules
+├── scripts/                   # 原子脚本:lint-fix / lint-summary / lint-loop / commit-lint-clean
+├── docs/                      # architecture / mobile-designs / superpowers / workflow-canvas
+├── .github/workflows/         # lint.yml(PR 触发,3 个并行 job:lint / build / test)
+└── .husky/                    # git hook(pre-commit → lint-staged → eslint)
+```
+
+## 架构骨架
+
+```
+                ┌──────────────────────────────────────────┐
+                │ apps/showcase (Vue 3 + Vite, host SPA)   │
+                │                                          │
+   build 期:    │  vite build                              │
+                │   └─ plugin: @style-library/             │
+                │         manifest-generator               │
+                │   └─ 扫 packages/**/component.config.ts  │
+                │   └─ 产出 ComponentManifest(注入 window) │
+                │                                          │
+   runtime:     │  components/registry      (refs + 列表)  │
+                │  router/RouterRegistrar   (自动注册路由) │
+                │  SearchIndex              (search 模块)  │
+                │                                          │
+                │  组件挂载:                                │
+                │   ├─ Vue  组件 → VueMountAdapter         │
+                │   └─ React 组件 → ReactMountAdapter       │
+                │             → ShadowRootHost(隔离样式)   │
+                └──────────────────────────────────────────┘
+                        ▲                          ▲
+                        │ 协议(component-contract)│
+                        │ ComponentConfig 类型 +  │
+                        │ manifest / route /     │
+                        │ mount / isolation /    │
+                        │ theme 字段             │
+                        │                          │
+   ┌────────────────────┴──────┐         ┌─────────┴────────┐
+   │  packages/vue-components/  │         │ packages/react-  │
+   │  各 demo 目录:              │         │  components/     │
+   │   component.config.ts      │         │  各 demo 目录:    │
+   │   index.vue                │         │   component.config.ts │
+   │                            │         │   index.tsx              │
+   └────────────────────────────┘         └─────────────────────┘
+```
 
 ## 快速开始
 
-### 安装依赖
+> 需要 **Node ≥ 22** + **pnpm ≥ 9**(锁文件 `packageManager` 字段已钉)。
 
 ```bash
-npm install
+pnpm install            # 同时会触发 "prepare" 脚本装 husky 的 hooks
+pnpm dev                # 启动 showcase(app 在 5173,Vite 默认)
+pnpm build              # 产出 apps/showcase/dist
+pnpm preview            # 预览生产构建
 ```
 
-### 开发
+`pnpm install` 后,**pre-commit hook 已就绪** —— 之后每次 `git commit` 都会自动 lint,
+详见 [开发与代码质量](#开发与代码质量)。
 
-```bash
-npm run dev
-```
+## 添加一个新组件 demo
 
-### 构建
+> 适用:在 showcase 里加一个新卡片 + 路由。组件库已在 `packages/` 内提供,详见
+> `apps/showcase/src/registry/` 与 `packages/manifest-generator/`。
 
-```bash
-npm run build
-```
-
-### 预览构建结果
-
-```bash
-npm run preview
-```
-
-## 添加新组件
-
-在 `src/components/` 下创建新目录，包含两个文件：
+挑一个目标框架的包,在 `packages/vue-components/src/<demo-id>/`
+或 `packages/react-components/src/<demo-id>/` 下放两个文件即可:
 
 ```
-src/components/YourDemo/
-├── component.js    # 组件配置
-└── index.vue       # 组件实现
+packages/<vue|react>-components/src/<demo-id>/
+├── component.config.ts        # 组件协议(必填,Vite 插件扫的是这个)
+└── index.vue  或  index.tsx   # 你的实现
 ```
 
-### component.js 示例
+`component.config.ts` 形态参考 `packages/vue-components/src/mobile-nav-v5/component.config.ts`:
 
-```javascript
+```ts
+import type { ComponentConfig } from '@style-library/component-contract';
+
 export default {
-  name: 'YourDemo',
-  title: '您的演示',
-  description: '组件描述',
+  id: 'demo-id',                       // 唯一 id,也是路由 path
+  name: 'DemoComponent',               // 组件名(PascalCase)
+  title: '演示标题',                    // 卡片与详情页标题
+  description: '一句话描述',
   version: '1.0.0',
-  group: 'Demo',
-  category: 'Example',
-  tags: ['demo', 'example'],
-  component: './index.vue',
+  framework: 'vue',                    // 或 'react'
+  entry: './index.vue',                // 相对 component.config.ts
+  group: '分类',                        // 卡片左侧分组
+  category: '类型',                     // 卡片右侧类别
+  tags: ['demo'],
+  platform: 'both',                    // 'desktop' | 'mobile' | 'both'
+  status: 'stable',                    // 'stable' | 'experimental' | 'wip'
   route: {
-    path: '/yourdemo',
-    meta: {
-      title: '您的演示',
-      icon: '🎨'
-    }
+    path: '/components/demo-id',
+    title: '演示标题',
   },
-  fullscreen: true
-}
+  mount: { kind: 'vue', propsMode: 'default' },
+  isolation: { mode: 'shadow-dom' },
+  theme: { mode: 'css-variables', namespace: 'sl' },
+  capabilities: { resizable: true, fullscreen: false, fullscreenMode: 'container' },
+} satisfies ComponentConfig;
 ```
 
-组件会自动被发现并在首页展示。
+字段的全部契约见 [`packages/component-contract/src/types.ts`](packages/component-contract/src/types.ts)
+(spec §4 ComponentConfig / §5 Manifest)。
+
+加完两个文件、跑 `pnpm dev`,showcase 会**自动发现**该组件,
+首页出现新卡片、`/components/<demo-id>` 出现新详情页 —— 无需改 showcase 源码。
+
+## 协议与构建产物
+
+- **`@style-library/component-contract`** —— 组件配置的类型与 JSON schema 单一来源。
+  调整字段 = 同时改这一处 + 必跑 `pnpm test`(generator / adapter / validator 都依赖)。
+- **`@style-library/manifest-generator`** —— Vite 插件,扫 `component.config.ts` 输出 `ComponentManifest`。
+- **`@style-library/mount-adapters`** —— `VueMountAdapter` / `ReactMountAdapter`、
+  `ShadowRootHost`(隔离样式)、`AdapterFactory`(按 manifest.mount.kind 派发)。
 
 ## 技术栈
 
-- Vue 3 (Composition API)
-- Vite
-- Vue Router
-- Three.js
+- **宿主**:Vue 3(Composition API)+ Vite 5
+- **辅助栈**:Vue Router(自动生成)+ Lucide icons(@lucide/vue)
+- **微前端能力**:React 19 组件可 mount 入 Vue host(`packages/mount-adapters`)
+- **隔离**:ShadowRoot(`packages/mount-adapters` 的 `ShadowRootHost`)
+- **协议**:TypeScript + JSON Schema,见 `packages/component-contract`
+- **构建产物**:静态 SPA(容器化见 `Dockerfile`)
 
 ## 开发与代码质量
 
@@ -119,22 +182,8 @@ git commit --no-verify -m "..."
 
 **不应成为习惯。** 走 PR 时 CI 仍会拦下同样的问题。
 
-## 项目结构
+## 参考
 
-```
-src/
-├── components/           # 组件目录
-│   └── ComponentName/
-│       ├── component.js  # 组件配置
-│       └── index.vue     # 组件实现
-├── router/              # 路由配置
-├── utils/               # 工具函数
-│   ├── componentDiscovery.js  # 组件自动发现
-│   └── dynamicImports.js      # 动态导入
-├── views/               # 页面视图
-│   ├── Home.vue         # 首页（组件列表）
-│   └── ComponentView.vue # 组件详情页
-└── App.vue              # 根组件
-```
-
-详细说明请参阅 [CLAUDE.md](./CLAUDE.md)
+- [`packages/component-contract/src/types.ts`](packages/component-contract/src/types.ts) —— 组件协议类型源
+- [`docs/architecture/framework-architecture-review.md`](docs/architecture/framework-architecture-review.md) —— 整体架构评审
+- [`docs/architecture/manifest-loader-reconciliation.md`](docs/architecture/manifest-loader-reconciliation.md) —— manifest 与 loader 的对齐
