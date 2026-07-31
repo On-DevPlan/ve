@@ -1,10 +1,14 @@
 #!/usr/bin/env node
 // 原子脚本:聚合 ESLint JSON 报告,按"规则"输出表格。
-// 由 `pnpm lint:summary` 调用。
+// 由 `pnpm lint:summary` / `pnpm lint:summary:strict` 调用。
 //
-// 两种模式:
+// 三种模式:
 //   默认(stdin):    从 stdin 读 ESLint --format=json 输出(兼容旧调用方)
 //   --self:        内部跑 eslint + 摘要,不依赖外部预生成的报告文件
+//   --strict       在两种模式上叠加:发现 error OR warning 即 exit 1。
+//                  默认不传 --strict 时仍按"只读摘要"语义 exit 0,
+//                  避免与 lint-summary.test.mjs 的既有断言和 lint-loop.mjs
+//                  的透传语义冲突。
 //
 // 输出:
 //   1) stdout:人类可读的"文件数 / 错误数 / 警告数 + 按规则聚合的表"
@@ -58,6 +62,13 @@ function summarize(reports) {
 }
 
 async function main() {
+  // 解析 CLI flag
+  // --strict:退出码变"语义门禁" —— errors>0 OR warnings>0 时 exit 1
+  // 默认(无 --strict):维持"只读摘要"语义,exit 0,与
+  // scripts/__tests__/lint-summary.test.mjs 的现有断言 + lint-loop.mjs / commit-lint-clean.mjs
+  // 对 --strict 缺失的透传语义保持兼容
+  const strict = process.argv.includes('--strict');
+
   // 拿原始 JSON
   let raw;
   if (process.argv.includes('--self')) {
@@ -92,6 +103,12 @@ async function main() {
   }
   // 机器可读 JSON,便于下游脚本(比如 CI)继续消费
   process.stdout.write(JSON.stringify({ errors, warnings, byRule: rows }, null, 2));
+
+  // --strict 门禁:任一错误或警告就退出非零,让上层(CI / hook)能据此拦截。
+  // 故意放在所有输出写完之后,避免被解析脚本吞掉表格内容。
+  if (strict && (errors > 0 || warnings > 0)) {
+    process.exit(1);
+  }
 }
 
 main();

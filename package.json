@@ -15,6 +15,7 @@
     "lint": "eslint . --max-warnings=0 --format=json --output-file=eslint-report.json",
     "lint:fix": "node scripts/lint-fix.mjs",
     "lint:summary": "node scripts/lint-summary.mjs --self",
+    "lint:summary:strict": "node scripts/lint-summary.mjs --self --strict",
     "lint:loop": "node scripts/lint-loop.mjs",
     "test": "vitest run",
     "prepare": "husky"
