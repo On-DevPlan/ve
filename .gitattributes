@@ -1,0 +1,4 @@
+# Husky hook scripts must keep LF line endings.
+# CRLF breaks them under `sh` on Windows (the trailing \r causes
+# "command not found" when git invokes the hook).
+.husky/* text eol=lf

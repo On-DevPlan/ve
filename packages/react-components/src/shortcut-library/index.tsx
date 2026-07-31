@@ -17,11 +17,6 @@ import Sidebar from './Sidebar';
 import ShortcutTable from './ShortcutTable';
 import Keyboard from './Keyboard';
 
-// 按下后高亮停留时间 —— transition 渐变时长写在 CSS 中
-const FLASH_DURATION_MS = 280;
-// flash 节流:同一个 code 在 50ms 内重复触发,不重新启动 setTimeout。
-// 自动连发(R-repeat 60Hz)时,这是必要的视觉去抖。
-const FLASH_THROTTLE_MS = 50;
 // 物理键盘长按阈值 —— 按住多少毫秒后弹 mapping popup。
 // 800ms 跟「习惯的单击」区分得开(普通人单击<300ms),又不会让用户等太久。
 const KEY_HOLD_MS = 800;

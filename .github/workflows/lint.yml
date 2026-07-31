@@ -1,7 +1,9 @@
 name: lint
+
+# 只在 PR 上跑:合并前的最终闸门,而不是"推到默认分支后才报错"。
+# 不带 branches 限定 → 所有目标分支(main / deploy)的 PR 都触发,避免漏分支。
+# 不监听 push:提交前由本地 pre-commit hook 兜底,merge 流程由 PR 保证。
 on:
-  push:
-    branches: [main]
   pull_request:
 
 jobs:
@@ -15,6 +17,30 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm lint
-      - run: pnpm --filter @style-library/showcase build
-      - run: pnpm exec vitest run
+      # 直接用默认(人类可读)格式,--max-warnings=0 保持严格。
+      # 不要用 `pnpm lint`:那个是 --format=json --output-file,CI 控制台看不到报错内容。
+      - run: pnpm exec eslint . --max-warnings=0
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
