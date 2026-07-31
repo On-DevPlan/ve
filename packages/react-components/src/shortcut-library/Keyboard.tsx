@@ -2,22 +2,21 @@
 // 接收 highlightedCodes 集合,把对应键渲染为"按下"状态
 // 风格参考 zfrontier:flat,两态(浅色未按,深色按下)
 //
-// 每个键是独立的 Key 子组件:
-//   - 鼠标按住 ≥ LONG_PRESS_MS → 通过 onLongPress(code, rect) 让父组件弹 mapping popup
-//   - onPointerLeave/Up/Cancel → 取消长按计时器
-//   - 短按(< LONG_PRESS_MS)不触发任何回调 —— 视觉上已有的 flash 是父组件的全局 keydown 监听负责
+// 长按交互统一模型:
+//   - 鼠标按下 visual key: 立即 onPress(加入 heldKeys 变蓝)+ 父组件启动
+//     800ms hold timer;命中后弹 mapping popup;onRelease 清掉
+//   - 物理键按下: 立即加 heldKeys + 800ms hold timer;命中弹 popup;keyup 清掉
+// 两种入口通过父组件统一管理 heldKeys + 800ms 倒计时,视觉态完全一致。
 
-import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useRef, type PointerEvent as ReactPointerEvent } from 'react';
 
 interface Props {
   highlightedCodes: Set<string>;
   hoveredCodes: Set<string>;
-  flashCodes?: Set<string>;
-  onLongPress?: (code: string, rect: DOMRect) => void;
+  heldKeys?: Set<string>;
+  onPress?: (code: string) => void;
+  onRelease?: (code: string) => void;
 }
-
-// 长按阈值 —— 必须与父组件保持一致
-const LONG_PRESS_MS = 250;
 
 // 物理布局——按物理行而非逻辑 row(用户的 Ctrl 是 ControlLeft)
 const ROWS: Array<Array<{ code: string; label: string; w?: number }>> = [
@@ -84,12 +83,14 @@ function ModifierAlias({ code }: { code: string }) {
   return null;
 }
 
-// 单个键 —— 自带 long-press timer,鼠标按下 ≥ 250ms 触发 onLongPress。
-// 用 pointer events 同时覆盖鼠标和触屏;键盘路径仍由父组件的全局 keydown 监听负责。
+// 单个键 —— 视觉态完全由 props 决定:
+//   isOn:     来自父组件的 highlightedCodes(录入 3s 高亮)
+//   isHeld:   来自父组件的 heldKeys(物理键盘 / 鼠标长按中,键被按住)
+//   isHover:  来自父组件的 hoveredCodes(表格行 hover 高亮)
 //
-// 按下时立即进入稳定的 is-pressed 视觉态(短 transition,避免基态→按下态的 0.24s
-// 颜色渐变造成"闪一下"的错觉),松开/移出/取消时清掉。
-// long-press 命中后 popup 由父组件管理关闭,我们只清 timer。
+// 鼠标 / 触屏按压完全交给父组件管:pointerdown 调 onPress、pointerup /
+// leave / cancel 调 onRelease。父组件维护 heldKeys 集合 + 启动 hold
+// 倒计时 + 命中弹 mapping popup。
 interface KeyProps {
   code: string;
   label: string;
@@ -97,67 +98,62 @@ interface KeyProps {
   height: number;
   isOn: boolean;
   isHover: boolean;
-  isFlash: boolean;
-  onLongPress?: (code: string, rect: DOMRect) => void;
+  isHeld: boolean;
+  onPress?: (code: string) => void;
+  onRelease?: (code: string) => void;
 }
 
-function Key({ code, label, width, height, isOn, isHover, isFlash, onLongPress }: KeyProps) {
-  const timerRef = useRef<number | null>(null);
+function Key({ code, label, width, height, isOn, isHover, isHeld, onPress, onRelease }: KeyProps) {
   const elRef = useRef<HTMLDivElement>(null);
-  // 鼠标按下中。Local state,不参与父组件重渲染,避免一次按键触发整树 reconcile。
-  const [pressed, setPressed] = useState(false);
-
-  const cancel = useCallback(() => {
-    if (timerRef.current !== null) {
-      window.clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-  }, []);
-
-  // 卸载时清理 timer + 视觉态
-  useEffect(() => {
-    return () => cancel();
-  }, [cancel]);
 
   const handlePointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     // 鼠标主键(或触屏)才触发;右键/中键忽略
     if (e.pointerType === 'mouse' && e.button !== 0) return;
-    setPressed(true);
-    if (!onLongPress) return;
-    cancel();
-    timerRef.current = window.setTimeout(() => {
-      const el = elRef.current;
-      if (!el) return;
-      onLongPress(code, el.getBoundingClientRect());
-    }, LONG_PRESS_MS);
+    if (!onPress) return;
+    // 父组件不需要 rect,它在 timer 命中那一刻自己查 DOM 取最新位置
+    // (支持 hover / scroll 时 key 位置变化)。
+    onPress(code);
   };
 
-  const releasePressed = () => {
-    cancel();
-    setPressed(false);
+  const handlePointerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
+    // 只在主键释放时通知父组件;右键/中键释放直接忽略
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    if (!onRelease) return;
+    onRelease(code);
+  };
+
+  // pointerleave / pointercancel:放弃本次按压
+  // 注:pointerleave 不冒泡,React 17+ 在 document 监听时可能收不到,
+  // 我们改用 onPointerOut(pointerout 是冒泡版本)同时挂两个保险。
+  const handleCancel = () => {
+    if (!onRelease) return;
+    onRelease(code);
   };
 
   return (
     <div
       ref={elRef}
-      className={`sl-sl-kb__key ${isOn ? 'is-on' : ''} ${isHover ? 'is-hover' : ''} ${isFlash ? 'is-flash' : ''} ${pressed ? 'is-pressed' : ''}`}
+      className={`sl-sl-kb__key ${isOn || isHeld ? 'is-on' : ''} ${isHover ? 'is-hover' : ''}`}
       style={{ width, height }}
       title={code}
+      data-shortcut-code={code}
       onPointerDown={handlePointerDown}
-      onPointerUp={releasePressed}
-      onPointerLeave={releasePressed}
-      onPointerCancel={releasePressed}
+      onPointerUp={handlePointerUp}
+      onPointerLeave={handleCancel}
+      onPointerOut={handleCancel}
+      onPointerCancel={handleCancel}
     >
       {label && <span className="sl-sl-kb__label">{label}</span>}
-      {isOn && <ModifierAlias code={code} />}
+      {(isOn || isHeld) && <ModifierAlias code={code} />}
     </div>
   );
 }
 
-export default function Keyboard({ highlightedCodes, hoveredCodes, flashCodes, onLongPress }: Props) {
+export default function Keyboard({ highlightedCodes, hoveredCodes, heldKeys, onPress, onRelease }: Props) {
   // 单元宽 56px,gap 4px
   const UNIT = 56;
   const GAP = 4;
+  const heldSet = heldKeys ?? new Set<string>();
 
   return (
     <div className="sl-sl-kb">
@@ -166,7 +162,7 @@ export default function Keyboard({ highlightedCodes, hoveredCodes, flashCodes, o
           {row.map((key) => {
             const isOn = highlightedCodes.has(key.code);
             const isHover = hoveredCodes.has(key.code);
-            const isFlash = flashCodes?.has(key.code) ?? false;
+            const isHeld = heldSet.has(key.code);
             const w = (key.w ?? 1) * UNIT + (key.w ? (key.w - 1) * GAP : 0);
             return (
               <Key
@@ -177,8 +173,9 @@ export default function Keyboard({ highlightedCodes, hoveredCodes, flashCodes, o
                 height={UNIT}
                 isOn={isOn}
                 isHover={isHover}
-                isFlash={isFlash}
-                onLongPress={onLongPress}
+                isHeld={isHeld}
+                onPress={onPress}
+                onRelease={onRelease}
               />
             );
           })}

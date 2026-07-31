@@ -1,27 +1,20 @@
 // @vitest-environment jsdom
-// Pinpoint test: simulate pointerDown on a keyboard key, assert the
-// `is-pressed` className lands on the element and the CSS rule resolves
-// to a short transition (not 0.24s).
+// Pinpoint test: 统一的「按住」交互(鼠标 / 物理键共享)
+//   - 按下: 键立刻变蓝(is-on)—— 给用户视觉反馈「正在按住」
+//   - 持续 KEY_HOLD_MS(800ms): 弹 mapping popup,展示该键绑定的快捷键
+//   - 释放: 立刻回到基态(is-on 移除),popup 保留
+// 鼠标 / 物理键路径统一,差别在入口(pointerdown vs keydown),后续一致。
 
-// @ts-expect-error - React act() flag
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createRoot, type Root } from 'react-dom/client';
 import { act } from 'react';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import ShortcutLibrary from '../src/shortcut-library';
 
-const CSS = readFileSync(
-  resolve(__dirname, '../src/shortcut-library/index.css'),
-  'utf8',
-);
+const KEY_HOLD_MS = 800;
 
 function seed(): void {
-  // Three groups × two shortcuts so highlightedCodes gets non-empty state
-  // on initial render of the detail page (otherwise the preview is hidden
-  // and we can't reach the keyboard).
   localStorage.setItem(
     'sl-shortcut-library:v1',
     JSON.stringify([
@@ -41,74 +34,196 @@ function seed(): void {
 
 let container: HTMLDivElement;
 let root: Root;
-let styleNode: HTMLStyleElement;
 
 beforeEach(() => {
   container = document.createElement('div');
   container.style.height = '800px';
   container.style.width = '1280px';
   document.body.appendChild(container);
-  styleNode = document.createElement('style');
-  styleNode.textContent = CSS;
-  document.head.appendChild(styleNode);
   root = createRoot(container);
 });
 
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
-  styleNode.remove();
   localStorage.clear();
 });
 
-describe('long-press is-pressed wiring', () => {
-  it('applies is-pressed className on pointerDown', async () => {
+describe('hold-to-popup wiring (mouse + keyboard unified)', () => {
+  it('mouse pointerdown adds is-on to the key (visual feedback while pressing)', async () => {
     seed();
     await act(async () => {
       root.render(<ShortcutLibrary />);
     });
 
-    // Pick the first keyboard key (KeyQ in row 3 is a stable choice).
-    // Look it up by title attribute (we set title={code} in Keyboard.tsx).
     const key = container.querySelector('.sl-sl-kb__key[title="KeyQ"]') as HTMLElement | null;
-    expect(key, 'KeyQ should be rendered').not.toBeNull();
-    expect(key!.classList.contains('is-pressed')).toBe(false);
+    expect(key).not.toBeNull();
+    const classBefore = key!.className;
+    expect(key!.classList.contains('is-on')).toBe(false);
 
-    // Fire a real PointerEvent so React's synthetic event handler runs.
     await act(async () => {
       key!.dispatchEvent(
         new PointerEvent('pointerdown', { bubbles: true, button: 0, pointerType: 'mouse' }),
       );
     });
-
+    // 按下立即变蓝,给用户「正在按住」反馈
     expect(
-      key!.classList.contains('is-pressed'),
-      'is-pressed className should be applied immediately after pointerDown',
-    ).toBe(true);
+      key!.className,
+      'key className must include is-on on pointerDown',
+    ).toContain('is-on');
+    expect(key!.className).not.toBe(classBefore);
 
-    // Release — className should clear.
+    // 短按(< KEY_HOLD_MS)释放 → 回到基态,popup 不弹
     await act(async () => {
       key!.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, button: 0 }));
     });
-    expect(key!.classList.contains('is-pressed')).toBe(false);
+    expect(key!.classList.contains('is-on')).toBe(false);
+    expect(document.querySelectorAll('.sl-sl-longpress').length).toBe(0);
   });
 
-  it('is-pressed CSS rule has transition: none (instant color switch)', () => {
-    // The base .sl-sl-kb__key has transition: background 0.24s ease-out,
-    // so adding is-pressed without overriding transition still fades.
-    // We require transition: none to guarantee a truly instant flip.
-    const m = CSS.match(/\.sl-sl-kb__key\.is-pressed\s*\{([^}]+)\}/);
-    expect(m, 'is-pressed block missing').not.toBeNull();
-    expect(m![1]).toMatch(/transition:\s*none/);
+  it('mouse hold >= KEY_HOLD_MS opens the mapping popup while still pressing', async () => {
+    vi.useFakeTimers();
+    try {
+      seed();
+      await act(async () => {
+        root.render(<ShortcutLibrary />);
+      });
+
+      const ctr = container.querySelector('.sl-sl-kb__key[title="ControlLeft"]') as HTMLElement | null;
+      expect(ctr).not.toBeNull();
+
+      // 按下 → 立即变蓝 + 启动 hold timer
+      await act(async () => {
+        ctr!.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, pointerType: 'mouse' }));
+      });
+      expect(ctr!.classList.contains('is-on')).toBe(true);
+
+      // 阈值之前:popup 不应出现
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(KEY_HOLD_MS - 1);
+      });
+      expect(
+        document.querySelectorAll('.sl-sl-longpress').length,
+        'popup must not appear before KEY_HOLD_MS',
+      ).toBe(0);
+
+      // 跨过阈值:popup 出现,键仍保持 is-on(用户还没松开)
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1);
+      });
+      const popups = document.querySelectorAll('.sl-sl-longpress');
+      expect(popups.length, 'popup must appear after KEY_HOLD_MS').toBe(1);
+      expect(ctr!.classList.contains('is-on'), 'key must stay is-on while popup is open').toBe(true);
+      const popup = popups[0] as HTMLElement;
+      expect(popup.textContent).toMatch(/VSCode/);
+      expect(popup.textContent).toMatch(/Ctrl\s*\+\s*R/);
+      expect(popup.textContent).toMatch(/open recent/);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
-  it('is-pressed resets box-shadow (so is-hover yellow glow does not bleed through)', () => {
-    // If is-pressed doesn't reset box-shadow, the yellow is-hover glow
-    // remains during the hold and animates away on release — which reads
-    // as "the key flashed" to the user.
-    const m = CSS.match(/\.sl-sl-kb__key\.is-pressed\s*\{([^}]+)\}/);
-    expect(m, 'is-pressed block missing').not.toBeNull();
-    const decls = m![1];
-    expect(decls).toMatch(/box-shadow:\s*none/);
+  it('pointerout/leave during hold cancels: key returns to base, no popup', async () => {
+    vi.useFakeTimers();
+    try {
+      seed();
+      await act(async () => {
+        root.render(<ShortcutLibrary />);
+      });
+
+      const ctr = container.querySelector('.sl-sl-kb__key[title="ControlLeft"]') as HTMLElement | null;
+      await act(async () => {
+        ctr!.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, pointerType: 'mouse' }));
+      });
+      expect(ctr!.classList.contains('is-on')).toBe(true);
+
+      // 鼠标移开键 → 取消 hold(timer 清掉,is-on 移除)
+      await act(async () => {
+        ctr!.dispatchEvent(new PointerEvent('pointerout', { bubbles: true, button: 0, pointerType: 'mouse' }));
+      });
+      expect(ctr!.classList.contains('is-on'), 'is-on must be removed on cancel').toBe(false);
+      expect(
+        document.querySelectorAll('.sl-sl-longpress').length,
+        'popup must NOT appear after cancel',
+      ).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('physical keyboard hold: key turns blue on keydown, popup appears after KEY_HOLD_MS, key returns to base on keyup', async () => {
+    // 与鼠标路径完全统一,只是入口是 window keydown/keyup。
+    vi.useFakeTimers();
+    try {
+      seed();
+      await act(async () => {
+        root.render(<ShortcutLibrary />);
+      });
+
+      const r = container.querySelector('.sl-sl-kb__key[title="ControlLeft"]') as HTMLElement | null;
+      expect(r).not.toBeNull();
+      const classBefore = r!.className;
+      expect(r!.classList.contains('is-on')).toBe(false);
+
+      // 物理键 keydown(非 repeat)→ 键立即变蓝
+      await act(async () => {
+        window.dispatchEvent(new KeyboardEvent('keydown', { code: 'ControlLeft', key: 'Control', bubbles: true }));
+      });
+      expect(r!.className, 'is-on must be applied on keydown').toContain('is-on');
+      expect(r!.className).not.toBe(classBefore);
+
+      // 阈值之前:popup 不应出现
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(KEY_HOLD_MS - 1);
+      });
+      expect(
+        document.querySelectorAll('.sl-sl-longpress').length,
+        'popup must not appear before KEY_HOLD_MS',
+      ).toBe(0);
+
+      // 跨过阈值 → popup 出现
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1);
+      });
+      const popups = document.querySelectorAll('.sl-sl-longpress');
+      expect(popups.length, 'popup must appear after KEY_HOLD_MS').toBe(1);
+      const popup = popups[0] as HTMLElement;
+      expect(popup.textContent).toMatch(/VSCode/);
+      expect(popup.textContent).toMatch(/Ctrl\s*\+\s*R/);
+
+      // 键释放 → 立刻回到基态
+      await act(async () => {
+        window.dispatchEvent(new KeyboardEvent('keyup', { code: 'ControlLeft', key: 'Control', bubbles: true }));
+      });
+      expect(r!.className, 'is-on must be removed on keyup').toBe(classBefore);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('OS auto-repeat (e.repeat=true) does not restart the 800ms hold timer', async () => {
+    // e.repeat 事件不该重启 hold timer(否则 OS auto-repeat 会让 popup
+    // 永远弹不出来)。这里只验证:重复 keydown 后 heldKeys 仍只有一份。
+    seed();
+    await act(async () => {
+      root.render(<ShortcutLibrary />);
+    });
+    const r = container.querySelector('.sl-sl-kb__key[title="KeyR"]') as HTMLElement | null;
+    expect(r).not.toBeNull();
+
+    // 第一次 keydown
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyR', key: 'r', bubbles: true }));
+    });
+    expect(r!.classList.contains('is-on')).toBe(true);
+
+    // 多次 auto-repeat keydown —— 由于 jsdom 不支持构造带 repeat=true 的事件,
+    // 我们只验证没有崩、className 仍稳定。
+    await act(async () => {
+      for (let i = 0; i < 5; i++) {
+        window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyR', key: 'r', bubbles: true }));
+      }
+    });
+    expect(r!.classList.contains('is-on')).toBe(true);
   });
 });

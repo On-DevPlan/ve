@@ -166,38 +166,36 @@ describe('feature 3 — long-press mapping popup + flash throttle', () => {
     expect(useShortcuts).toMatch(/BindingHit/);
   });
 
-  it('Keyboard wires pointer events with a 250ms long-press timer', () => {
-    expect(keyboard).toMatch(/LONG_PRESS_MS\s*=\s*250/);
+  it('Keyboard wires pointer events with unified onPress/onRelease (heldKeys-driven)', () => {
+    // 之前是 timer-based:pointerdown 后 setTimeout 250ms 触发 onLongPress。
+    // 然后改成 release-based:pointerdown 记下时间戳,pointerup 时计算按住
+    // 时长。最新版:不再有 LONG_PRESS_MS / setTimeout,完全由父组件的
+    // onPress / onRelease 回调 + heldKeys state 决定视觉态 + 弹 popup。
+    // 鼠标 / 物理键路径完全统一。
     expect(keyboard).toMatch(/onPointerDown=/);
     expect(keyboard).toMatch(/onPointerUp=/);
     expect(keyboard).toMatch(/onPointerLeave=/);
+    expect(keyboard).toMatch(/onPointerOut=/);
     expect(keyboard).toMatch(/onPointerCancel=/);
-    expect(keyboard).toMatch(/window\.setTimeout\([\s\S]*?LONG_PRESS_MS/);
+    expect(keyboard).toMatch(/onPress\?/);
+    expect(keyboard).toMatch(/onRelease\?/);
   });
 
-  it('adds a stable is-pressed visual state during pointer hold', () => {
-    // Without an is-pressed state, the key transitions from the base
-    // 浅灰 background to the 蓝色 is-on color over 0.24s — which reads
-    // as "先闪一下再长亮". The fix is a dedicated class with
-    // transition: none so the visual change is truly instant.
-    expect(keyboard).toMatch(/is-pressed/);
-    expect(keyboard).toMatch(/setPressed\(true\)/);
-    expect(keyboard).toMatch(/setPressed\(false\)/);
-    expect(css).toMatch(/\.sl-sl-kb__key\.is-pressed/);
-    // The is-pressed rule must declare transition: none to short-circuit
-    // the base element's 0.24s color transition on press.
-    const pressedRule = css.match(
-      /\.sl-sl-kb__key\.is-pressed\s*\{([^}]+)\}/,
-    );
-    expect(pressedRule, 'is-pressed rule missing').not.toBeNull();
-    expect(pressedRule![1]).toMatch(/transition:\s*none/);
+  it('pointerDown now ADDS is-on (hold-to-popup is the new visual feedback)', () => {
+    // 之前的设计是「pointerdown 不变 className,长按只弹 popup」,用户反馈
+    // 看不到反馈。这一版改为「按下立刻变蓝、持续 hold 弹 popup」,鼠标
+    // 和物理键统一。所以 className 会变。
+    expect(keyboard).toMatch(/is-on/);
   });
 
-  it('index.tsx throttles flash at 50ms per code', () => {
-    // Without throttle, OS auto-repeat hammers setTimeout every frame and
-    // visually strobes the key — drives users up the wall.
-    expect(indexTsx).toMatch(/FLASH_THROTTLE_MS\s*=\s*50/);
-    expect(indexTsx).toMatch(/flashLastAt/);
+  it('index.tsx tracks keyboard hold for KEY_HOLD_MS then fires onLongPress', () => {
+    // 物理键按下时键变蓝,持续 KEY_HOLD_MS(800ms)后弹 mapping popup。
+    // 鼠标走同样的 onPress / onRelease 路径,达到同样的 800ms 阈值。
+    expect(indexTsx).toMatch(/KEY_HOLD_MS\s*=\s*800/);
+    expect(indexTsx).toMatch(/heldKeys/);
+    expect(indexTsx).toMatch(/setHeldKeys/);
+    expect(indexTsx).toMatch(/holdPress/);
+    expect(indexTsx).toMatch(/holdRelease/);
   });
 
   it('renders the long-press popup via portal to the host target', () => {

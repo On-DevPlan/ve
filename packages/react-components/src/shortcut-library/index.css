@@ -442,6 +442,8 @@
   border-color: #1d4ed8;
   color: #fff;
   transform: translateY(1px);
+  /* 物理键 / 鼠标长按中要稳态,不能有 0.24s 渐变,否则会看到「闪一下再亮」 */
+  transition: none;
 }
 .sl-sl-kb__key.is-hover {
   background: var(--sl-hover-bg, #fef3c7);
@@ -450,31 +452,10 @@
   transform: translateY(1px);
   box-shadow: 0 0 0 2px var(--sl-hover-glow, rgba(245, 158, 11, 0.25));
 }
-/* 物理按键瞬时高亮 —— 比 is-on 略浅,让"已录入"和"刚刚按过"视觉上分开 */
-.sl-sl-kb__key.is-flash {
-  background: var(--sl-color-primary, #2563eb);
-  border-color: var(--sl-color-primary, #2563eb);
-  color: #fff;
-  transform: translateY(2px);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
-}
-/* 鼠标长按中 —— 视觉上是"已按下"的稳定态,与 is-flash 区别在于:
-   1. 没有外发光(像在"按下去但没弹起来")
-   2. transition: none —— 不接受任何颜色过渡,按下/松开都是瞬时切换。
-      之前用 0.05s 短过渡是错的:即便 50ms,在某些屏幕刷新率(240Hz)
-      下仍能被感知到「闪一下再稳定」。直接 transition: none 是唯一
-      保证「瞬间切换」的做法。
-   3. 与 is-on 视觉一致,语义都是"已按下"
-   4. 显式重置 box-shadow: none —— 否则 is-hover 的黄色外发光会和
-      蓝色背景并存,松开时 box-shadow 从蓝→黄过渡 0.24s,看起来像"闪" */
-.sl-sl-kb__key.is-pressed {
-  background: var(--sl-color-primary, #2563eb);
-  border-color: #1d4ed8;
-  color: #fff;
-  transform: translateY(1px);
-  box-shadow: none;
-  transition: none;
-}
+/* is-on 已经覆盖物理键被按住的蓝色高亮,is-flash 之前是瞬时反馈用的,
+   新的设计里按住 visual key 用 heldKeys prop 走 is-on 路径(蓝底 + 稳定),
+   物理键盘按住也走 is-on 路径,is-flash 整体不再被使用。 */
+
 .sl-sl-kb__alias {
   position: absolute;
   top: -16px;
