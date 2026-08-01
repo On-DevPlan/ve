@@ -13,7 +13,7 @@
 import fs from 'node:fs'; // 读 manifest.schema.json
 import path from 'node:path'; // resolve schema 路径
 import { fileURLToPath } from 'node:url'; // URL → 路径
-import type { Plugin } from 'vite'; // Vite 插件类型
+import type { Plugin, ViteDevServer } from 'vite'; // Vite 插件类型
 import { scanConfigs } from './scanner.ts'; // 扫描 + 校验
 import { generateManifest } from './generator.ts'; // 生成 manifest
 import { buildLoaderInventory } from './loader-inventory.ts'; // 扫 loader(对账用)
@@ -139,19 +139,7 @@ export function manifestPlugin(opts: ManifestPluginOptions): Plugin & {
 
     // configureServer 钩子:仅 dev 跑(被 Vite dev server 调用)
     // server.middlewares 是 connect 实例,server.watcher 是 chokidar 包装,server.ws 是 ws server
-    configureServer(server: {
-      middlewares: {
-        use: (
-          path: string,
-          handler: (
-            req: unknown,
-            res: { statusCode: number; setHeader: (k: string, v: string) => void; end: (s: string) => void },
-          ) => void,
-        ) => void;
-      };
-      watcher: { on: (ev: string, cb: (file: string) => void) => void };
-      ws: { send: (m: { type: string }) => void };
-    }) {
+    configureServer(server: ViteDevServer) {
       // dev 路由:GET /__component-manifest.json
       const route = '/__component-manifest.json';
       // watcher debounce 计时器(文件写入竞态合并)

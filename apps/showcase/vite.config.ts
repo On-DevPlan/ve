@@ -14,31 +14,51 @@
 import { defineConfig } from 'vite'; // Vite 配置工厂
 import vue from '@vitejs/plugin-vue'; // Vue 3 SFC 插件
 import react from '@vitejs/plugin-react'; // React 19 插件
-// 仓库内 workspace 包:让 dev 中间件 + prod emit 都能产出 component-manifest
-import { manifestPlugin } from '@style-library/manifest-generator';
+// 仓库内 workspace 包:
+//   - manifestPlugin: 生成 component manifest(dev/prod 都用)
+//   - mfeDynamicProxy: 组件级 dev proxy,声明见各 component.config.ts 的 `api` 字段
+//   - scanConfigs: 启动时扫描所有 component.config.ts,喂给 mfeDynamicProxy
+import { manifestPlugin, mfeDynamicProxy, scanConfigs } from '@style-library/manifest-generator';
 import path from 'node:path'; // 用于 resolve 绝对路径
 import { fileURLToPath } from 'node:url'; // URL → 路径
 
 // ESM 里没有 __dirname,临时造一个指向当前文件目录
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export default defineConfig({
-  // 插件栈:Vue SFC → React JSX → manifest
+// 所有组件 component.config.ts 的 glob(manifestPlugin 和 mfeDynamicProxy 共用)
+const COMPONENT_ROOTS = [
+  path.resolve(__dirname, '../../packages/vue-components/src/*/component.config.ts'),
+  path.resolve(__dirname, '../../packages/react-components/src/*/component.config.ts'),
+];
+
+/**
+ * 异步扫描所有 component.config.ts,把 configs 喂给 mfeDynamicProxy。
+ * Vite 支持 defineConfig(async () => config),所以我们这里用 async。
+ *
+ * 注意:scanConfigs 会动态 import 每个 component.config.ts,验证 schema。
+ * manifestPlugin 内部也会独立调一次 scanConfigs —— 两次扫描是浪费但无副作用,
+ * 启动开销可忽略(几十个组件 ~50ms)。后续可以提取共享缓存。
+ */
+async function buildMfeProxyPlugin() {
+  const scanned = await scanConfigs({ roots: COMPONENT_ROOTS });
+  return mfeDynamicProxy({ configs: scanned.map((s) => s.config) });
+}
+
+export default defineConfig(async () => ({
+  // 插件栈:Vue SFC → React JSX → mfe proxy → manifest
   plugins: [
     vue(),
     react(),
-    // 告诉 manifest-plugin 去哪里找 component.config.ts
-    manifestPlugin({
-      componentRoots: [
-        // packages/vue-components/src/<id>/component.config.ts
-        path.resolve(__dirname, '../../packages/vue-components/src/*/component.config.ts'),
-        // packages/react-components/src/<id>/component.config.ts
-        path.resolve(__dirname, '../../packages/react-components/src/*/component.config.ts'),
-      ],
-    }),
+    await buildMfeProxyPlugin(),
+    manifestPlugin({ componentRoots: COMPONENT_ROOTS }),
   ],
   // dev server:0.0.0.0 让局域网设备也能访问
-  server: { host: '0.0.0.0', port: 5173 },
+  // 注意:server.proxy 已彻底移除 —— 组件的 dev 依赖通过各 component.config.ts
+  // 的 `api` 字段声明,由 mfeDynamicProxy 在挂载时按需激活。
+  server: {
+    host: '0.0.0.0',
+    port: 5173,
+  },
   // 生产预览:与 dev 同 host,默认端口 4173
   preview: { host: '0.0.0.0', port: 4173 },
   build: {
@@ -50,7 +70,7 @@ export default defineConfig({
       // 手动分包策略(spec §8.1)
       output: {
         // manualChunks 函数:对每个 module id 决定要不要拆出去
-        manualChunks(id) {
+        manualChunks(id: string) {
           // 1) 每个 Vue 组件独立 chunk:id 形如 .../vue-components/src/<id>/...
           if (id.includes('/vue-components/src/')) {
             const m = id.match(/\/vue-components\/src\/([^/]+)\//);
@@ -75,4 +95,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));

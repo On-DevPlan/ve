@@ -14,3 +14,5 @@ export * from './vite-plugin.ts';
 export * from './loader-inventory.ts';
 // 透传 reconcile(对账器 + 报告类型)
 export * from './reconcile.ts';
+// 透传 mfe-dynamic-proxy(组件级 dev proxy 插件)
+export * from './mfe-dynamic-proxy.ts';

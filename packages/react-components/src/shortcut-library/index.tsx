@@ -13,9 +13,131 @@ import ImportModal from './ImportModal';
 import type { ImportParseResult } from './import-parser';
 import type { ImportStats } from './useShortcuts';
 import type { Shortcut } from './types';
+import type { UserKVStore } from './userKvStore';
+import SettingsPanel from './SettingsPanel';
 import Sidebar from './Sidebar';
 import ShortcutTable from './ShortcutTable';
 import Keyboard from './Keyboard';
+
+/**
+ * user/kv 模式 UI 钩子:管理 Login/Register 表单 + 验证码发送 + 邀请码预填。
+ *
+ * 状态机:
+ *   - mode = 'login' | 'register' | null(自动检测)
+ *     null = 还没点 Login/Register,显示两个按钮
+ *   - 表单字段:email / password / code(仅 register)/ invitationCode(仅 register)
+ *   - 错误:统一一个 error 字段,红色 alert
+ */
+function useUserKVAuth(store: UserKVStore) {
+  const [mode, setMode] = useState<'login' | 'register' | null>(null);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [code, setCode] = useState('');
+  const [invitationCode, setInvitationCode] = useState('ROOT-INIT-2026');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [codeSentHint, setCodeSentHint] = useState<string | null>(null);
+
+  const reset = () => {
+    setMode(null);
+    setEmail('');
+    setPassword('');
+    setCode('');
+    setInvitationCode('ROOT-INIT-2026');
+    setError(null);
+    setCodeSentHint(null);
+  };
+
+  const handleSendCode = useCallback(async () => {
+    if (!email) {
+      setError('请先填邮箱');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      await store.sendCode(email);
+      setCodeSentHint('验证码已发送,请查收邮箱');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }, [store, email]);
+
+  const handleLogin = useCallback(async () => {
+    if (!email || !password || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await store.login(email, password);
+      // 登录成功 → 让 useShortcuts 的轮询 detect 到 authState=logged-in 自动切 cloud store
+      reset();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }, [store, email, password, busy]);
+
+  const handleRegister = useCallback(async () => {
+    if (!email || !password || !code || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await store.register({ email, password, code, invitationCode });
+      reset();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }, [store, email, password, code, invitationCode, busy]);
+
+  const handleLogout = useCallback(() => {
+    store.logout();
+    reset();
+  }, [store]);
+
+  return {
+    mode,
+    setMode,
+    email, setEmail,
+    password, setPassword,
+    code, setCode,
+    invitationCode, setInvitationCode,
+    busy, error, codeSentHint,
+    handleSendCode, handleLogin, handleRegister, handleLogout,
+    reset,
+  };
+}
+
+// 同步 pill 文案生成器:基于 cloudStore 的 syncState / lastSyncAt 决定显示
+//  - idle + 有上次同步 → "已同步 N 秒/分/小时前"
+//  - idle + 从未同步 → "云端就绪"
+//  - syncing → "同步中…"
+//  - error → "同步失败"
+function syncLabel(store: UserKVStore): string {
+  switch (store.syncState) {
+    case 'syncing':
+      return '同步中…';
+    case 'error':
+      return '同步失败';
+    case 'idle': {
+      if (!store.lastSyncAt) return '云端就绪';
+      const elapsed = Math.max(0, Date.now() - store.lastSyncAt);
+      const sec = Math.floor(elapsed / 1000);
+      if (sec < 5) return '刚刚同步';
+      if (sec < 60) return `${sec} 秒前同步`;
+      const min = Math.floor(sec / 60);
+      if (min < 60) return `${min} 分钟前同步`;
+      const hr = Math.floor(min / 60);
+      if (hr < 24) return `${hr} 小时前同步`;
+      const day = Math.floor(hr / 24);
+      return `${day} 天前同步`;
+    }
+  }
+}
 
 // 物理键盘长按阈值 —— 按住多少毫秒后弹 mapping popup。
 // 800ms 跟「习惯的单击」区分得开(普通人单击<300ms),又不会让用户等太久。
@@ -44,9 +166,11 @@ interface PopupState {
 
 export default function ShortcutLibrary() {
   const store = useShortcuts();
+  const auth = useUserKVAuth(store.cloudStore);
   const [highlightedCodes, setHighlightedCodes] = useState<Set<string>>(new Set());
   const [hoveredCodes, setHoveredCodes] = useState<Set<string>>(new Set());
   const [showImport, setShowImport] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   // 键盘预览折叠态 —— 默认展开;用户手动收起后写入 LS,下次进详情页保持
   const [previewCollapsed, setPreviewCollapsed] = useState<boolean>(loadPreviewCollapsed);
   // 长按 popup 状态(由 Keyboard 子组件回调触发)
@@ -288,6 +412,200 @@ export default function ShortcutLibrary() {
 
   return (
     <div className="sl-sl-root">
+      <div className={`sl-sl-userkv-bar sl-sl-userkv-bar--${store.cloudStore.authState}`}>
+        {store.cloudStore.userId > 0 ? (
+          <>
+            {/* Sync status pill —— banner 唯一的状态指示 */}
+            <span
+              className={`sl-sl-sync-pill sl-sl-sync-pill--${store.cloudStore.syncState}`}
+              title={
+                store.cloudStore.syncState === 'error'
+                  ? `同步失败: ${store.cloudStore.lastSyncError ?? '未知错误'}`
+                  : store.cloudStore.lastSyncAt
+                    ? `上次同步: ${new Date(store.cloudStore.lastSyncAt).toLocaleTimeString()}`
+                    : '尚未同步'
+              }
+            >
+              <span className="sl-sl-sync-pill__dot" aria-hidden="true" />
+              <span className="sl-sl-sync-pill__text">{syncLabel(store.cloudStore)}</span>
+            </span>
+            <span className="sl-sl-userkv-bar__email">{store.cloudStore.currentUser?.email}</span>
+            <code
+              className="sl-sl-userkv-bar__invite"
+              title="你的邀请码,分享给朋友注册"
+              onClick={() => {
+                const code = store.cloudStore.invitationCode;
+                if (code && typeof navigator !== 'undefined' && navigator.clipboard) {
+                  void navigator.clipboard.writeText(code);
+                }
+              }}
+            >
+              {store.cloudStore.invitationCode || '...'}
+            </code>
+            <button
+              className="sl-sl-icon-btn"
+              aria-label="设置"
+              title="设置"
+              onClick={() => setShowSettings(true)}
+            >
+              ⚙
+            </button>
+            <button
+              className="sl-sl-btn sl-sl-btn--ghost"
+              onClick={async () => {
+                // 退出规则:
+                // 1) auto 模式:一切自动同步,直接退出(无需弹窗)
+                // 2) manual + 干净(dirty=false):直接退出
+                // 3) manual + dirty + warnOnDirtyExit 开:先弹 confirm,选「先保存」就 flush
+                // 4) manual + dirty + warnOnDirtyExit 关:直接退出(用户自己担责)
+                if (store.saveMode === 'manual' && store.dirty && store.warnOnDirtyExit) {
+                  const save = window.confirm(
+                    '有未保存的本地改动。\n\n点「确定」= 先保存到云端再退出\n点「取消」= 直接退出(丢失改动)',
+                  );
+                  if (save) {
+                    try {
+                      await store.flushDirty();
+                    } catch (e) {
+                      window.alert('保存失败:' + (e instanceof Error ? e.message : String(e)));
+                      return; // 失败不退出
+                    }
+                  } else {
+                    const ok = window.confirm('确认丢失未保存的改动并退出?');
+                    if (!ok) return;
+                  }
+                }
+                auth.handleLogout();
+              }}
+            >
+              退出
+            </button>
+          </>
+        ) : auth.mode === 'login' ? (
+          <>
+            <span className="sl-sl-userkv-bar__label">登录</span>
+            <input
+              type="email"
+              className="sl-sl-input sl-sl-userkv-bar__input"
+              placeholder="邮箱"
+              value={auth.email}
+              onChange={(e) => auth.setEmail(e.target.value)}
+              disabled={auth.busy}
+              autoComplete="email"
+            />
+            <input
+              type="password"
+              className="sl-sl-input sl-sl-userkv-bar__input"
+              placeholder="密码"
+              value={auth.password}
+              onChange={(e) => auth.setPassword(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void auth.handleLogin();
+              }}
+              disabled={auth.busy}
+              autoComplete="current-password"
+            />
+            <button
+              className="sl-sl-btn sl-sl-btn--primary"
+              onClick={() => void auth.handleLogin()}
+              disabled={!auth.email || !auth.password || auth.busy}
+            >
+              {auth.busy ? '登录中…' : '登录'}
+            </button>
+            <button
+              className="sl-sl-btn sl-sl-btn--ghost"
+              onClick={() => auth.setMode(null)}
+              disabled={auth.busy}
+            >
+              ←
+            </button>
+          </>
+        ) : auth.mode === 'register' ? (
+          <>
+            <span className="sl-sl-userkv-bar__label">注册</span>
+            <input
+              type="email"
+              className="sl-sl-input sl-sl-userkv-bar__input"
+              placeholder="邮箱"
+              value={auth.email}
+              onChange={(e) => auth.setEmail(e.target.value)}
+              disabled={auth.busy}
+              autoComplete="email"
+            />
+            <input
+              type="password"
+              className="sl-sl-input sl-sl-userkv-bar__input"
+              placeholder="密码(>=6 位)"
+              value={auth.password}
+              onChange={(e) => auth.setPassword(e.target.value)}
+              disabled={auth.busy}
+              autoComplete="new-password"
+            />
+            <div className="sl-sl-userkv-bar__row">
+              <input
+                className="sl-sl-input sl-sl-userkv-bar__input sl-sl-userkv-bar__input--code"
+                placeholder="6 位验证码"
+                value={auth.code}
+                onChange={(e) => auth.setCode(e.target.value)}
+                disabled={auth.busy}
+                maxLength={6}
+              />
+              <button
+                className="sl-sl-btn sl-sl-btn--ghost"
+                onClick={() => void auth.handleSendCode()}
+                disabled={!auth.email || auth.busy}
+              >
+                发验证码
+              </button>
+            </div>
+            <input
+              className="sl-sl-input sl-sl-userkv-bar__input"
+              placeholder="邀请码(默认 ROOT-INIT-2026)"
+              value={auth.invitationCode}
+              onChange={(e) => auth.setInvitationCode(e.target.value)}
+              disabled={auth.busy}
+            />
+            <button
+              className="sl-sl-btn sl-sl-btn--primary"
+              onClick={() => void auth.handleRegister()}
+              disabled={!auth.email || !auth.password || !auth.code || auth.busy}
+            >
+              {auth.busy ? '注册中…' : '注册并登录'}
+            </button>
+            <button
+              className="sl-sl-btn sl-sl-btn--ghost"
+              onClick={() => auth.setMode(null)}
+              disabled={auth.busy}
+            >
+              ←
+            </button>
+            {auth.codeSentHint && (
+              <span className="sl-sl-userkv-bar__hint">{auth.codeSentHint}</span>
+            )}
+          </>
+        ) : (
+          <>
+            <span className="sl-sl-userkv-bar__label">游客模式(本地)</span>
+            <button
+              className="sl-sl-btn sl-sl-btn--primary"
+              onClick={() => auth.setMode('login')}
+            >
+              登录
+            </button>
+            <button
+              className="sl-sl-btn sl-sl-btn--ghost"
+              onClick={() => auth.setMode('register')}
+            >
+              注册
+            </button>
+          </>
+        )}
+        {auth.error && (
+          <span className="sl-sl-userkv-bar__error" role="alert">
+            {auth.error}
+          </span>
+        )}
+      </div>
+
       <Sidebar
         groups={store.groups}
         selectedGroupId={store.selectedGroupId}
@@ -379,6 +697,22 @@ export default function ShortcutLibrary() {
           onClose={() => setShowImport(false)}
         />
       )}
+
+      <SettingsPanel
+        open={showSettings}
+        onClose={() => setShowSettings(false)}
+        saveMode={store.saveMode}
+        onChangeSaveMode={store.setSaveMode}
+        warnOnDirtyExit={store.warnOnDirtyExit}
+        onToggleWarnOnDirtyExit={store.setWarnOnDirtyExit}
+        dirty={store.dirty}
+        saving={store.saving}
+        onFlushDirty={() => {
+          void store.flushDirty().catch((e: unknown) => {
+            console.error('[save]', e);
+          });
+        }}
+      />
 
       {/* 长按 popup —— portal 到 host target(优先 shadowRoot,fallback document.body),
           避免被 .sl-sl-preview 的 overflow-x:auto 裁剪。
