@@ -26,6 +26,8 @@ export default function Sidebar({
   const [newName, setNewName] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
+  // 就地二次确认删除:× → ? → 再点一次真删
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const filtered = groups.filter((g) =>
     g.name.toLowerCase().includes(filter.toLowerCase()),
@@ -122,14 +124,25 @@ export default function Sidebar({
                     编辑
                   </button>
                   <button
-                    className="sl-sl-icon-btn sl-sl-icon-btn--danger"
-                    title="删除"
+                    className={`sl-sl-icon-btn sl-sl-icon-btn--danger${
+                      confirmDeleteId === g.id ? ' is-confirming' : ''
+                    }`}
+                    title={confirmDeleteId === g.id ? '再点一次确认删除' : '删除'}
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (confirm(`删除分组 "${g.name}" ?`)) onDelete(g.id);
+                      if (confirmDeleteId === g.id) {
+                        onDelete(g.id);
+                        setConfirmDeleteId(null);
+                      } else {
+                        setConfirmDeleteId(g.id);
+                      }
+                    }}
+                    onBlur={() => {
+                      // 失焦取消待确认
+                      if (confirmDeleteId === g.id) setConfirmDeleteId(null);
                     }}
                   >
-                    ×
+                    {confirmDeleteId === g.id ? '?' : '×'}
                   </button>
                 </span>
               )}

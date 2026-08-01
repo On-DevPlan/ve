@@ -15,6 +15,9 @@ const references = [
   'architecture-and-design-philosophy.md',
   'how-to-add-component.md',
   'fix-lint-loop.md',
+  'component-level-dev-proxy.md',
+  'protocol.md',
+  'manifest-loader-reconciliation.md',
 ];
 
 describe('web-work-flow skill', () => {

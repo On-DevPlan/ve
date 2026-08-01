@@ -2,7 +2,7 @@
 // 内嵌 CapturePopover 用于"录入组合键";同组内 combo 重复时高亮
 // 「条件」列展示 condition 字段(纯备注),仅当存在时显示
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Group, Shortcut, KeyStroke } from './types';
 import CapturePopover from './CapturePopover';
 import { ComboDisplay } from './KeyChip';
@@ -34,6 +34,13 @@ export default function ShortcutTable({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftDesc, setDraftDesc] = useState('');
   const [draftCondition, setDraftCondition] = useState('');
+  // 就地二次确认删除:第一次点 × 变 ?,再点一次真删。失焦或切分组自动取消。
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  // 切换分组时清掉待确认态,避免"?"跨分组残留
+  useEffect(() => {
+    setConfirmDeleteId(null);
+  }, [group.id]);
 
   // 计算同组内冲突的 combo
   const conflictMap = useMemo(() => {
@@ -163,12 +170,24 @@ export default function ShortcutTable({
                         编辑
                       </button>
                       <button
-                        className="sl-sl-icon-btn sl-sl-icon-btn--danger"
+                        className={`sl-sl-icon-btn sl-sl-icon-btn--danger${
+                          confirmDeleteId === s.id ? ' is-confirming' : ''
+                        }`}
+                        title={confirmDeleteId === s.id ? '再点一次确认删除' : '删除'}
                         onClick={() => {
-                          if (confirm(`删除 &ldquo;${comboLabel(s.combo)}&rdquo; ?`)) onDeleteShortcut(s.id);
+                          if (confirmDeleteId === s.id) {
+                            onDeleteShortcut(s.id);
+                            setConfirmDeleteId(null);
+                          } else {
+                            setConfirmDeleteId(s.id);
+                          }
+                        }}
+                        onBlur={() => {
+                          // 失焦取消待确认态,避免"?"卡住
+                          if (confirmDeleteId === s.id) setConfirmDeleteId(null);
                         }}
                       >
-                        ×
+                        {confirmDeleteId === s.id ? '?' : '×'}
                       </button>
                     </td>
                   </tr>

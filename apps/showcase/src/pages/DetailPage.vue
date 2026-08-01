@@ -57,6 +57,10 @@ class MountSession {
 
   // 释放该 session 拥有的全部资源;幂等,多次调用安全。
   cleanup(): void {
+    // 卸载前 deactivate 该组件的 dev proxy(如果声明了 api)。
+    // 注意:必须先 deactivate 再 unmount,否则组件内部的 fetch 可能晚到
+    // 一拍被 proxy 错误转发。失败被吞(只是 dev 便利,不影响功能)。
+    void fetch(`/__mfe/deactivate?id=${encodeURIComponent(this.id)}`).catch(() => {});
     this.abort.abort();
     if (this.unmount) {
       try { this.unmount(); } catch { /* ignore */ }
@@ -95,6 +99,12 @@ async function mount(componentId: string) {
   // 建新 session;本函数后续引用全部走这个 session,不再触碰模块变量。
   const session = new MountSession(componentId, containerEl, defaultTokens);
   currentSession = session;
+
+  // 挂载前 activate:让 mfeDynamicProxy 切换到本组件的 api 规则。
+  // 不 await:fetch 是同步发起 + server 端 activate 立即设 activeId,
+  // 组件 loader() 在同一 microtask 后执行,首个 fetch 一定看到 activeId 已设。
+  // 失败被吞(没有声明 api 的组件 activate 是 no-op)。
+  void fetch(`/__mfe/activate?id=${encodeURIComponent(componentId)}`).catch(() => {});
 
   try {
     const loader = loaders[entry.loaderKey];

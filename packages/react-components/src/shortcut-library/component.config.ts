@@ -18,4 +18,13 @@ export default {
   isolation: { mode: 'shadow-dom' },
   theme: { mode: 'css-variables', namespace: 'sl' },
   capabilities: { fullscreen: false, resizable: false },
+  // 组件级 dev 依赖:挂载到 shortcut-library 详情页时,/api 才会被 vite 代理
+  // 到 :8080。其他组件(car-battle 等)不触发,完全不占用 dev server 路径。
+  api: [
+    {
+      context: '/api',
+      target: 'http://localhost:8080',
+      changeOrigin: true,
+    },
+  ],
 } satisfies ComponentConfig;

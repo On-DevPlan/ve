@@ -156,6 +156,39 @@ export interface ComponentConfig {
    * 覆盖 glob 自动发现的条目。
    */
   loaderUrl?: string;
+
+  /**
+   * 该组件需要的后端 API(代理规则)。dev server 启动时由
+   * manifest-generator 的 mfeDynamicProxy plugin 收集成静态表,
+   * 运行时按"当前激活的组件 id"动态代理。
+   *
+   * 两种写法任选:
+   *   - 数组:[{ context, target, ... }, ...] 显式穷举,适合多后端/复杂规则
+   *   - 对象映射:{ 逻辑名: 'target' | ApiRule } key 自动推 context 为 '/api/<key>'
+   *
+   * 示例:
+   *   api: [{ context: '/v1', target: 'http://localhost:8080' }]
+   *   api: { shortcut: 'http://localhost:8080' }  // → context '/api/shortcut'
+   */
+  api?: ApiRule[] | Record<string, string | Omit<ApiRule, 'context'> & { context?: string }>;
+}
+
+/** 单条 dev-server 代理规则(由 ComponentConfig.api 引用)。 */
+export interface ApiRule {
+  /** 路径匹配前缀,如 '/api/shortcut' 或 '/v1'。匹配时按最长前缀优先。 */
+  context: string;
+  /** 目标后端 base URL,可每条不同(天然支持多后端)。 */
+  target: string;
+  /**
+   * 路径重写。可选两种形式:
+   *   - Record<regeX, replacement>:对 req.url 做正则替换(顺序不保证)
+   *   - (path: string) => string:函数式,适合复杂改写
+   */
+  rewrite?: Record<string, string> | ((path: string) => string);
+  /** 默认 true。改 Host 头让后端看到正确的 origin,后端无感。 */
+  changeOrigin?: boolean;
+  /** WebSocket 代理时置 true。 */
+  ws?: boolean;
 }
 
 // 元数据过滤:Registry / SearchIndex 查询参数(spec §7)
