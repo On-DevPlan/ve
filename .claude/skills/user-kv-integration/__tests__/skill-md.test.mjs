@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 
 const root = '.claude/skills/user-kv-integration';
-const references = ['protocol.md'];
+const references = ['protocol.md', 'deployment.md'];
 
 describe('user-kv-integration skill', () => {
   it('has SKILL.md and all references', () => {
@@ -22,7 +22,8 @@ describe('user-kv-integration skill', () => {
 
   it('SKILL.md frontmatter has name and description', () => {
     const content = readFileSync(`${root}/SKILL.md`, 'utf8');
-    assert.match(content, /^---\n/, 'should start with YAML frontmatter');
+    // 允许 CRLF —— 仓库里的 skill 文档是 CRLF 行尾(Windows),写死 /^---\n/ 会误报
+    assert.match(content, /^---\r?\n/, 'should start with YAML frontmatter');
     assert.match(content, /name:\s*user-kv-integration/, 'should declare name');
     assert.match(content, /description:/, 'should declare description');
   });
@@ -31,6 +32,16 @@ describe('user-kv-integration skill', () => {
     for (const ref of references) {
       const content = readFileSync(`${root}/references/${ref}`, 'utf8');
       assert.ok(content.split('\n').length > 5, `${ref} too short`);
+    }
+  });
+
+  it('every [[wikilink]] in SKILL.md resolves to an existing ref', () => {
+    // 指向不存在的 ref 会让读者跟着死链走 —— 改文件名却忘了改引用是最常见的失效。
+    const content = readFileSync(`${root}/SKILL.md`, 'utf8');
+    const links = [...content.matchAll(/\[\[([^\]]+)\]\]/g)].map((m) => m[1]);
+    assert.ok(links.length > 0, 'SKILL.md should reference at least one ref');
+    for (const link of new Set(links)) {
+      assert.ok(existsSync(`${root}/references/${link}.md`), `[[${link}]] has no ref file`);
     }
   });
 });

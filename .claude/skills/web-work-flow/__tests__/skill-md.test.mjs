@@ -11,13 +11,23 @@ import { readFileSync, existsSync } from 'node:fs'; // 文件系统读取
 
 // skill 根目录(相对仓库根)
 const root = '.claude/skills/web-work-flow';
+// 全部 ref —— 与 references/ 目录保持一致。新增 ref 时同步加进来,
+// 否则文档被误删 / 路由表指向不存在的 ref 时测试不会报警。
 const references = [
   'architecture-and-design-philosophy.md',
-  'how-to-add-component.md',
-  'fix-lint-loop.md',
+  'component-decision-tree.md',
   'component-level-dev-proxy.md',
-  'protocol.md',
+  'dev-server-watcher.md',
+  'eslint-extending-existing.md',
+  'eslint-pattern-recipes.md',
+  'eslint-testing-pattern.md',
+  'fix-lint-loop.md',
+  'how-to-add-component.md',
+  'large-component-layout.md',
   'manifest-loader-reconciliation.md',
+  'protocol.md',
+  'shadow-dom-build-css-loss.md',
+  'when-eslint-vs-ajv.md',
 ];
 
 describe('web-work-flow skill', () => {
@@ -34,7 +44,8 @@ describe('web-work-flow skill', () => {
     // 读取 SKILL.md 全文
     const content = readFileSync(`${root}/SKILL.md`, 'utf8');
     // 1. 必须以 --- 起头(YAML frontmatter 起始)
-    expect(content).toMatch(/^---\n/);
+    //    允许 CRLF —— 仓库里的 skill 文档是 CRLF 行尾(Windows),写死 /^---\n/ 会误报
+    expect(content).toMatch(/^---\r?\n/);
     // 2. 必须有 name: web-work-flow
     expect(content).toMatch(/name:\s*web-work-flow/);
     // 3. 必须有 description: 字段
@@ -47,6 +58,17 @@ describe('web-work-flow skill', () => {
       const content = readFileSync(`${root}/references/${ref}`, 'utf8');
       // 至少有 5 行内容(避免空文档或只有 frontmatter)
       expect(content.split('\n').length).toBeGreaterThan(5);
+    }
+  });
+
+  it('every [[wikilink]] in SKILL.md resolves to an existing ref', () => {
+    // SKILL.md 是路由表 —— 指向不存在的 ref 会让读者跟着死链走,
+    // 这是本 skill 最实际的失效模式(改文件名却忘了改路由表)。
+    const content = readFileSync(`${root}/SKILL.md`, 'utf8');
+    const links = [...content.matchAll(/\[\[([^\]]+)\]\]/g)].map((m) => m[1]);
+    expect(links.length).toBeGreaterThan(0);
+    for (const link of new Set(links)) {
+      expect(existsSync(`${root}/references/${link}.md`), `[[${link}]] has no ref file`).toBe(true);
     }
   });
 });

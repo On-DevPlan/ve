@@ -15,6 +15,7 @@ description: Use when integrating a frontend component with the user/kv API at /
 - 单 key 存储整个组件的 JSON 配置/数据
 - 想做 auto / manual 同步模式切换
 - 看到后端返回 `code: 52 / duplicate key value violates unique constraint` 23505 → 用本 skill 知道如何在前端兜底
+- **线上 405 Not Allowed(本地正常)** → 见 [[deployment]],这是路由问题不是代码问题
 
 ## 何时**不**使用
 
@@ -39,9 +40,20 @@ description: Use when integrating a frontend component with the user/kv API at /
 │  └────────┬─────────────────────────────────┘    │
 │           │ fetch('/api/v1/kv/{key}')         │
 └───────────┼─────────────────────────────────────┘
-            │ Vite proxy (mfeDynamicProxy)
-            ▼
-   /api  →  http://localhost:8080  (dev)
+            │ 相对路径 —— 同源,不跨域
+            │
+      ┌─────┴──────┐
+      │            │
+   dev│            │prod
+      ▼            ▼
+ Vite 中间件    nginx location
+ (mfeDynamic-   (gen-nginx.mjs
+  Proxy)         构建期生成)
+      │            │
+      ▼            ▼
+ :8080 (本机)   :8988 (生产后端)
+
+  两端读同一份 component.config.ts 的 api 字段 —— 详见 [[deployment]]
 ```
 
 ## 三件套最小实现
@@ -167,15 +179,19 @@ onBlur={() => confirmDeleteId === id && setConfirmDeleteId(null)}
 | 双重 confirm 弹窗 | 退出按钮 + effect 各弹一次 | 只在按钮 onClick 弹 |
 | `credentials: 'omit'` 失败 | cookie 不带 | fetch 默认就是 omit,别手动加 |
 | 401 后 JWT 残留 LS | 下次启动又拿坏 token 试 | logout 时清 LS token |
+| 线上 405,本地正常 | dev 代理是 vite 中间件,prod 没有 | nginx 加 `/api` 反代,见 [[deployment]] |
+| 改 baseUrl 直连后端端口 | 405 变 CORS 错误 | 后端通常无 CORS 中间件;走同源反代 |
 
 ## 复用清单
 
 | 现成资源 | 路径 | 怎么用 |
 |---|---|---|
 | 协议 + DTO 字段 | [[protocol]] | 客户端 wire 字段权威来源 |
+| 上线部署 / 405 排查 | [[deployment]] | nginx 反代、CORS、容器网络 |
 | 后端 user/kv 设计 | dev_ctr_hello/.claude/skills/user-kv-invitecode/SKILL.md | 完整说明(数据库 / 路由 / 中间件) |
 | 后端 kv 模块命令 | `dev_ctr_hello/internal/service/kv/` | 服务端 upsert bug 位置(目前用 workaround) |
-| Vite mfeDynamicProxy | `ve/packages/manifest-generator/src/mfe-dynamic-proxy.ts` | 改 api 字段,不动 vite.config.ts |
+| 组件级 API 声明(dev + prod) | `ve/packages/react-components/src/shortcut-library/component.config.ts` 的 `api` 字段 | 改 target,不动 vite.config.ts / default.conf |
+| nginx 路由生成器 | `ve/packages/manifest-generator/src/nginx-emit.ts` | 从同一份 api 声明生成 prod location |
 | ShortcutStore 抽象 | `ve/packages/react-components/src/shortcut-library/store.ts` | LSStore + UserKVStore 都 implements |
 
 ## 验证
@@ -195,6 +211,15 @@ cd ve && pnpm dev                    # :5173
 # 6. 切到 manual → 加一组 → 没 POST;modal 出现"保存到云端"
 ```
 
+上线后**必须**再验证一次 —— dev 通过不代表 prod 通过(代理层是两套):
+
+```bash
+curl -i -X POST http://<host>/api/v1/user/login \
+  -H 'content-type: application/json' -d '{}'
+# → Server: GoFrame HTTP Server + {"code":51,...}  = 通了
+# → Server: nginx + HTML                            = 还在 SPA fallback,见 [[deployment]]
+```
+
 ## 范围外
 
 - WebCrypto 加密(那是 e2ekv 的事,user/kv 服务端能看明文)
@@ -209,7 +234,7 @@ cd ve && pnpm dev                    # :5173
 | ref | 何时读 | 路径 |
 | --- | -------- | ---- |
 | [[protocol]] | 客户端对接 wire 字段(请求/响应/状态码) | references/protocol.md |
-| (可加更多:如坑点 / 实现模板) | | references/ |
+| [[deployment]] | 上线:nginx 反代 / 405 排查 / CORS / 容器网络 | references/deployment.md |
 
 ## 维护
 
