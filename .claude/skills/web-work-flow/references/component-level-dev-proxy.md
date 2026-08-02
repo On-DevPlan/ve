@@ -61,6 +61,23 @@ api: {
 
 分环境让"唯一事实源"成立的同时不牺牲正确性。缺对应环境的值时 `resolveTarget` **抛错而非回退**:回退到 dev 值就意味着把 localhost 印进生产配置,正是要防的失败模式。宁可构建期炸,不要运行期 502。
 
+### 两端可以取相同值(当前 shortcut-library 的选择)
+
+分环境**允许**但不**强制**两端不同。`shortcut-library` 目前 `dev` 与 `prod` 都指向生产后端:
+
+```ts
+target: {
+  dev:  'http://47.110.80.47:8988',
+  prod: 'http://47.110.80.47:8988',
+},
+```
+
+好处:本地 `pnpm dev` 不必再起 `go run .`,克隆仓库即可调。
+
+**代价:本地写操作直接落到生产数据库。** 加分组、删分组都是真实数据,没有回滚。需要隔离时把 `dev` 改回 `http://localhost:8080` 并在本地起后端。
+
+> 即使两端取值相同,也**不要**简写成单个 string。简写的语义是"两端共用一个后端"这件事是**永久的**(如公网托管的第三方 API);而这里是临时取值相同。写成 string 后将来要拆环境,得先改回对象形态,反而丢了意图。
+
 ## 为什么需要动态 dispatcher(dev 侧)
 
 Vite 的 `server.proxy` 是**启动时静态注册**的中间件,运行期不能增删。所以"点进去才监听"做不到字面意义。变通方法:
@@ -167,8 +184,9 @@ location ^~ /api/ {
 ### dev
 
 ```bash
-go run .  # 后端 :8080
-pnpm dev  # 前端 :5173
+pnpm dev  # 前端 :5173(被占则顺延,看日志里的实际端口)
+# shortcut-library 当前 dev target 指向生产后端,不必再起 go run .
+# 若把 dev 改回 localhost:8080,则需要先 `go run .`
 
 # 1. 无 activate → 走 SPA fallback (text/html)
 curl -i http://localhost:5173/api/v1/user/info
@@ -176,9 +194,10 @@ curl -i http://localhost:5173/api/v1/user/info
 # 2. 手动 activate(模拟挂载)
 curl -i 'http://localhost:5173/__mfe/activate?id=shortcut-library'
 
-# 3. 现在被代理到 :8080,server 头变 GoFrame
+# 3. 现在被代理到后端,401 + server 头变 GoFrame
 curl -i http://localhost:5173/api/v1/user/info
-# → 'server: GoFrame HTTP Server'
+# → HTTP/1.1 401 Unauthorized
+# → server: GoFrame HTTP Server
 
 # 4. deactivate 后 fallback 恢复
 curl -i 'http://localhost:5173/__mfe/deactivate?id=shortcut-library'

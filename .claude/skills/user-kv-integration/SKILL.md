@@ -198,10 +198,11 @@ onBlur={() => confirmDeleteId === id && setConfirmDeleteId(null)}
 
 ```bash
 # 后端
-cd dev_ctr_hello && go run .        # :8080
+cd dev_ctr_hello && go run .        # :8080 —— 仅当组件 dev target 指向 localhost 时需要
+                                    # shortcut-library 当前 dev 指向生产后端,可跳过
 
 # 前端
-cd ve && pnpm dev                    # :5173
+cd ve && pnpm dev                    # :5173(被占则顺延)
 
 # 1. 游客:加几个分组,刷新页面 → 数据还在(LS)
 # 2. 注册:dev_ctr_hello/docs/api/e2ekv.md §附录的 send-code 注入法绕过邮箱
@@ -210,6 +211,9 @@ cd ve && pnpm dev                    # :5173
 # 5. 关 tab → 新 incognito → Login 同账号 → 数据回来
 # 6. 切到 manual → 加一组 → 没 POST;modal 出现"保存到云端"
 ```
+
+> ⚠️ 当组件的 dev target 指向生产后端时(shortcut-library 当前如此),上面这些
+> 步骤写的是**生产数据**。用测试账号,别拿真实用户的 key 练手。
 
 上线后**必须**再验证一次 —— dev 通过不代表 prod 通过(代理层是两套):
 
