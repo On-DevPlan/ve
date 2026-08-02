@@ -12,6 +12,7 @@
     "dev": "pnpm --filter @style-library/showcase dev",
     "build": "pnpm --filter @style-library/showcase build",
     "preview": "pnpm --filter @style-library/showcase preview",
+    "gen:nginx": "node --experimental-strip-types scripts/gen-nginx.mjs --env prod",
     "lint": "eslint . --max-warnings=0 --format=json --output-file=eslint-report.json",
     "lint:fix": "node scripts/lint-fix.mjs",
     "lint:summary": "node scripts/lint-summary.mjs --self",

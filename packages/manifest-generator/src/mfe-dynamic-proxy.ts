@@ -24,7 +24,7 @@
 
 import type { Plugin, ViteDevServer } from 'vite';
 import httpProxy from 'http-proxy';
-import type { ApiRule, ComponentConfig } from '@style-library/component-contract';
+import type { ApiRule, ApiTarget, ComponentConfig } from '@style-library/component-contract';
 
 // ---- 归一化 -----------------------------------------------------------
 
@@ -33,8 +33,12 @@ import type { ApiRule, ComponentConfig } from '@style-library/component-contract
  *   - 数组:已经是,直接返回
  *   - 对象:每个 key 推 context 为 `/api/<key>`,value 若是 string 当 target,
  *     否则展开成 ApiRule(允许覆盖 context)
+ *
+ * **导出给 nginx 生成器复用**:dev 中间件与 prod 配置生成必须走同一个归一化
+ * 实现,否则两边对 `api` 字段的解释可能漂移 —— 那就等于又造了第二个事实源,
+ * 恰好是这套设计要消灭的东西。
  */
-function normalizeApi(api: ComponentConfig['api']): ApiRule[] {
+export function normalizeApi(api: ComponentConfig['api']): ApiRule[] {
   if (!api) return [];
   if (Array.isArray(api)) return api;
   return Object.entries(api).map(([name, v]) => {
@@ -43,6 +47,26 @@ function normalizeApi(api: ComponentConfig['api']): ApiRule[] {
     }
     return { context: v.context ?? `/api/${name}`, ...v };
   });
+}
+
+/**
+ * 从 ApiTarget 取出指定环境的 base URL。
+ *   - string:两端共用同一个值
+ *   - { dev, prod }:按 env 取
+ *
+ * 缺失对应环境的值时抛错而非静默回退 —— 回退到 dev 值就意味着把 localhost
+ * 印进生产配置,而这正是我们要防的失败模式。宁可构建期炸,不要运行期 502。
+ */
+export function resolveTarget(target: ApiTarget, env: 'dev' | 'prod', ctx?: string): string {
+  if (typeof target === 'string') return target;
+  const picked = target?.[env];
+  if (!picked) {
+    throw new Error(
+      `[api] rule${ctx ? ` "${ctx}"` : ''} is missing target.${env}. ` +
+        `Declare both { dev, prod }, or use a plain string when both environments share one backend.`,
+    );
+  }
+  return picked;
 }
 
 // ---- 工厂 -------------------------------------------------------------
@@ -134,7 +158,8 @@ export function mfeDynamicProxy(opts: MfeDynamicProxyOptions): Plugin {
           req,
           res,
           {
-            target: matched.target,
+            // dev 侧取 target.dev(string 形式则两端同值)
+            target: resolveTarget(matched.target, 'dev', matched.context),
             changeOrigin: matched.changeOrigin ?? true,
             ws: matched.ws,
           },

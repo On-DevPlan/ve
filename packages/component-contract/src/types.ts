@@ -158,27 +158,40 @@ export interface ComponentConfig {
   loaderUrl?: string;
 
   /**
-   * 该组件需要的后端 API(代理规则)。dev server 启动时由
-   * manifest-generator 的 mfeDynamicProxy plugin 收集成静态表,
-   * 运行时按"当前激活的组件 id"动态代理。
+   * 该组件需要的后端 API(代理规则)。**dev 与 prod 的唯一事实源**:
+   *   - dev:  manifest-generator 的 mfeDynamicProxy plugin 收集成静态表,
+   *           运行时按"当前激活的组件 id"动态代理。
+   *   - prod: scripts/gen-nginx.mjs 读同一份声明,生成 nginx location 片段。
+   * 两端共用 normalizeApi() 归一化,保证不会出现"本地能跑、上线 404"。
    *
    * 两种写法任选:
    *   - 数组:[{ context, target, ... }, ...] 显式穷举,适合多后端/复杂规则
    *   - 对象映射:{ 逻辑名: 'target' | ApiRule } key 自动推 context 为 '/api/<key>'
    *
    * 示例:
-   *   api: [{ context: '/v1', target: 'http://localhost:8080' }]
-   *   api: { shortcut: 'http://localhost:8080' }  // → context '/api/shortcut'
+   *   api: [{ context: '/v1', target: { dev: 'http://localhost:8080', prod: 'http://api.example.com' } }]
+   *   api: { shortcut: 'http://localhost:8080' }  // → context '/api/shortcut',两端同 target
    */
   api?: ApiRule[] | Record<string, string | Omit<ApiRule, 'context'> & { context?: string }>;
 }
 
-/** 单条 dev-server 代理规则(由 ComponentConfig.api 引用)。 */
+/**
+ * 代理目标。两种写法:
+ *   - string:dev 与 prod 指向同一个后端(极少见,通常只有公网托管的第三方 API)
+ *   - { dev, prod }:分环境。dev 给 vite 中间件用,prod 给 nginx 生成器用。
+ *
+ * 为什么必须分环境:dev 的 target 常写 http://localhost:8080,指的是开发机上
+ * `go run .` 起的进程;这个值一旦被原样印进生产 nginx 配置,在容器里 localhost
+ * 是容器自身回环地址,必然 502。分环境让"唯一事实源"成立的同时不牺牲正确性。
+ */
+export type ApiTarget = string | { dev: string; prod: string };
+
+/** 单条代理规则(由 ComponentConfig.api 引用)。dev 驱动 vite 中间件,prod 驱动 nginx 生成。 */
 export interface ApiRule {
   /** 路径匹配前缀,如 '/api/shortcut' 或 '/v1'。匹配时按最长前缀优先。 */
   context: string;
   /** 目标后端 base URL,可每条不同(天然支持多后端)。 */
-  target: string;
+  target: ApiTarget;
   /**
    * 路径重写。可选两种形式:
    *   - Record<regeX, replacement>:对 req.url 做正则替换(顺序不保证)

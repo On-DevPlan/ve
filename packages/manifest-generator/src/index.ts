@@ -14,5 +14,7 @@ export * from './vite-plugin.ts';
 export * from './loader-inventory.ts';
 // 透传 reconcile(对账器 + 报告类型)
 export * from './reconcile.ts';
-// 透传 mfe-dynamic-proxy(组件级 dev proxy 插件)
+// 透传 mfe-dynamic-proxy(组件级 dev proxy 插件 + 两端共用的 normalizeApi/resolveTarget)
 export * from './mfe-dynamic-proxy.ts';
+// 透传 nginx-emit(prod 侧出口:同一份 api 声明 → nginx location 片段)
+export * from './nginx-emit.ts';
