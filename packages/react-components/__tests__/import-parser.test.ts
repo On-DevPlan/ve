@@ -177,6 +177,58 @@ desc = "only A"
     expect(result.groups[0].shortcuts).toHaveLength(1);
   });
 
+  // 回归:TOML basic string 里 \\ 表示一个反斜杠。旧实现只 replace(/\\"/g,'"'),
+  // 没处理 \\,于是 combo = "\\"(反斜杠键)解析出两个字符的 "\\",长度不为 1,
+  // CHAR_TO_CODE 匹配失败 → 报「无法识别的按键: "\\"」。Krita 的工具选项快捷键
+  // 正好就是反斜杠键,踩中这条。
+  describe('TOML escape sequences', () => {
+    it('parses combo = "\\\\" as the single Backslash key', () => {
+      const toml = `[[groups]]
+name = "Krita"
+
+[[groups.shortcuts]]
+combo = "\\\\"
+desc = "显示工具选项"
+`;
+      const result = parseImportToml(toml);
+      expect(result.errors, `unexpected errors: ${result.errors.join(' | ')}`).toHaveLength(0);
+      expect(result.groups[0].shortcuts).toHaveLength(1);
+      const combo = result.groups[0].shortcuts[0].combo;
+      expect(combo).toHaveLength(1);
+      expect(combo[0]).toMatchObject({ code: 'Backslash', label: '\\', isModifier: false });
+    });
+
+    it('keeps an escaped backslash inside desc/condition text', () => {
+      const toml = `[[groups]]
+name = "G"
+
+[[groups.shortcuts]]
+combo = "A"
+desc = "路径 C:\\\\Users"
+condition = "Krita 2.9.6 起 \\\\ 打开工具选项"
+`;
+      const result = parseImportToml(toml);
+      expect(result.errors).toHaveLength(0);
+      const sc = result.groups[0].shortcuts[0];
+      expect(sc.description).toBe('路径 C:\\Users');
+      expect(sc.condition).toBe('Krita 2.9.6 起 \\ 打开工具选项');
+    });
+
+    it('does not collapse \\\\" into a bare quote (single-pass unescaping)', () => {
+      // 两步 replace 的经典坑:\\" 先变 \" 再被误判成 " —— 反斜杠 + 引号必须都留下
+      const toml = `[[groups]]
+name = "G"
+
+[[groups.shortcuts]]
+combo = "A"
+desc = "ends with backslash \\\\ then quote \\" done"
+`;
+      const result = parseImportToml(toml);
+      expect(result.errors).toHaveLength(0);
+      expect(result.groups[0].shortcuts[0].description).toBe('ends with backslash \\ then quote " done');
+    });
+  });
+
   it('handles desc before combo order-independently', () => {
     const toml = `[[groups]]
 name = "Editor"

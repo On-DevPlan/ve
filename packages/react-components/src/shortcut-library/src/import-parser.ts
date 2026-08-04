@@ -61,6 +61,26 @@ const CHAR_TO_CODE: Record<string, string> = {
   ',': 'Comma', '.': 'Period', '/': 'Slash', '`': 'Backquote',
 };
 
+/** 还原 TOML basic string 的转义序列。
+ *
+ *  必须单次遍历:如果先 replace(/\\\\/g,'\\') 再 replace(/\\"/g,'"'),
+ *  输入 `\\"` 会先变成 `\"` 再被第二步误判成 `"`,丢掉本该保留的引号。
+ *  用一个正则 + callback 一次扫完,每个转义序列只被消费一次。
+ *
+ *  支持 TOML 规范里 combo/desc/condition 实际会用到的子集:
+ *    \\ → \      \" → "      \n → 换行      \r → 回车      \t → 制表
+ */
+function unescapeBasicString(s: string): string {
+  return s.replace(/\\(["\\nrt])/g, (_match, ch: string) => {
+    switch (ch) {
+      case 'n': return '\n';
+      case 'r': return '\r';
+      case 't': return '\t';
+      default: return ch; // '"' 和 '\' 直接还原成自身
+    }
+  });
+}
+
 /** Resolve a display-label combo like "Ctrl+R" to KeyStroke[].
  *  Returns the array on success, or an error string on failure. */
 export function resolveCombo(input: string): KeyStroke[] | string {
@@ -155,7 +175,7 @@ export function parseImportToml(toml: string): ImportParseResult {
     const key = line.slice(0, eqIdx).trim();
     const valRaw = line.slice(eqIdx + 1).trim();
     const val = valRaw.startsWith('"') && valRaw.endsWith('"')
-      ? valRaw.slice(1, -1).replace(/\\"/g, '"')
+      ? unescapeBasicString(valRaw.slice(1, -1))
       : valRaw;
 
     if (inShortcuts && currentGroup) {
