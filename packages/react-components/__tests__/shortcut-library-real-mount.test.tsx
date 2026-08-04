@@ -20,7 +20,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { act } from 'react';
 import ShortcutLibrary from '../src/shortcut-library';
 
-const KEY_HOLD_MS = 800;
+const KEY_HOLD_MS = 400;
 
 let container: HTMLDivElement;
 let root: Root;

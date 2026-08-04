@@ -21,27 +21,31 @@ const indexTsx = readFileSync(
   'utf8',
 );
 const importModal = readFileSync(
-  resolve(__dirname, '../src/shortcut-library/ImportModal.tsx'),
+  resolve(__dirname, '../src/shortcut-library/src/ImportModal.tsx'),
   'utf8',
 );
 const parser = readFileSync(
-  resolve(__dirname, '../src/shortcut-library/import-parser.ts'),
+  resolve(__dirname, '../src/shortcut-library/src/import-parser.ts'),
   'utf8',
 );
 const types = readFileSync(
-  resolve(__dirname, '../src/shortcut-library/types.ts'),
+  resolve(__dirname, '../src/shortcut-library/src/types.ts'),
   'utf8',
 );
 const useShortcuts = readFileSync(
-  resolve(__dirname, '../src/shortcut-library/useShortcuts.ts'),
+  resolve(__dirname, '../src/shortcut-library/src/useShortcuts.ts'),
   'utf8',
 );
 const keyboard = readFileSync(
-  resolve(__dirname, '../src/shortcut-library/Keyboard.tsx'),
+  resolve(__dirname, '../src/shortcut-library/src/Keyboard.tsx'),
   'utf8',
 );
 const table = readFileSync(
-  resolve(__dirname, '../src/shortcut-library/ShortcutTable.tsx'),
+  resolve(__dirname, '../src/shortcut-library/src/ShortcutTable.tsx'),
+  'utf8',
+);
+const keymap = readFileSync(
+  resolve(__dirname, '../src/shortcut-library/src/keymap.ts'),
   'utf8',
 );
 
@@ -189,9 +193,9 @@ describe('feature 3 — long-press mapping popup + flash throttle', () => {
   });
 
   it('index.tsx tracks keyboard hold for KEY_HOLD_MS then fires onLongPress', () => {
-    // 物理键按下时键变蓝,持续 KEY_HOLD_MS(800ms)后弹 mapping popup。
-    // 鼠标走同样的 onPress / onRelease 路径,达到同样的 800ms 阈值。
-    expect(indexTsx).toMatch(/KEY_HOLD_MS\s*=\s*800/);
+    // 物理键按下时键变蓝,持续 KEY_HOLD_MS(400ms)后弹 mapping popup。
+    // 鼠标走同样的 onPress / onRelease 路径,达到同样的 400ms 阈值。
+    expect(indexTsx).toMatch(/KEY_HOLD_MS\s*=\s*400/);
     expect(indexTsx).toMatch(/heldKeys/);
     expect(indexTsx).toMatch(/setHeldKeys/);
     expect(indexTsx).toMatch(/holdPress/);
@@ -233,5 +237,50 @@ describe('feature 4 — row-hover description tooltip', () => {
     expect(table).toMatch(/onShortcutHover\(s,\s*\(e\.currentTarget/);
     expect(table).toMatch(/onShortcutHover\?/);
     expect(table).toMatch(/\(null,\s*null\)/);
+  });
+});
+
+describe('feature 5 — navigation cluster keys', () => {
+  it('renders the 6-key nav cluster in Keyboard ROWS', () => {
+    // Insert/Home/PageUp 上排,Delete/End/PageDown 下排 —— 标准导航簇,补在方向键上方
+    for (const code of ['Insert', 'Home', 'PageUp', 'Delete', 'End', 'PageDown']) {
+      expect(keyboard, `${code} must appear in ROWS`).toMatch(new RegExp(`code: '${code}'`));
+    }
+  });
+
+  it('keymap labels the nav keys so captured shortcuts render correctly', () => {
+    // 没有这些标签,录入 Home/Delete 等会落到 fallback 的全大写(如 'HOME'),很难看
+    expect(keymap).toMatch(/Insert: 'Ins'/);
+    expect(keymap).toMatch(/Home: 'Home'/);
+    expect(keymap).toMatch(/PageUp: 'PgUp'/);
+    expect(keymap).toMatch(/Delete: 'Del'/);
+    expect(keymap).toMatch(/End: 'End'/);
+    expect(keymap).toMatch(/PageDown: 'PgDn'/);
+  });
+});
+
+describe('feature 6 — hover + double-click-pin reveal', () => {
+  it('Keyboard wires mouse hover + double-click + pinnedCode', () => {
+    // 悬停(仅鼠标)与双击是新加的两个"显示快捷键"入口,与长按汇入同一个 popup
+    expect(keyboard).toMatch(/onMouseEnter=/);
+    expect(keyboard).toMatch(/onMouseLeave=/);
+    expect(keyboard).toMatch(/onDoubleClick=/);
+    expect(keyboard).toMatch(/onHoverEnter\?/);
+    expect(keyboard).toMatch(/onHoverLeave\?/);
+    expect(keyboard).toMatch(/onDblClick\?/);
+    expect(keyboard).toMatch(/pinnedCode/);
+    expect(keyboard).toMatch(/is-pinned/);
+  });
+
+  it('index.tsx holds a unified popup with hover-open delay + a pinned flag', () => {
+    expect(indexTsx).toMatch(/HOVER_OPEN_DELAY\s*=\s*\d+/);
+    expect(indexTsx).toMatch(/pinned:\s*boolean/);
+    expect(indexTsx).toMatch(/handleHoverEnter/);
+    expect(indexTsx).toMatch(/handleHoverLeave/);
+    expect(indexTsx).toMatch(/handleDoubleClickKey/);
+    // pinned popup 不被外部 pointerup 关闭(pin 期间常驻,只能 × / Esc / 被其它键替换)
+    expect(indexTsx).toMatch(/longPressPopup\?\.pinned\) return/);
+    // 双击 → pinned: true
+    expect(indexTsx).toMatch(/pinned:\s*true/);
   });
 });

@@ -2,20 +2,28 @@
 // 接收 highlightedCodes 集合,把对应键渲染为"按下"状态
 // 风格参考 zfrontier:flat,两态(浅色未按,深色按下)
 //
-// 长按交互统一模型:
-//   - 鼠标按下 visual key: 立即 onPress(加入 heldKeys 变蓝)+ 父组件启动
-//     800ms hold timer;命中后弹 mapping popup;onRelease 清掉
-//   - 物理键按下: 立即加 heldKeys + 800ms hold timer;命中弹 popup;keyup 清掉
-// 两种入口通过父组件统一管理 heldKeys + 800ms 倒计时,视觉态完全一致。
+// 三种"显示该键快捷键"的入口,视觉态相同,差别只在触发方式(由父组件统一管):
+//   - 悬停 (mouse):           mouseenter → 父组件延迟 HOVER_OPEN_DELAY 弹 popup(非 pin)
+//   - 长按 (mouse / 物理键):   pointerdown → 父组件 KEY_HOLD_MS(400ms) hold timer → 弹 popup(非 pin)
+//   - 双击 (mouse):           dblclick → 父组件直接弹 popup 并 pin 住
+// 父组件持有唯一的 popup state(含 pinned 标志),三种入口都往里写,popup 由 pinned
+// 决定是否"常驻"。本组件只负责上报事件 + 渲染视觉态。
 
-import { useRef, type PointerEvent as ReactPointerEvent } from 'react';
+import { type PointerEvent as ReactPointerEvent, type MouseEvent as ReactMouseEvent } from 'react';
 
 interface Props {
   highlightedCodes: Set<string>;
   hoveredCodes: Set<string>;
   heldKeys?: Set<string>;
+  // 当前被 pin 住的键 code(双击 pin 后,该键挂 is-pinned,显示一个常驻环)
+  pinnedCode?: string | null;
   onPress?: (code: string) => void;
   onRelease?: (code: string) => void;
+  // 悬停(仅鼠标):进入 / 离开一个键。父组件据此延迟弹 / 关 mapping popup。
+  onKeyHoverEnter?: (code: string, rect: DOMRect) => void;
+  onKeyHoverLeave?: (code: string) => void;
+  // 双击:父组件直接弹 popup 并 pin 住。
+  onDoubleClickKey?: (code: string, rect: DOMRect) => void;
 }
 
 // 物理布局——按物理行而非逻辑 row(用户的 Ctrl 是 ControlLeft)
@@ -66,6 +74,17 @@ const ROWS: Array<Array<{ code: string; label: string; w?: number }>> = [
     { code: 'MetaRight', label: '⌘', w: 1.25 },
     { code: 'ControlRight', label: 'Ctrl', w: 1.25 },
   ],
+  // 导航簇:Insert/Home/PageUp 上排,Delete/End/PageDown 下排(标准 2×3 布局)
+  [
+    { code: 'Insert', label: 'Ins' },
+    { code: 'Home', label: 'Home' },
+    { code: 'PageUp', label: 'PgUp' },
+  ],
+  [
+    { code: 'Delete', label: 'Del' },
+    { code: 'End', label: 'End' },
+    { code: 'PageDown', label: 'PgDn' },
+  ],
   [
     { code: 'ArrowUp', label: '↑' },
     { code: 'ArrowDown', label: '↓' },
@@ -87,10 +106,11 @@ function ModifierAlias({ code }: { code: string }) {
 //   isOn:     来自父组件的 highlightedCodes(录入 3s 高亮)
 //   isHeld:   来自父组件的 heldKeys(物理键盘 / 鼠标长按中,键被按住)
 //   isHover:  来自父组件的 hoveredCodes(表格行 hover 高亮)
+//   isPinned: 双击 pin 住后,该键是 popup 的固定来源 → 挂 is-pinned 常驻环
 //
-// 鼠标 / 触屏按压完全交给父组件管:pointerdown 调 onPress、pointerup /
-// leave / cancel 调 onRelease。父组件维护 heldKeys 集合 + 启动 hold
-// 倒计时 + 命中弹 mapping popup。
+// 鼠标 / 触屏按压交给父组件:pointerdown 调 onPress、pointerup / leave / cancel
+// 调 onRelease。悬停 / 双击同理上报,mouseenter / leave 只认鼠标(触屏不会触发,
+// 避免点触误弹 hover popup)。父组件维护 heldKeys + hold / hover 定时器 + popup。
 interface KeyProps {
   code: string;
   label: string;
@@ -99,19 +119,22 @@ interface KeyProps {
   isOn: boolean;
   isHover: boolean;
   isHeld: boolean;
+  isPinned: boolean;
   onPress?: (code: string) => void;
   onRelease?: (code: string) => void;
+  onHoverEnter?: (code: string, rect: DOMRect) => void;
+  onHoverLeave?: (code: string) => void;
+  onDblClick?: (code: string, rect: DOMRect) => void;
 }
 
-function Key({ code, label, width, height, isOn, isHover, isHeld, onPress, onRelease }: KeyProps) {
-  const elRef = useRef<HTMLDivElement>(null);
-
+function Key({
+  code, label, width, height, isOn, isHover, isHeld, isPinned,
+  onPress, onRelease, onHoverEnter, onHoverLeave, onDblClick,
+}: KeyProps) {
   const handlePointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     // 鼠标主键(或触屏)才触发;右键/中键忽略
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     if (!onPress) return;
-    // 父组件不需要 rect,它在 timer 命中那一刻自己查 DOM 取最新位置
-    // (支持 hover / scroll 时 key 位置变化)。
     onPress(code);
   };
 
@@ -130,10 +153,22 @@ function Key({ code, label, width, height, isOn, isHover, isHeld, onPress, onRel
     onRelease(code);
   };
 
+  // 悬停只认鼠标(mouseenter / leave 在触屏上不触发,避免点触连发 hover popup)。
+  // rect 用 currentTarget 当前的布局位置(hover 是瞬时的,进入那一刻的位置足够)。
+  const handleMouseEnter = (e: ReactMouseEvent<HTMLDivElement>) => {
+    onHoverEnter?.(code, e.currentTarget.getBoundingClientRect());
+  };
+  const handleMouseLeave = () => {
+    onHoverLeave?.(code);
+  };
+  // 双击:rect 同样取当前布局位置。可能残留的 hold / hover 定时器由父组件清。
+  const handleDoubleClick = (e: ReactMouseEvent<HTMLDivElement>) => {
+    onDblClick?.(code, e.currentTarget.getBoundingClientRect());
+  };
+
   return (
     <div
-      ref={elRef}
-      className={`sl-sl-kb__key ${isOn || isHeld ? 'is-on' : ''} ${isHover ? 'is-hover' : ''}`}
+      className={`sl-sl-kb__key ${isOn || isHeld ? 'is-on' : ''} ${isHover ? 'is-hover' : ''} ${isPinned ? 'is-pinned' : ''}`}
       style={{ width, height }}
       title={code}
       data-shortcut-code={code}
@@ -142,6 +177,9 @@ function Key({ code, label, width, height, isOn, isHover, isHeld, onPress, onRel
       onPointerLeave={handleCancel}
       onPointerOut={handleCancel}
       onPointerCancel={handleCancel}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      onDoubleClick={handleDoubleClick}
     >
       {label && <span className="sl-sl-kb__label">{label}</span>}
       {(isOn || isHeld) && <ModifierAlias code={code} />}
@@ -149,7 +187,10 @@ function Key({ code, label, width, height, isOn, isHover, isHeld, onPress, onRel
   );
 }
 
-export default function Keyboard({ highlightedCodes, hoveredCodes, heldKeys, onPress, onRelease }: Props) {
+export default function Keyboard({
+  highlightedCodes, hoveredCodes, heldKeys, pinnedCode,
+  onPress, onRelease, onKeyHoverEnter, onKeyHoverLeave, onDoubleClickKey,
+}: Props) {
   // 单元宽 56px,gap 4px
   const UNIT = 56;
   const GAP = 4;
@@ -163,6 +204,7 @@ export default function Keyboard({ highlightedCodes, hoveredCodes, heldKeys, onP
             const isOn = highlightedCodes.has(key.code);
             const isHover = hoveredCodes.has(key.code);
             const isHeld = heldSet.has(key.code);
+            const isPinned = pinnedCode === key.code;
             const w = (key.w ?? 1) * UNIT + (key.w ? (key.w - 1) * GAP : 0);
             return (
               <Key
@@ -174,8 +216,12 @@ export default function Keyboard({ highlightedCodes, hoveredCodes, heldKeys, onP
                 isOn={isOn}
                 isHover={isHover}
                 isHeld={isHeld}
+                isPinned={isPinned}
                 onPress={onPress}
                 onRelease={onRelease}
+                onHoverEnter={onKeyHoverEnter}
+                onHoverLeave={onKeyHoverLeave}
+                onDblClick={onDoubleClickKey}
               />
             );
           })}
