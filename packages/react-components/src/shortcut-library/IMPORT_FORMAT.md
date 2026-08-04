@@ -62,9 +62,33 @@ condition = "选中文本时"
 | 特殊键 | `Enter` `Esc` `Tab` `Space` `Backspace` |
 | 导航键 | `Insert`(或 `Ins`) `Home` `PageUp`(或 `PgUp`) `Delete`(或 `Del`) `End` `PageDown`(或 `PgDn`) |
 
-> ⚠️ 不支持的写法:列表外的按键名(`Return` / `Ctrl_L` / `KeyA` / `Numpad1`)会被判为
-> "无法识别的按键"。`+` 键本身不能写进 combo(`+` 是分隔符),要表示它请用符号行的
-> `=`(US 布局下 `+` 是 `Shift+=`),例:`combo = "Alt+Shift+="`。
+以上就是全部可用按键,不在清单里的名字一律报「无法识别的按键」。常见错误对照:
+
+| 错 | 对 |
+|---|---|
+| `Return` | `Enter` |
+| `Escape` | `Esc` |
+| `Control` / `Ctrl_L` | `Ctrl` |
+| `KeyA` | `A` |
+| `Digit1` | `1` |
+| `Minus` | `-` |
+| `Numpad1` | 小键盘不支持,改用主键区 `1` |
+
+### 字符串转义
+
+`combo` / `desc` / `condition` 是 TOML 双引号字符串,其中反斜杠和引号必须转义:
+
+| 想表达 | 写法 |
+|---|---|
+| 反斜杠键 | `combo = "\\"`(**两个**反斜杠,不是一个) |
+| 文本里的路径 | `desc = "打开 C:\\Users 目录"` |
+| 文本里的引号 | `desc = "所谓 \"快捷键\""` |
+
+中文、全角标点、emoji 都不需要转义。
+
+> ⚠️ `+` 是 combo 的分隔符,**无法转义**,所以加号键不能直接写进 combo。
+> US 布局下 `+` 是 `Shift+=`,因此请写 `combo = "Alt+Shift+="`。
+> 写成 `"Alt+Shift++"` 会被静默解析成错误的组合键(不报错但绑定错)。
 
 ## 完整示例
 
@@ -121,6 +145,9 @@ condition = "选中文本时"
 | 错误 | 原因 |
 |---|---|
 | "组合键缺少主键" | combo 只写了修饰键,如 `Ctrl+Shift` |
-| "无法识别的按键" | combo 中包含不支持的按键名 |
+| "无法识别的按键" | combo 中包含不支持的按键名(见上方对照表);若显示两个反斜杠,是反斜杠没转义 |
 | "分组缺少 name 字段" | `[group]` 块内缺少 `name = "..."` |
 | "未知字段" | `[[groups.shortcuts]]` 出现了 combo/desc/condition 之外的字段 |
+
+不报错但结果不对的情况:`combo` 里含 `+` 键(如 `"Alt+Shift++"`)会被静默解析成
+少一个键的组合,导入后看起来正常但绑定错误 —— 改用 `=` 见上方说明。

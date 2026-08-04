@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+// 用真解析器校验提示词里的示例 —— 见 "every TOML example inside the prompt parses"
+import { parseImportToml } from '../src/shortcut-library/src/import-parser';
 
 /**
  * Source-level regression tests for the four product features added on top
@@ -128,6 +130,50 @@ describe('feature 1 — copy-format prompt', () => {
     const doc = readFileSync(docPath, 'utf8');
     expect(doc).toMatch(/condition/);
     expect(parser).toMatch(/key === 'condition'/);
+  });
+
+  it('documents the key vocabulary the parser actually accepts', () => {
+    // 提示词的按键清单就是 LLM 的唯一依据。清单漏了什么,LLM 就只能猜,
+    // 用户拿到的就是「无法识别的按键」。导航簇当初就是这么漏掉的。
+    const prompt = importModal.match(/FORMAT_PROMPT\s*=\s*`([\s\S]*?)`;/)![1];
+    for (const key of ['PageUp', 'PgUp', 'PageDown', 'PgDn', 'Home', 'End', 'Insert']) {
+      expect(prompt, `按键清单必须包含 ${key}`).toContain(key);
+    }
+    // 反斜杠转义 + 加号不能进 combo,这两条是实际踩过的坑
+    expect(prompt, '必须说明反斜杠要转义').toMatch(/转义/);
+    expect(prompt, '必须说明 + 是分隔符不能当按键').toMatch(/\+ 是分隔符/);
+  });
+
+  it('every TOML example inside the prompt parses with zero errors', () => {
+    // 这条把「提示词教的写法」和「解析器认的写法」锁在一起。
+    // 之前示例里写了 Ctrl+Shift+Digit1,而 Digit1 恰好是提示词自己
+    // 明令禁止的全名写法 —— 靠人眼才发现。现在示例一旦自相矛盾,测试就红。
+    const prompt = importModal.match(/FORMAT_PROMPT\s*=\s*`([\s\S]*?)`;/)![1]
+      // 模板字面量里的 \` 和 \\ 在运行时会还原,这里手工还原成实际文本
+      .replace(/\\`/g, '`')
+      .replace(/\\\\/g, '\\');
+
+    // 只保留真正的 TOML 语句行,丢掉 # 注释和说明
+    const tomlLines = prompt.split('\n').filter((line) => {
+      const t = line.trim();
+      if (t === '' || t.startsWith('#')) return false;
+      return /^\[\[groups(\.shortcuts)?\]\]$/.test(t)
+        || /^(name|combo|desc|condition)\s*=/.test(t);
+    });
+    const toml = tomlLines.join('\n');
+
+    const result = parseImportToml(toml);
+    expect(
+      result.errors,
+      `提示词示例里有解析器不接受的写法: ${result.errors.join(' | ')}`,
+    ).toHaveLength(0);
+    // sanity:确实抽到了示例,而不是把所有行都过滤空了
+    expect(result.groups.length).toBeGreaterThanOrEqual(4);
+    const allCombos = result.groups.flatMap((g) => g.shortcuts.map((s) => s.combo));
+    expect(allCombos.length).toBeGreaterThanOrEqual(10);
+    // 示例 4 必须真的示范了反斜杠键和导航键
+    expect(allCombos.some((c) => c.length === 1 && c[0].code === 'Backslash')).toBe(true);
+    expect(allCombos.some((c) => c.some((k) => k.code === 'PageUp'))).toBe(true);
   });
 });
 

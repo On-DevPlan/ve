@@ -38,17 +38,38 @@ const FORMAT_PROMPT = `你是一个快捷键数据生成助手。根据用户需
 
 # === 主键写法(大小写不敏感) ===
 # 字母: A-Z     数字: 0-9     功能键: F1-F12
-# 方向: ↑ ↓ ← →  符号: - = [ ] \\ ; ' , . / \`
+# 方向: ↑ ↓ ← →
+# 符号: - = [ ] ; ' , . / \` 以及反斜杠(写法见下方"字符串转义")
 # 特殊: Enter Esc Tab Space Backspace
 # 导航: Insert(Ins) Home PageUp(PgUp) Delete(Del) End PageDown(PgDn)
 #       └ 括号内是等价简写,两种都能识别
+# ⚠️ 以上就是全部可用按键。不在这个清单里的名字一律报"无法识别的按键"。
+
+# === 字符串转义(TOML 双引号字符串规则) ===
+# 在 combo / desc / condition 的双引号内,这两个字符必须转义:
+#   反斜杠 → 写两个反斜杠      引号 → 写 \\"
+# 例:反斜杠键这条快捷键(Krita 的"显示工具选项")
+#   对: combo = "\\\\"          错: combo = "\\"
+# 例:说明文字里出现路径
+#   对: desc = "打开 C:\\\\Users 目录"
+# 中文、全角标点、emoji 都不需要转义,直接写。
 
 # === 不要这样写 ===
-# - 不要用列表外的按键名(如 Return / Ctrl_L / KeyA / Numpad1),会被判为无法识别
+# - 不要用列表外的按键名。常见错误:
+#     错 Return   → 对 Enter
+#     错 Escape   → 对 Esc
+#     错 Control  → 对 Ctrl
+#     错 Ctrl_L   → 对 Ctrl
+#     错 KeyA     → 对 A
+#     错 Digit1   → 对 1
+#     错 Minus    → 对 -
+#     错 Numpad1  → 小键盘不支持,改用主键区数字 1
 # - 不要把 + 键本身放进 combo —— + 是分隔符,无法转义。
 #   需要表达 "Alt+Shift 加上加号键" 时,请改用它在主键行的符号名 =
 #   (US 布局下 + 是 Shift+= ),例:combo = "Alt+Shift+="
+#   同理 combo = "Alt+Shift++" 或 "Alt+Shift++;" 都会被静默解析成错误的组合键。
 # - 不要用 combo = "" 或只有修饰键的 combo(如 "Ctrl+Shift"),必须有一个主键
+# - 不要给同一分组写出两条完全相同的 combo(会被判为冲突并标红)
 
 # === 示例 1:基础分组 ===
 [[groups]]
@@ -90,12 +111,12 @@ desc = "快速切换频道"
 name = "Word"
 
 [[groups.shortcuts]]
-combo = "Ctrl+Shift+Digit1"
+combo = "Ctrl+Shift+1"
 desc = "上标"
 condition = "选中文本时"
 
 [[groups.shortcuts]]
-combo = "Ctrl+Shift+Digit2"
+combo = "Ctrl+Shift+2"
 desc = "下标"
 condition = "选中文本时"
 
@@ -104,12 +125,40 @@ combo = "Ctrl+Shift+L"
 desc = "切换侧边栏"
 condition = "仅 Windows/Linux"
 
+# === 示例 4:导航键 + 符号键 + 转义(照这个写法准没错) ===
+[[groups]]
+name = "Krita"
+
+[[groups.shortcuts]]
+combo = "PageUp"
+desc = "切换到上一层图层"
+
+[[groups.shortcuts]]
+combo = "Ctrl+PageDown"
+desc = "把当前图层下移一层"
+
+[[groups.shortcuts]]
+combo = "\\\\"
+desc = "显示工具选项"
+condition = "Krita 2.9.6 起 \\\\ 打开工具选项"
+
+[[groups.shortcuts]]
+combo = ";"
+desc = "切换到上一个被激活的图层"
+
+[[groups.shortcuts]]
+combo = "Alt+Shift+="
+desc = "切换上一个混合模式"
+condition = "US 布局下 + 是 Shift+= ,所以这里写 ="
+
 # === 易错点(必须避免) ===
 # 1. combo 只写修饰键 → "Ctrl+Shift" 是非法,必须含主键
-# 2. 主键用全名 → 错:"Control+R";对:"Ctrl+R";符号主键错:"Minus";对:"-"
+# 2. 主键用全名 → 错:"Control+R" / "Digit1" / "Minus";对:"Ctrl+R" / "1" / "-"
 # 3. 顺序不规范 → 修饰键在前,主键在末尾,例:"Ctrl+Shift+P" 而不是 "P+Ctrl+Shift"
 # 4. 出现未知字段 → 每个 [[groups.shortcuts]] 只允许 combo / desc / condition
 # 5. 缩进/引号混乱 → name 与 desc 一律用双引号包裹
+# 6. 反斜杠没转义 → 错:combo = "\\";对:combo = "\\\\"
+# 7. 想表达 + 键 → 不能写 "+",改写成 "="(见示例 4)
 
 # === 输出要求 ===
 # - 只输出 TOML 文本,不要包裹在 markdown 代码块里(用户复制时不需要三个反引号 toml)
