@@ -24,7 +24,9 @@ export interface ImportParseResult {
 }
 
 // Reverse lookup: display label → KeyboardEvent.code
-// Only covers labels that a user might type in an import file
+// Only covers labels that a user might type in an import file.
+// 导航簇同时收两种写法:KeyboardEvent.code 原名(PageUp)和键盘上的简写(PgUp),
+// 因为用户手写 TOML 时两种都会用,而 labelFor() 最终会归一到 LABEL_MAP 的标签。
 const LABEL_REVERSE: Record<string, string> = {
   'Ctrl': 'ControlLeft',
   'Shift': 'ShiftLeft',
@@ -40,6 +42,15 @@ const LABEL_REVERSE: Record<string, string> = {
   '→': 'ArrowRight',
   'Backspace': 'Backspace',
   'Delete': 'Delete',
+  'Del': 'Delete',
+  'Insert': 'Insert',
+  'Ins': 'Insert',
+  'Home': 'Home',
+  'End': 'End',
+  'PageUp': 'PageUp',
+  'PgUp': 'PageUp',
+  'PageDown': 'PageDown',
+  'PgDn': 'PageDown',
 };
 
 // Characters that map to their Symbol-key code directly

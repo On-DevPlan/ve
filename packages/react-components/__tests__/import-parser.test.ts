@@ -50,6 +50,44 @@ describe('resolveCombo', () => {
     expect(result).toBeInstanceOf(Array);
     expect((result as KeyStroke[])[0]).toMatchObject({ code: 'F7' });
   });
+
+  // 回归:键盘 ROWS / keymap.LABEL_MAP 加了导航簇,但 import-parser 有自己独立的
+  // LABEL_REVERSE 表,当时漏了 → 导入 Krita 这类用 PageUp/PageDown 的配置直接
+  // 报「无法识别的按键」。两套表必须同步。
+  describe('navigation cluster keys', () => {
+    it.each([
+      ['PageUp', 'PageUp', 'PgUp'],
+      ['PgUp', 'PageUp', 'PgUp'],
+      ['PageDown', 'PageDown', 'PgDn'],
+      ['PgDn', 'PageDown', 'PgDn'],
+      ['Home', 'Home', 'Home'],
+      ['End', 'End', 'End'],
+      ['Insert', 'Insert', 'Ins'],
+      ['Ins', 'Insert', 'Ins'],
+      ['Delete', 'Delete', 'Del'],
+      ['Del', 'Delete', 'Del'],
+    ])('resolves %s → code %s / label %s', (input, code, label) => {
+      const result = resolveCombo(input);
+      expect(result, `"${input}" must resolve, got: ${String(result)}`).toBeInstanceOf(Array);
+      const keys = result as KeyStroke[];
+      expect(keys).toHaveLength(1);
+      expect(keys[0]).toMatchObject({ code, label, isModifier: false });
+    });
+
+    it('resolves Ctrl+PageUp / Ctrl+PageDown as modifier + nav key', () => {
+      for (const [input, expectedCode] of [
+        ['Ctrl+PageUp', 'PageUp'],
+        ['Ctrl+PageDown', 'PageDown'],
+      ] as const) {
+        const result = resolveCombo(input);
+        expect(result, `"${input}" must resolve`).toBeInstanceOf(Array);
+        const keys = result as KeyStroke[];
+        expect(keys).toHaveLength(2);
+        expect(keys[0]).toMatchObject({ code: 'ControlLeft', isModifier: true });
+        expect(keys[1]).toMatchObject({ code: expectedCode, isModifier: false });
+      }
+    });
+  });
 });
 
 describe('parseImportToml', () => {

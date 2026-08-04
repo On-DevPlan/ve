@@ -59,7 +59,12 @@ condition = "选中文本时"
 | 功能键 | `F1` … `F12` |
 | 方向键 | `↑` `↓` `←` `→` |
 | 符号 | `-` `=` `[` `]` `\` `;` `'` `,` `.` `/` `` ` `` |
-| 特殊键 | `Enter` `Esc` `Tab` `Space` `Backspace` `Delete` |
+| 特殊键 | `Enter` `Esc` `Tab` `Space` `Backspace` |
+| 导航键 | `Insert`(或 `Ins`) `Home` `PageUp`(或 `PgUp`) `Delete`(或 `Del`) `End` `PageDown`(或 `PgDn`) |
+
+> ⚠️ 不支持的写法:列表外的按键名(`Return` / `Ctrl_L` / `KeyA` / `Numpad1`)会被判为
+> "无法识别的按键"。`+` 键本身不能写进 combo(`+` 是分隔符),要表示它请用符号行的
+> `=`(US 布局下 `+` 是 `Shift+=`),例:`combo = "Alt+Shift+="`。
 
 ## 完整示例
 

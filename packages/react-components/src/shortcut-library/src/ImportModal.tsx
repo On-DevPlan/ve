@@ -39,7 +39,16 @@ const FORMAT_PROMPT = `你是一个快捷键数据生成助手。根据用户需
 # === 主键写法(大小写不敏感) ===
 # 字母: A-Z     数字: 0-9     功能键: F1-F12
 # 方向: ↑ ↓ ← →  符号: - = [ ] \\ ; ' , . / \`
-# 特殊: Enter Esc Tab Space Backspace Delete
+# 特殊: Enter Esc Tab Space Backspace
+# 导航: Insert(Ins) Home PageUp(PgUp) Delete(Del) End PageDown(PgDn)
+#       └ 括号内是等价简写,两种都能识别
+
+# === 不要这样写 ===
+# - 不要用列表外的按键名(如 Return / Ctrl_L / KeyA / Numpad1),会被判为无法识别
+# - 不要把 + 键本身放进 combo —— + 是分隔符,无法转义。
+#   需要表达 "Alt+Shift 加上加号键" 时,请改用它在主键行的符号名 =
+#   (US 布局下 + 是 Shift+= ),例:combo = "Alt+Shift+="
+# - 不要用 combo = "" 或只有修饰键的 combo(如 "Ctrl+Shift"),必须有一个主键
 
 # === 示例 1:基础分组 ===
 [[groups]]
