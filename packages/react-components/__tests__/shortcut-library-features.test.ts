@@ -272,15 +272,15 @@ describe('feature 6 — hover + double-click-pin reveal', () => {
     expect(keyboard).toMatch(/is-pinned/);
   });
 
-  it('index.tsx holds a unified popup with hover-open delay + a pinned flag', () => {
+  it('index.tsx holds a unified popup with hover-open delay + pinned is a visual label', () => {
     expect(indexTsx).toMatch(/HOVER_OPEN_DELAY\s*=\s*\d+/);
     expect(indexTsx).toMatch(/pinned:\s*boolean/);
     expect(indexTsx).toMatch(/handleHoverEnter/);
     expect(indexTsx).toMatch(/handleHoverLeave/);
     expect(indexTsx).toMatch(/handleDoubleClickKey/);
-    // pinned popup 不被外部 pointerup 关闭(pin 期间常驻,只能 × / Esc / 被其它键替换)
-    expect(indexTsx).toMatch(/longPressPopup\?\.pinned\) return/);
-    // 双击 → pinned: true
+    // 双击 → pinned: true(纯视觉标签:📌 徽章 + 源键 outline 环)
     expect(indexTsx).toMatch(/pinned:\s*true/);
+    // pinned 跟其它 popup 共享关闭逻辑 —— 不能有"pinned 外部点击不关"的特殊分支
+    expect(indexTsx).not.toMatch(/pinned\) return/);
   });
 });

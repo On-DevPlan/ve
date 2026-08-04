@@ -166,7 +166,9 @@ interface PopupState {
   code: string;
   rect: DOMRect;
   hits: BindingHit[];
-  // pin 住(双击触发)的 popup 不被外部点击 / 鼠标移开关闭,只能 × / Esc / 被其它键替换。
+  // pinned 只是一个视觉标签(形容词):true 时显示 📌 徽章 + 源键常驻 outline
+  // 环,与其它 popup 共享同一套显示 / 关闭 / 替换逻辑(hover / hold / 其它 dblclick
+  // 都会覆盖当前 popup,且都会被外部 pointerup 关闭)。
   pinned: boolean;
 }
 
@@ -235,8 +237,9 @@ export default function ShortcutLibrary() {
     setLongPressPopup(null);
   }, []);
 
-  // 悬停进入:延迟 HOVER_OPEN_DELAY 后弹(无绑定不弹;已 pin 在同一键则不降级)。
+  // 悬停进入:延迟 HOVER_OPEN_DELAY 后弹(无绑定不弹)。
   // 用 setLongPressPopup 的函数式更新读最新 popup,避免闭包里 popup 过期。
+  // 任何新触发(hover / hold / dblclick)都会覆盖当前 popup —— 没有"锁住"逻辑。
   const handleHoverEnter = useCallback(
     (code: string, rect: DOMRect) => {
       // 先清掉上一个未触发的 hover timer,快速划过时不连发
@@ -248,7 +251,6 @@ export default function ShortcutLibrary() {
         hoverTimer.current = undefined;
         const hits = findBindingsByCode(store.groups, code);
         setLongPressPopup((prev) => {
-          if (prev?.pinned && prev.code === code) return prev; // 已 pin 同一键 → 不降级
           if (hits.length === 0) return prev; // 无绑定不弹(悬停是"扫一眼",空 popup 是噪音)
           return { code, rect, hits, pinned: false };
         });
@@ -258,16 +260,14 @@ export default function ShortcutLibrary() {
     [store.groups],
   );
 
-  // 悬停离开:取消待触发的 hover timer;若当前 popup 非 pin 且正是这个键 → 关掉。
+  // 悬停离开:取消待触发的 hover timer;关闭当前 popup(无论 pinned,因为 pinned
+  // 跟 popup 是同一套关闭逻辑)。
   const handleHoverLeave = useCallback((code: string) => {
     if (hoverTimer.current !== undefined) {
       window.clearTimeout(hoverTimer.current);
       hoverTimer.current = undefined;
     }
-    setLongPressPopup((prev) => {
-      if (prev && !prev.pinned && prev.code === code) return null;
-      return prev;
-    });
+    setLongPressPopup((prev) => (prev?.code === code ? null : prev));
   }, []);
 
   // 双击:弹 popup 并 pin 住。清掉可能残留的 hold / hover 定时器,避免它们事后
@@ -358,8 +358,7 @@ export default function ShortcutLibrary() {
       const target = e.target as HTMLElement | null;
       // popup 内部松开不关闭
       if (target?.closest('.sl-sl-longpress')) return;
-      // pinned 的 popup 不被外部点击关闭(只能 × / Esc / 被其它键替换)
-      if (longPressPopup?.pinned) return;
+      // 所有 popup(无论 pinned)都按同一逻辑关闭
       handleLongPressClose();
     }
     window.addEventListener('keydown', onKeyDown);
