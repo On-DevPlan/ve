@@ -260,7 +260,7 @@ describe('feature 5 — navigation cluster keys', () => {
 });
 
 describe('feature 6 — hover + double-click-pin reveal', () => {
-  it('Keyboard wires mouse hover + double-click + pinnedCode', () => {
+  it('Keyboard wires mouse hover + double-click', () => {
     // 悬停(仅鼠标)与双击是新加的两个"显示快捷键"入口,与长按汇入同一个 popup
     expect(keyboard).toMatch(/onMouseEnter=/);
     expect(keyboard).toMatch(/onMouseLeave=/);
@@ -268,19 +268,18 @@ describe('feature 6 — hover + double-click-pin reveal', () => {
     expect(keyboard).toMatch(/onHoverEnter\?/);
     expect(keyboard).toMatch(/onHoverLeave\?/);
     expect(keyboard).toMatch(/onDblClick\?/);
-    expect(keyboard).toMatch(/pinnedCode/);
-    expect(keyboard).toMatch(/is-pinned/);
   });
 
-  it('index.tsx holds a unified popup with hover-open delay + pinned is a visual label', () => {
+  it('index.tsx holds one unified popup — no pin concept at all', () => {
     expect(indexTsx).toMatch(/HOVER_OPEN_DELAY\s*=\s*\d+/);
-    expect(indexTsx).toMatch(/pinned:\s*boolean/);
     expect(indexTsx).toMatch(/handleHoverEnter/);
     expect(indexTsx).toMatch(/handleHoverLeave/);
     expect(indexTsx).toMatch(/handleDoubleClickKey/);
-    // 双击 → pinned: true(纯视觉标签:📌 徽章 + 源键 outline 环)
-    expect(indexTsx).toMatch(/pinned:\s*true/);
-    // pinned 跟其它 popup 共享关闭逻辑 —— 不能有"pinned 外部点击不关"的特殊分支
-    expect(indexTsx).not.toMatch(/pinned\) return/);
+    // pin 概念已完全移除:没有 pinned 状态字段、没有 📌 徽章、没有 is-pinned 环
+    expect(indexTsx).not.toMatch(/pinned/);
+    expect(indexTsx).not.toMatch(/📌/);
+    expect(keyboard).not.toMatch(/pinned/i);
+    expect(css).not.toMatch(/is-pinned/);
+    expect(css).not.toMatch(/longpress__pin/);
   });
 });

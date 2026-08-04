@@ -6,8 +6,8 @@
 //   - 悬停 (mouse):           mouseenter → 父组件延迟 HOVER_OPEN_DELAY 弹 popup(非 pin)
 //   - 长按 (mouse / 物理键):   pointerdown → 父组件 KEY_HOLD_MS(400ms) hold timer → 弹 popup(非 pin)
 //   - 双击 (mouse):           dblclick → 父组件直接弹 popup 并 pin 住
-// 父组件持有唯一的 popup state(含 pinned 标志),三种入口都往里写,popup 由 pinned
-// 决定是否"常驻"。本组件只负责上报事件 + 渲染视觉态。
+// 父组件持有唯一的 popup state,三种入口都往里写;新触发覆盖旧 popup。
+// 本组件只负责上报事件 + 渲染视觉态。
 
 import { type PointerEvent as ReactPointerEvent, type MouseEvent as ReactMouseEvent } from 'react';
 
@@ -15,8 +15,6 @@ interface Props {
   highlightedCodes: Set<string>;
   hoveredCodes: Set<string>;
   heldKeys?: Set<string>;
-  // 当前被 pin 住的键 code(双击 pin 后,该键挂 is-pinned,显示一个常驻环)
-  pinnedCode?: string | null;
   onPress?: (code: string) => void;
   onRelease?: (code: string) => void;
   // 悬停(仅鼠标):进入 / 离开一个键。父组件据此延迟弹 / 关 mapping popup。
@@ -106,7 +104,6 @@ function ModifierAlias({ code }: { code: string }) {
 //   isOn:     来自父组件的 highlightedCodes(录入 3s 高亮)
 //   isHeld:   来自父组件的 heldKeys(物理键盘 / 鼠标长按中,键被按住)
 //   isHover:  来自父组件的 hoveredCodes(表格行 hover 高亮)
-//   isPinned: 双击 pin 住后,该键是 popup 的固定来源 → 挂 is-pinned 常驻环
 //
 // 鼠标 / 触屏按压交给父组件:pointerdown 调 onPress、pointerup / leave / cancel
 // 调 onRelease。悬停 / 双击同理上报,mouseenter / leave 只认鼠标(触屏不会触发,
@@ -119,7 +116,6 @@ interface KeyProps {
   isOn: boolean;
   isHover: boolean;
   isHeld: boolean;
-  isPinned: boolean;
   onPress?: (code: string) => void;
   onRelease?: (code: string) => void;
   onHoverEnter?: (code: string, rect: DOMRect) => void;
@@ -128,7 +124,7 @@ interface KeyProps {
 }
 
 function Key({
-  code, label, width, height, isOn, isHover, isHeld, isPinned,
+  code, label, width, height, isOn, isHover, isHeld,
   onPress, onRelease, onHoverEnter, onHoverLeave, onDblClick,
 }: KeyProps) {
   const handlePointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
@@ -168,7 +164,7 @@ function Key({
 
   return (
     <div
-      className={`sl-sl-kb__key ${isOn || isHeld ? 'is-on' : ''} ${isHover ? 'is-hover' : ''} ${isPinned ? 'is-pinned' : ''}`}
+      className={`sl-sl-kb__key ${isOn || isHeld ? 'is-on' : ''} ${isHover ? 'is-hover' : ''}`}
       style={{ width, height }}
       title={code}
       data-shortcut-code={code}
@@ -188,7 +184,7 @@ function Key({
 }
 
 export default function Keyboard({
-  highlightedCodes, hoveredCodes, heldKeys, pinnedCode,
+  highlightedCodes, hoveredCodes, heldKeys,
   onPress, onRelease, onKeyHoverEnter, onKeyHoverLeave, onDoubleClickKey,
 }: Props) {
   // 单元宽 56px,gap 4px
@@ -204,7 +200,6 @@ export default function Keyboard({
             const isOn = highlightedCodes.has(key.code);
             const isHover = hoveredCodes.has(key.code);
             const isHeld = heldSet.has(key.code);
-            const isPinned = pinnedCode === key.code;
             const w = (key.w ?? 1) * UNIT + (key.w ? (key.w - 1) * GAP : 0);
             return (
               <Key
@@ -216,7 +211,6 @@ export default function Keyboard({
                 isOn={isOn}
                 isHover={isHover}
                 isHeld={isHeld}
-                isPinned={isPinned}
                 onPress={onPress}
                 onRelease={onRelease}
                 onHoverEnter={onKeyHoverEnter}

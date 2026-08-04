@@ -166,10 +166,6 @@ interface PopupState {
   code: string;
   rect: DOMRect;
   hits: BindingHit[];
-  // pinned 只是一个视觉标签(形容词):true 时显示 📌 徽章 + 源键常驻 outline
-  // 环,与其它 popup 共享同一套显示 / 关闭 / 替换逻辑(hover / hold / 其它 dblclick
-  // 都会覆盖当前 popup,且都会被外部 pointerup 关闭)。
-  pinned: boolean;
 }
 
 export default function ShortcutLibrary() {
@@ -228,7 +224,7 @@ export default function ShortcutLibrary() {
       const hits = findBindingsByCode(store.groups, code);
       // 即使没有 hits 也展示 popup,告诉用户「该键未被任何分组使用」。
       // 长按是非 pin 的(松开后可被外部点击关闭)。
-      setLongPressPopup({ code, rect, hits, pinned: false });
+      setLongPressPopup({ code, rect, hits });
     },
     [store.groups],
   );
@@ -252,7 +248,7 @@ export default function ShortcutLibrary() {
         const hits = findBindingsByCode(store.groups, code);
         setLongPressPopup((prev) => {
           if (hits.length === 0) return prev; // 无绑定不弹(悬停是"扫一眼",空 popup 是噪音)
-          return { code, rect, hits, pinned: false };
+          return { code, rect, hits };
         });
       }, HOVER_OPEN_DELAY);
       hoverTimer.current = t;
@@ -260,8 +256,7 @@ export default function ShortcutLibrary() {
     [store.groups],
   );
 
-  // 悬停离开:取消待触发的 hover timer;关闭当前 popup(无论 pinned,因为 pinned
-  // 跟 popup 是同一套关闭逻辑)。
+  // 悬停离开:取消待触发的 hover timer;关闭当前 popup。
   const handleHoverLeave = useCallback((code: string) => {
     if (hoverTimer.current !== undefined) {
       window.clearTimeout(hoverTimer.current);
@@ -285,7 +280,7 @@ export default function ShortcutLibrary() {
         holdTimers.current.delete(code);
       }
       const hits = findBindingsByCode(store.groups, code);
-      setLongPressPopup({ code, rect, hits, pinned: true });
+      setLongPressPopup({ code, rect, hits });
     },
     [store.groups],
   );
@@ -358,7 +353,6 @@ export default function ShortcutLibrary() {
       const target = e.target as HTMLElement | null;
       // popup 内部松开不关闭
       if (target?.closest('.sl-sl-longpress')) return;
-      // 所有 popup(无论 pinned)都按同一逻辑关闭
       handleLongPressClose();
     }
     window.addEventListener('keydown', onKeyDown);
@@ -749,7 +743,6 @@ export default function ShortcutLibrary() {
               highlightedCodes={highlightedCodes}
               hoveredCodes={hoveredCodes}
               heldKeys={heldKeys}
-              pinnedCode={longPressPopup?.pinned ? longPressPopup.code : null}
               onPress={holdPress}
               onRelease={holdRelease}
               onKeyHoverEnter={handleHoverEnter}
@@ -797,9 +790,6 @@ export default function ShortcutLibrary() {
           <div className="sl-sl-longpress__head">
             <span className="sl-sl-longpress__title">
               按键 <code>{longPressPopup.code}</code> 的映射
-              {longPressPopup.pinned && (
-                <span className="sl-sl-longpress__pin" title="已固定:点 × 或按 Esc 关闭,或操作其它键替换">📌</span>
-              )}
             </span>
             <button
               className="sl-sl-icon-btn"

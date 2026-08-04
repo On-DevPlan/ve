@@ -469,12 +469,6 @@
   transform: translateY(1px);
   box-shadow: 0 0 0 2px var(--sl-hover-glow, rgba(245, 158, 11, 0.25));
 }
-/* 双击 pin 住的源键:常驻蓝色 outline 环,提示"这个键的映射正被固定展示"。
-   用 outline 而非 box-shadow,避免和 is-hover 的 glow / is-on 的样式冲突。 */
-.sl-sl-kb__key.is-pinned {
-  outline: 2px solid color-mix(in srgb, var(--sl-color-primary, #2563eb) 45%, transparent);
-  outline-offset: 1px;
-}
 /* is-on 已经覆盖物理键被按住的蓝色高亮,is-flash 之前是瞬时反馈用的,
    新的设计里按住 visual key 用 heldKeys prop 走 is-on 路径(蓝底 + 稳定),
    物理键盘按住也走 is-on 路径,is-flash 整体不再被使用。 */
@@ -751,11 +745,6 @@
   font-size: 11px;
   color: var(--sl-color-text-mute, #9ca3af);
   padding: 4px 0;
-}
-.sl-sl-longpress__pin {
-  margin-left: 6px;
-  font-size: 12px;
-  /* emoji 📌 自带颜色,不再额外染色 */
 }
 
 /* ===== Row-hover Description Tooltip ===== */

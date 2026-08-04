@@ -228,8 +228,8 @@ describe('hold-to-popup wiring (mouse + keyboard unified)', () => {
   });
 });
 
-describe('double-click instant-pins (📌) the mapping popup', () => {
-  it('dblclick opens a pinned popup (📌) immediately, closes on outside pointerup', async () => {
+describe('double-click = accelerated hold (instant popup)', () => {
+  it('dblclick opens the mapping popup immediately, closes on outside pointerup / Esc', async () => {
     seed();
     await act(async () => {
       root.render(<ShortcutLibrary />);
@@ -243,29 +243,27 @@ describe('double-click instant-pins (📌) the mapping popup', () => {
     const popups = document.querySelectorAll('.sl-sl-longpress');
     expect(popups.length, 'dblclick must open the mapping popup immediately').toBe(1);
     const popup = popups[0] as HTMLElement;
-    expect(popup.querySelector('.sl-sl-longpress__pin'), 'pinned popup shows the 📌 badge').not.toBeNull();
-    expect(r!.classList.contains('is-pinned'), 'pinned source key carries the is-pinned ring').toBe(true);
+    expect(popup.textContent).toMatch(/VSCode/);
+    expect(popup.textContent).toMatch(/Ctrl\s*\+\s*R/);
 
-    // pinned 是视觉标签 —— 跟其它 popup 一样,外部 pointerup 同样关闭
+    // 跟其它 popup 完全一样:外部 pointerup 关闭
     await act(async () => {
       document.body.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, button: 0 }));
     });
-    expect(document.querySelectorAll('.sl-sl-longpress').length, 'outside pointerup closes a pinned popup').toBe(0);
-    expect(r!.classList.contains('is-pinned'), 'is-pinned ring cleared once closed').toBe(false);
+    expect(document.querySelectorAll('.sl-sl-longpress').length, 'outside pointerup closes it').toBe(0);
 
     // Esc 同样关闭
     await act(async () => {
-      // 重新 dblclick,再验证 Esc
       r!.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
     });
     expect(document.querySelectorAll('.sl-sl-longpress').length).toBe(1);
     await act(async () => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     });
-    expect(document.querySelectorAll('.sl-sl-longpress').length, 'Esc closes the popup').toBe(0);
+    expect(document.querySelectorAll('.sl-sl-longpress').length, 'Esc closes it').toBe(0);
   });
 
-  it('double-clicking another key replaces the popup (sharing the same display logic as hover/hold)', async () => {
+  it('double-clicking another key replaces the popup (one shared display logic)', async () => {
     seed();
     await act(async () => {
       root.render(<ShortcutLibrary />);
@@ -279,16 +277,18 @@ describe('double-click instant-pins (📌) the mapping popup', () => {
       r.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
     });
     expect(document.querySelectorAll('.sl-sl-longpress').length).toBe(1);
-    expect(r.classList.contains('is-pinned')).toBe(true);
+    expect(
+      (document.querySelector('.sl-sl-longpress') as HTMLElement).textContent,
+    ).toMatch(/KeyR/);
 
-    // 双击另一个绑定键 → 替换(新 dblclick 覆盖旧 popup,is-pinned 环转移)
+    // 双击另一个键 → 覆盖旧 popup(始终只有一个 popup)
     await act(async () => {
       ctr.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
     });
     expect(document.querySelectorAll('.sl-sl-longpress').length).toBe(1);
-    const popup = document.querySelector('.sl-sl-longpress') as HTMLElement;
-    expect(popup.querySelector('.sl-sl-longpress__pin'), 'replaced popup is still pinned').not.toBeNull();
-    expect(r.classList.contains('is-pinned'), 'old ring cleared after replace').toBe(false);
-    expect(ctr.classList.contains('is-pinned'), 'new key gets the is-pinned ring').toBe(true);
+    expect(
+      (document.querySelector('.sl-sl-longpress') as HTMLElement).textContent,
+      'popup switched to the newly double-clicked key',
+    ).toMatch(/ControlLeft/);
   });
 });
