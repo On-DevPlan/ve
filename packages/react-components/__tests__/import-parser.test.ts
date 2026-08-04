@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { parseImportToml, resolveCombo } from '../src/shortcut-library/import-parser';
-import type { KeyStroke } from '../src/shortcut-library/types';
+import { parseImportToml, resolveCombo } from '../src/shortcut-library/src/import-parser';
+import type { KeyStroke } from '../src/shortcut-library/src/types';
 
 describe('resolveCombo', () => {
   it('resolves Ctrl+R to ControlLeft + KeyR', () => {

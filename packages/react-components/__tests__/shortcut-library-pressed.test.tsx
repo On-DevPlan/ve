@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // Pinpoint test: 统一的「按住」交互(鼠标 / 物理键共享)
 //   - 按下: 键立刻变蓝(is-on)—— 给用户视觉反馈「正在按住」
-//   - 持续 KEY_HOLD_MS(800ms): 弹 mapping popup,展示该键绑定的快捷键
+//   - 持续 KEY_HOLD_MS(400ms): 弹 mapping popup,展示该键绑定的快捷键
 //   - 释放: 立刻回到基态(is-on 移除),popup 保留
 // 鼠标 / 物理键路径统一,差别在入口(pointerdown vs keydown),后续一致。
 
@@ -12,7 +12,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { act } from 'react';
 import ShortcutLibrary from '../src/shortcut-library';
 
-const KEY_HOLD_MS = 800;
+const KEY_HOLD_MS = 400;
 
 function seed(): void {
   localStorage.setItem(
@@ -201,7 +201,7 @@ describe('hold-to-popup wiring (mouse + keyboard unified)', () => {
     }
   });
 
-  it('OS auto-repeat (e.repeat=true) does not restart the 800ms hold timer', async () => {
+  it('OS auto-repeat (e.repeat=true) does not restart the 400ms hold timer', async () => {
     // e.repeat 事件不该重启 hold timer(否则 OS auto-repeat 会让 popup
     // 永远弹不出来)。这里只验证:重复 keydown 后 heldKeys 仍只有一份。
     seed();
@@ -225,5 +225,65 @@ describe('hold-to-popup wiring (mouse + keyboard unified)', () => {
       }
     });
     expect(r!.classList.contains('is-on')).toBe(true);
+  });
+});
+
+describe('double-click pins the mapping popup (pin is replaceable)', () => {
+  it('dblclick opens a pinned popup (📌) that survives outside pointerup and closes on Esc', async () => {
+    seed();
+    await act(async () => {
+      root.render(<ShortcutLibrary />);
+    });
+    const r = container.querySelector('.sl-sl-kb__key[title="KeyR"]') as HTMLElement | null;
+    expect(r).not.toBeNull();
+
+    await act(async () => {
+      r!.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    });
+    const popups = document.querySelectorAll('.sl-sl-longpress');
+    expect(popups.length, 'dblclick must open the mapping popup').toBe(1);
+    const popup = popups[0] as HTMLElement;
+    expect(popup.querySelector('.sl-sl-longpress__pin'), 'pinned popup shows the 📌 badge').not.toBeNull();
+    expect(r!.classList.contains('is-pinned'), 'pinned source key carries the is-pinned ring').toBe(true);
+
+    // pinned popup must NOT be dismissed by a pointerup outside it
+    await act(async () => {
+      document.body.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, button: 0 }));
+    });
+    expect(document.querySelectorAll('.sl-sl-longpress').length, 'pinned popup survives outside pointerup').toBe(1);
+
+    // Esc always closes, even a pinned popup
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+    expect(document.querySelectorAll('.sl-sl-longpress').length, 'Esc closes the pinned popup').toBe(0);
+    expect(r!.classList.contains('is-pinned'), 'is-pinned ring cleared once closed').toBe(false);
+  });
+
+  it('double-clicking another bound key replaces the pinned popup', async () => {
+    seed();
+    await act(async () => {
+      root.render(<ShortcutLibrary />);
+    });
+    const r = container.querySelector('.sl-sl-kb__key[title="KeyR"]') as HTMLElement;
+    const ctr = container.querySelector('.sl-sl-kb__key[title="ControlLeft"]') as HTMLElement;
+    expect(r).not.toBeNull();
+    expect(ctr).not.toBeNull();
+
+    await act(async () => {
+      r.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    });
+    expect(document.querySelectorAll('.sl-sl-longpress').length).toBe(1);
+    expect(r.classList.contains('is-pinned')).toBe(true);
+
+    // 双击另一个有绑定的键 → 替换(pin 可被替换),is-pinned 环转移到新键
+    await act(async () => {
+      ctr.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    });
+    expect(document.querySelectorAll('.sl-sl-longpress').length).toBe(1);
+    const popup = document.querySelector('.sl-sl-longpress') as HTMLElement;
+    expect(popup.querySelector('.sl-sl-longpress__pin'), 'replaced popup is still pinned').not.toBeNull();
+    expect(r.classList.contains('is-pinned'), 'old pinned key ring cleared after replace').toBe(false);
+    expect(ctr.classList.contains('is-pinned'), 'new key gets the is-pinned ring').toBe(true);
   });
 });

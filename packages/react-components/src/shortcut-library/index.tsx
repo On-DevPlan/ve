@@ -1,23 +1,25 @@
 // index.tsx —— ShortcutLibrary 组件入口
 // 布局:左 sidebar(分组) + 主区(快捷键表格) + 下(键盘预览,可折叠)
-// 键盘预览支持:
-//   - 物理按键短按:is-flash 闪亮 280ms(per-code 节流 50ms 防止自动连发造成视觉抖动)
-//   - 长按 250ms:在键上方/侧边弹出 mapping popup,显示「该键绑定在: ...」
+// 键盘预览支持三种"显示该键快捷键"的入口(统一汇入同一个 mapping popup):
+//   - 悬停键(mouse):延迟 HOVER_OPEN_DELAY 弹出(无绑定的键不弹,避免噪音)
+//   - 长按键(mouse / 物理键,KEY_HOLD_MS):弹出
+//   - 双击键:弹出并 pin 住(pin 期间不被外部点击 / 移开关闭,但可被其它键替换)
+// 物理按键短按:键挂 is-on 蓝亮;录入 3s 高亮走 highlightedCodes。
 // 表格行 hover:右侧弹 floating description tooltip
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import './index.css';
-import { useShortcuts, findBindingsByCode, type BindingHit } from './useShortcuts';
-import ImportModal from './ImportModal';
-import type { ImportParseResult } from './import-parser';
-import type { ImportStats } from './useShortcuts';
-import type { Shortcut } from './types';
-import type { UserKVStore } from './userKvStore';
-import SettingsPanel from './SettingsPanel';
-import Sidebar from './Sidebar';
-import ShortcutTable from './ShortcutTable';
-import Keyboard from './Keyboard';
+import { useShortcuts, findBindingsByCode, type BindingHit } from './src/useShortcuts';
+import ImportModal from './src/ImportModal';
+import type { ImportParseResult } from './src/import-parser';
+import type { ImportStats } from './src/useShortcuts';
+import type { Shortcut } from './src/types';
+import type { UserKVStore } from './src/userKvStore';
+import SettingsPanel from './src/SettingsPanel';
+import Sidebar from './src/Sidebar';
+import ShortcutTable from './src/ShortcutTable';
+import Keyboard from './src/Keyboard';
 
 /**
  * user/kv 模式 UI 钩子:管理 Login/Register 表单 + 验证码发送 + 邀请码预填。
@@ -140,8 +142,10 @@ function syncLabel(store: UserKVStore): string {
 }
 
 // 物理键盘长按阈值 —— 按住多少毫秒后弹 mapping popup。
-// 800ms 跟「习惯的单击」区分得开(普通人单击<300ms),又不会让用户等太久。
-const KEY_HOLD_MS = 800;
+// 400ms:单击(<300ms)不会误触,长按明显比 800ms 更容易出快捷键。
+const KEY_HOLD_MS = 400;
+// 悬停多久后弹 mapping popup —— 比长按更轻量,做"扫一眼"用;无绑定的键不弹。
+const HOVER_OPEN_DELAY = 150;
 // 长按 popup 最多展示的映射数,超出显示「…还有 N 条」
 const LONG_PRESS_MAX = 5;
 
@@ -162,6 +166,8 @@ interface PopupState {
   code: string;
   rect: DOMRect;
   hits: BindingHit[];
+  // pin 住(双击触发)的 popup 不被外部点击 / 鼠标移开关闭,只能 × / Esc / 被其它键替换。
+  pinned: boolean;
 }
 
 export default function ShortcutLibrary() {
@@ -180,6 +186,8 @@ export default function ShortcutLibrary() {
   const [heldKeys, setHeldKeys] = useState<Set<string>>(new Set());
   // 每个 code 的 hold 倒计时 timer。命中后弹 popup,清掉。
   const holdTimers = useRef<Map<string, number>>(new Map());
+  // 悬停延迟弹 popup 的 timer(同一时刻只挂一个:mouseenter 先清旧再挂新)。
+  const hoverTimer = useRef<number | undefined>(undefined);
   // 同步一份 heldKeys(只读)给 onBlur 用 —— onBlur 里要清掉所有 timer,
   // 但 React 的 setHeldKeys 异步,onBlur 直接读 heldKeys state 拿不到最新值。
   // 用 ref 同步最新值。
@@ -216,8 +224,9 @@ export default function ShortcutLibrary() {
   const handleLongPress = useCallback(
     (code: string, rect: DOMRect) => {
       const hits = findBindingsByCode(store.groups, code);
-      // 即使没有 hits 也展示 popup,告诉用户「该键未被任何分组使用」
-      setLongPressPopup({ code, rect, hits });
+      // 即使没有 hits 也展示 popup,告诉用户「该键未被任何分组使用」。
+      // 长按是非 pin 的(松开后可被外部点击关闭)。
+      setLongPressPopup({ code, rect, hits, pinned: false });
     },
     [store.groups],
   );
@@ -225,6 +234,61 @@ export default function ShortcutLibrary() {
   const handleLongPressClose = useCallback(() => {
     setLongPressPopup(null);
   }, []);
+
+  // 悬停进入:延迟 HOVER_OPEN_DELAY 后弹(无绑定不弹;已 pin 在同一键则不降级)。
+  // 用 setLongPressPopup 的函数式更新读最新 popup,避免闭包里 popup 过期。
+  const handleHoverEnter = useCallback(
+    (code: string, rect: DOMRect) => {
+      // 先清掉上一个未触发的 hover timer,快速划过时不连发
+      if (hoverTimer.current !== undefined) {
+        window.clearTimeout(hoverTimer.current);
+        hoverTimer.current = undefined;
+      }
+      const t = window.setTimeout(() => {
+        hoverTimer.current = undefined;
+        const hits = findBindingsByCode(store.groups, code);
+        setLongPressPopup((prev) => {
+          if (prev?.pinned && prev.code === code) return prev; // 已 pin 同一键 → 不降级
+          if (hits.length === 0) return prev; // 无绑定不弹(悬停是"扫一眼",空 popup 是噪音)
+          return { code, rect, hits, pinned: false };
+        });
+      }, HOVER_OPEN_DELAY);
+      hoverTimer.current = t;
+    },
+    [store.groups],
+  );
+
+  // 悬停离开:取消待触发的 hover timer;若当前 popup 非 pin 且正是这个键 → 关掉。
+  const handleHoverLeave = useCallback((code: string) => {
+    if (hoverTimer.current !== undefined) {
+      window.clearTimeout(hoverTimer.current);
+      hoverTimer.current = undefined;
+    }
+    setLongPressPopup((prev) => {
+      if (prev && !prev.pinned && prev.code === code) return null;
+      return prev;
+    });
+  }, []);
+
+  // 双击:弹 popup 并 pin 住。清掉可能残留的 hold / hover 定时器,避免它们事后
+  // 把 pin 改回非 pin。即使无绑定也弹(pin 是用户主动检查)。
+  const handleDoubleClickKey = useCallback(
+    (code: string, rect: DOMRect) => {
+      if (hoverTimer.current !== undefined) {
+        window.clearTimeout(hoverTimer.current);
+        hoverTimer.current = undefined;
+      }
+      // 清掉第二次 pointerdown 启动的 hold timer,否则 400ms 后会把 pin 改回非 pin
+      const ht = holdTimers.current.get(code);
+      if (ht) {
+        window.clearTimeout(ht);
+        holdTimers.current.delete(code);
+      }
+      const hits = findBindingsByCode(store.groups, code);
+      setLongPressPopup({ code, rect, hits, pinned: true });
+    },
+    [store.groups],
+  );
 
   // 统一的「按下」「松开」入口(鼠标 / 触屏 / 物理键共享)。
   // 鼠标按下 visual key → onPress → 父组件把 code 加到 heldKeys(键变蓝)
@@ -294,6 +358,8 @@ export default function ShortcutLibrary() {
       const target = e.target as HTMLElement | null;
       // popup 内部松开不关闭
       if (target?.closest('.sl-sl-longpress')) return;
+      // pinned 的 popup 不被外部点击关闭(只能 × / Esc / 被其它键替换)
+      if (longPressPopup?.pinned) return;
       handleLongPressClose();
     }
     window.addEventListener('keydown', onKeyDown);
@@ -684,8 +750,12 @@ export default function ShortcutLibrary() {
               highlightedCodes={highlightedCodes}
               hoveredCodes={hoveredCodes}
               heldKeys={heldKeys}
+              pinnedCode={longPressPopup?.pinned ? longPressPopup.code : null}
               onPress={holdPress}
               onRelease={holdRelease}
+              onKeyHoverEnter={handleHoverEnter}
+              onKeyHoverLeave={handleHoverLeave}
+              onDoubleClickKey={handleDoubleClickKey}
             />
           )}
         </section>
@@ -726,7 +796,12 @@ export default function ShortcutLibrary() {
           onPointerDown={(e) => e.stopPropagation()}
         >
           <div className="sl-sl-longpress__head">
-            <span className="sl-sl-longpress__title">按键 <code>{longPressPopup.code}</code> 的映射</span>
+            <span className="sl-sl-longpress__title">
+              按键 <code>{longPressPopup.code}</code> 的映射
+              {longPressPopup.pinned && (
+                <span className="sl-sl-longpress__pin" title="已固定:点 × 或按 Esc 关闭,或操作其它键替换">📌</span>
+              )}
+            </span>
             <button
               className="sl-sl-icon-btn"
               aria-label="关闭"
