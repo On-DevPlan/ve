@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@lucide/vue": "^1.27.0",
+    "@remotion/player": "4.0.505",
     "@style-library/component-contract": "workspace:*",
     "@style-library/manifest-generator": "workspace:*",
     "@style-library/mount-adapters": "workspace:*",
@@ -18,6 +19,7 @@
     "@style-library/vue-components": "workspace:*",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "remotion": "4.0.505",
     "vue": "^3.4.0",
     "vue-router": "^4.4.0"
   },

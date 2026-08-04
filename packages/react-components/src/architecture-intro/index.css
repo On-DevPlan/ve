@@ -1,0 +1,81 @@
+/* architecture-intro 外壳样式。
+   只管 Player 外围的容器/标题/说明 —— 视频内部的一切都是 Remotion 内联 style,
+   不受这里影响(也不该受:视频是成品画面,不跟随宿主主题切换)。
+
+   类名统一 sl-ai- 前缀:
+     - sl- 前缀是 ShadowRoot CSS adoption 的识别约定(见 how-to-add-component §3)
+     - -ai- 是本组件的命名空间,避免与其它组件的 .sl-shell 之类撞车
+   颜色/间距走 --sl-* token 并带硬编码 fallback,保证 token 缺失时也不塌。 */
+
+.sl-ai-shell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sl-space-4, 20px);
+  box-sizing: border-box;
+  width: 100%;
+  padding: var(--sl-space-4, 20px);
+  font-family: var(--sl-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
+  color: var(--sl-color-text, #f2f6ff);
+}
+
+.sl-ai-header {
+  display: flex;
+  gap: var(--sl-space-3, 16px);
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.sl-ai-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  color: var(--sl-color-text, #f2f6ff);
+}
+
+.sl-ai-subtitle {
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--sl-color-text-muted, #8fa3cc);
+}
+
+.sl-ai-badge {
+  flex: 0 0 auto;
+  padding: 6px 14px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  color: #39e0d0;
+  white-space: nowrap;
+  background: rgb(57 224 208 / 10%);
+  border: 1px solid rgb(57 224 208 / 35%);
+  border-radius: 999px;
+}
+
+/* 16:9 舞台。aspect-ratio 让容器高度随宽度走,Player 内部再等比缩放画面。 */
+.sl-ai-stage {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  width: 100%;
+  overflow: hidden;
+  background: #05070f;
+  border: 1px solid var(--sl-color-border, rgb(148 178 255 / 22%));
+  border-radius: var(--sl-radius-lg, 16px);
+  box-shadow: 0 30px 80px -40px rgb(0 0 0 / 90%);
+}
+
+.sl-ai-footer {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--sl-color-text-muted, #8fa3cc);
+}
+
+.sl-ai-footer code {
+  padding: 2px 7px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  color: #61dafb;
+  background: rgb(97 218 251 / 10%);
+  border-radius: 5px;
+}
