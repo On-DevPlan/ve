@@ -45,19 +45,31 @@ export interface GroupInvitationView {
   createdAt: string;
 }
 
-export interface GroupKvKeyView {
+export interface KvView {
   key: string;
-  /** 截断后长度,避免大 value 撑爆卡片 */
+  value: string;
   valuePreview: string;
   valueLength: number;
   tags: string[];
+  groupId: number;
+  groupName: string;
+  myRole: GroupRole;
+  expiresAt: string;
 }
 
-export interface GroupKvInventory {
-  groupId: number;
+export interface KvListResult {
+  items: KvView[];
   total: number;
-  /** 仅展示前几名,完整列表点 "查看全部" 跳 shortcut-library / KV 控制台 */
-  keys: GroupKvKeyView[];
+  page: number;
+  pageSize: number;
+}
+
+export interface KvEditorPayload {
+  key: string;
+  value: string;
+  tags: string[];
+  /** 秒;0=永久 */
+  ttl: number;
 }
 
 /** 三视图模式:only one of Overview / Members / Invitations / Inventory */
@@ -92,6 +104,10 @@ export interface UserSpaceStore {
   revokeInvitation(id: number, invitationId: number): Promise<void>;
   acceptInvitation(code: string): Promise<GroupSummary>;
 
-  // ── KV 库存(只读,显示该组下了多少 KV) ─────────
-  inventory(id: number, limit?: number): Promise<GroupKvInventory>;
+  // ── KV ────────────────────────────────────────────
+  createKv(groupId: number, args: KvEditorPayload): Promise<void>;
+  updateKv(groupId: number, args: KvEditorPayload): Promise<void>;
+  deleteKv(groupId: number, key: string): Promise<void>;
+  getKvDetail(groupId: number, key: string): Promise<KvView>;
+  listKvs(groupId: number, opts: { page: number; pageSize: number; tags?: string[] }): Promise<KvListResult>;
 }

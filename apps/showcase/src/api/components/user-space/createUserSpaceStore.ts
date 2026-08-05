@@ -2,7 +2,7 @@
 //
 // 职责:把 groupV1Service / groupInvitationV1Service / userV1Service / kvV1Service
 // 的通用 HTTP 读写,包成 user-space 组件要的 listGroups / createGroup / members /
-// invitations / inventory 等业务动作。组件只认这些语义,不认后端协议。
+// invitations / createKv / listKvs 等业务动作。组件只认这些语义,不认后端协议。
 //
 // 为什么 import 走相对路径而不是 '@api':
 //   '@api' 解析到 api/index.ts,而 index.ts 又 `export * from './components'`
@@ -15,8 +15,9 @@
 //   - 后端 DTO 有 `description: string`(无效空串),UI 统一转 `''` 兜底
 //   - createInvitation 后端用 admin / writer / reader;owner 不允许
 //   - isDefault / isSelf 由前端按 callerUserId + callerDefaultGroupId 推断
-//   - inventory 只读 groupId 下的 KV:用 kvV1Service.list({groupId,...}) 拉,
-//     截断 + 总量返回给 UI,不暴露给后端 DTO 的内部字段(visibility 已经废弃)
+//   - KV CRUD 走 kvV1Service 的 groupId 契约:Set/Delete 需 owner|admin|writer,
+//     Get/List 任意成员。listKvs 复用后端 list 自带 value 全文,消除 N+1;
+//     toKvView 只做预览截断,不再逐条 get(visibility 已废弃)。
 
 import { jwtAuth } from '../../http/auth-store';
 import {
@@ -24,20 +25,18 @@ import {
   groupInvitationV1Service,
   userV1Service,
   kvV1Service,
-  ApiError,
 } from '../../services';
 import type {
   GroupMemberView,
   GroupSummary,
-  GroupKvInventory,
-  GroupKvKeyView,
   GroupInvitationView,
+  KvListResult,
+  KvView,
+  KvEditorPayload,
   UserSpaceStore,
 } from './types';
 
 const VALUE_PREVIEW_MAX = 80;
-/** 后端 "组内 KV 已存在但 key 不属于 caller" 业务 code(per-key)—— UI 忽略单条失败 */
-const KV_CODE_NOT_FOUND = 50;
 
 function normalizeDescription(desc: string | undefined | null): string {
   return (desc ?? '').trim();
@@ -63,6 +62,20 @@ function toGroupSummary(input: {
     isDefault,
     createdAt: input.createdAt,
     updatedAt: input.updatedAt,
+  };
+}
+
+function toKvView(kv: { key: string; value: string; expires_at: string; groupId: number; groupName: string; myRole: KvView['myRole']; tags?: string[] }): KvView {
+  return {
+    key: kv.key,
+    value: kv.value,
+    valuePreview: kv.value.length > VALUE_PREVIEW_MAX ? kv.value.slice(0, VALUE_PREVIEW_MAX) + '…' : kv.value,
+    valueLength: kv.value.length,
+    tags: kv.tags ?? [],
+    groupId: kv.groupId,
+    groupName: kv.groupName,
+    myRole: kv.myRole,
+    expiresAt: kv.expires_at,
   };
 }
 
@@ -229,37 +242,39 @@ export function createUserSpaceStore(): UserSpaceStore {
     return toGroupSummary(group, (await resolveDefaultGroupId()) === group.id);
   }
 
-  // ── KV 库存(只读) ─────────────────────────────
+  // ── KV CRUD ─────────────────────────────────────
+  // 权限(后端 contract):Set/Delete → owner|admin|writer;Get/List → 任意成员。
+  // createKv/updateKv 都是 set 的 upsert(按 key 覆盖);ttl 秒,0=永久。
 
-  async function inventory(id: number, limit: number = 10): Promise<GroupKvInventory> {
+  async function createKv(groupId: number, args: KvEditorPayload): Promise<void> {
     requireAuth();
-    const safeLimit = Math.max(1, Math.min(50, limit));
-    const { items, total } = await kvV1Service.list({ limit: safeLimit, offset: 0, groupId: id });
-    const keys: GroupKvKeyView[] = [];
-    for (const kv of items) {
-      // 安全:即使单条 get 失败也不阻塞整个列表
-      let valuePreview = '';
-      let valueLength = 0;
-      try {
-        const full = await kvV1Service.get({ key: kv.key });
-        valueLength = full.value.length;
-        valuePreview = full.value.length > VALUE_PREVIEW_MAX
-          ? full.value.slice(0, VALUE_PREVIEW_MAX) + '…'
-          : full.value;
-      } catch (e) {
-        // 单 key 不存在或权限不足:lid 静默跳过
-        if (e instanceof ApiError && e.code === KV_CODE_NOT_FOUND) continue;
-        // 其它错误也吞掉 —— inventory 是 best-effort,不能因单条失败炸列表
-        continue;
-      }
-      keys.push({
-        key: kv.key,
-        valuePreview,
-        valueLength,
-        tags: kv.tags ?? [],
-      });
-    }
-    return { groupId: id, total, keys };
+    await kvV1Service.set({ key: args.key, value: args.value, ttl: args.ttl, tags: args.tags, groupId });
+  }
+
+  async function updateKv(groupId: number, args: KvEditorPayload): Promise<void> {
+    requireAuth();
+    await kvV1Service.set({ key: args.key, value: args.value, ttl: args.ttl, tags: args.tags, groupId });
+  }
+
+  async function deleteKv(groupId: number, key: string): Promise<void> {
+    requireAuth();
+    await kvV1Service.delete({ key, groupId });
+  }
+
+  async function getKvDetail(groupId: number, key: string): Promise<KvView> {
+    requireAuth();
+    return toKvView(await kvV1Service.get({ key, groupId }));
+  }
+
+  async function listKvs(groupId: number, opts: { page: number; pageSize: number; tags?: string[] }): Promise<KvListResult> {
+    requireAuth();
+    const { items, total } = await kvV1Service.list({
+      limit: opts.pageSize,
+      offset: (opts.page - 1) * opts.pageSize,
+      tags: opts.tags,
+      groupId,
+    });
+    return { items: items.map(toKvView), total, page: opts.page, pageSize: opts.pageSize };
   }
 
   return {
@@ -278,6 +293,10 @@ export function createUserSpaceStore(): UserSpaceStore {
     createInvitation,
     revokeInvitation,
     acceptInvitation,
-    inventory,
+    createKv,
+    updateKv,
+    deleteKv,
+    getKvDetail,
+    listKvs,
   };
 }
