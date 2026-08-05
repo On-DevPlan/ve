@@ -61,6 +61,43 @@ export default function ShortcutLibrary() {
   const [showSettings, setShowSettings] = useState(false);
   // 键盘预览折叠态 —— 默认展开;用户手动收起后写入 LS,下次进详情页保持
   const [previewCollapsed, setPreviewCollapsed] = useState<boolean>(loadPreviewCollapsed);
+
+  // 拖拽布局:sidebar 宽度 + 键盘预览高度(都不持久化,组件实例间独立)
+  const [sidebarWidth, setSidebarWidth] = useState(280);
+  const [previewHeight, setPreviewHeight] = useState(200);
+  const dragType = useRef<null | 'sidebar' | 'preview'>(null);
+  const dragStart = useRef<{ x: number; y: number; w: number; h: number }>({ x: 0, y: 0, w: 0, h: 0 });
+
+  function startDrag(type: 'sidebar' | 'preview', e: React.PointerEvent<HTMLElement>) {
+    e.preventDefault();
+    dragType.current = type;
+    dragStart.current = {
+      x: e.clientX,
+      y: e.clientY,
+      w: sidebarWidth,
+      h: previewHeight,
+    };
+  }
+
+  useEffect(() => {
+    function onMove(e: PointerEvent) {
+      const t = dragType.current;
+      if (!t) return;
+      if (t === 'sidebar') {
+        setSidebarWidth(Math.min(500, Math.max(200, dragStart.current.w + (e.clientX - dragStart.current.x))));
+      } else {
+        setPreviewHeight(Math.min(500, Math.max(80, dragStart.current.h - (e.clientY - dragStart.current.y))));
+      }
+    }
+    function onUp() { dragType.current = null; }
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+  }, []);
+
   // 长按 popup 状态(由 Keyboard 子组件回调触发)
   const [longPressPopup, setLongPressPopup] = useState<PopupState | null>(null);
   // 物理键盘 / 鼠标当前被按住的 code 集合。键持续按住时,对应的 visual key
@@ -354,7 +391,10 @@ export default function ShortcutLibrary() {
   }, [hoveredShortcut]);
 
   return (
-    <div className="sl-sl-root">
+    <div
+      className="sl-sl-root"
+      style={{ ['--sl-sl-sidebar-w' as string]: `${sidebarWidth}px` }}
+    >
       <div className={`sl-sl-userkv-bar sl-sl-userkv-bar--${auth.jwtAuthState}`}>
         {auth.jwtAuthState === 'logged-in' && auth.token ? (
           <span className="sl-sl-sync-pill">已登录 {auth.jwtUser?.email ?? ''}</span>
@@ -398,6 +438,10 @@ export default function ShortcutLibrary() {
         onDelete={store.deleteGroup}
         filter={store.query}
       />
+      <div
+        className="sl-sl-resize-handle sl-sl-resize-handle--col"
+        onPointerDown={(e) => startDrag('sidebar', e)}
+      />
 
       <main className="sl-sl-main">
         <header className="sl-sl-topbar">
@@ -440,7 +484,16 @@ export default function ShortcutLibrary() {
           </div>
         )}
 
-        <section className={`sl-sl-preview ${previewCollapsed ? 'is-collapsed' : ''}`}>
+        {!previewCollapsed && (
+          <div
+            className="sl-sl-resize-handle sl-sl-resize-handle--row"
+            onPointerDown={(e) => startDrag('preview', e)}
+          />
+        )}
+        <section
+          className={`sl-sl-preview ${previewCollapsed ? 'is-collapsed' : ''}`}
+          style={previewCollapsed ? undefined : { ['--sl-sl-preview-h' as string]: `${previewHeight}px` }}
+        >
           <div className="sl-sl-preview__head">
             <span className="sl-sl-preview__title">键盘预览</span>
             <span className="sl-sl-preview__hint">

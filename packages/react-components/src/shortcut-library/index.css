@@ -10,7 +10,7 @@
    各自成为独立滚动容器,外层裁剪不再影响内容可达性 */
 .sl-sl-root {
   display: grid;
-  grid-template-columns: 280px 1fr;
+  grid-template-columns: var(--sl-sl-sidebar-w, 280px) 4px 1fr;
   height: 100vh;
   overflow: hidden;
   background: var(--sl-color-bg, #fafafa);
@@ -396,12 +396,14 @@
 
 /* ===== Keyboard Preview ===== */
 .sl-sl-preview {
-  flex: 0 0 auto;
+  flex: 0 0 var(--sl-sl-preview-h, auto);
   background: var(--sl-color-surface, #fff);
   border: 1px solid var(--sl-color-border, #e4e4e7);
   border-radius: 8px;
   padding: 20px;
   overflow-x: auto;
+  overflow-y: hidden;
+  min-height: 0;
 }
 .sl-sl-preview.is-collapsed { padding: 12px 20px; }
 .sl-sl-preview__head {
@@ -1138,4 +1140,38 @@
 }
 .sl-sl-settings-toggle input[type='checkbox']:checked + .sl-sl-settings-toggle__track .sl-sl-settings-toggle__thumb {
   left: 20px;
+}
+
+/* ===== 拖拽调整布局的 resize handle ===== */
+.sl-sl-resize-handle {
+  flex-shrink: 0;
+  background: transparent;
+  transition: background 0.15s;
+  z-index: 10;
+  touch-action: none;
+}
+.sl-sl-resize-handle:hover,
+.sl-sl-resize-handle:active {
+  background: var(--sl-color-primary, #2563eb);
+  opacity: 0.3;
+}
+/* 列向(sidebar 宽度):竖条,在 sidebar 右侧 */
+.sl-sl-resize-handle--col {
+  width: 4px;
+  cursor: col-resize;
+  align-self: stretch;
+}
+/* 行向(preview 高度):横条,在 preview 上方 */
+.sl-sl-resize-handle--row {
+  height: 4px;
+  cursor: row-resize;
+  width: 100%;
+  margin-bottom: 4px;
+  border-radius: 2px;
+  background: var(--sl-color-border, #e4e4e7);
+}
+.sl-sl-resize-handle--row:hover,
+.sl-sl-resize-handle--row:active {
+  background: var(--sl-color-primary, #2563eb);
+  opacity: 0.5;
 }
