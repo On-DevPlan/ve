@@ -52,7 +52,6 @@ describe('createShortcutStore', () => {
     loggedIn();
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ code: 0, data: null }), { status: 200 }));
     await createShortcutStore().save([]);
-    expect(fetchMock).toHaveBeenCalledWith('/api/v1/kv', expect.objectContaining({ body: expect.stringContaining('"visibility":"private"') }));
     expect(fetchMock).toHaveBeenCalledWith('/api/v1/kv', expect.objectContaining({ body: expect.stringContaining('"tags":["shortcut-library"]') }));
   });
 

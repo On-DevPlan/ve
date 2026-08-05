@@ -17,6 +17,7 @@ import type {
   KvListResponse,
   KvSetArgs,
   KvGetArgs,
+  KvDeleteArgs,
   KvTagCount,
 } from './types';
 
@@ -27,31 +28,33 @@ export type {
   KvListArgs,
   KvSetArgs,
   KvGetArgs,
+  KvDeleteArgs,
   KvTagCount,
-  Visibility,
 } from './types';
 
 export class KvV1Service extends HttpService {
   readonly BASE = apiPaths.kvV1;
 
   async set(args: KvSetArgs): Promise<void> {
-    await this.reqPost('', {
+    const body: { key: string; value: string; ttl: number; tags: string[]; groupId?: number } = {
       key: args.key,
       value: args.value,
-      visibility: args.visibility ?? 'private',
       ttl: args.ttl ?? 0,
       // replace 语义:传了就用,没传默认 [] = 清空
       tags: args.tags ?? [],
-    });
+    };
+    if (args.groupId !== undefined && args.groupId > 0) body.groupId = args.groupId;
+    await this.reqPost('', body);
   }
 
   async get(args: KvGetArgs): Promise<KvItem> {
-    const qs = args.ownerId && args.ownerId > 0 ? `?ownerId=${args.ownerId}` : '';
+    const qs = args.groupId && args.groupId > 0 ? `?groupId=${args.groupId}` : '';
     return this.reqGet<KvItem>(`/${encodeURIComponent(args.key)}${qs}`);
   }
 
-  async delete(args: { key: string }): Promise<void> {
-    await this.reqDelete(`/${encodeURIComponent(args.key)}`);
+  async delete(args: KvDeleteArgs): Promise<void> {
+    const qs = args.groupId && args.groupId > 0 ? `?groupId=${args.groupId}` : '';
+    await this.reqDelete(`/${encodeURIComponent(args.key)}${qs}`);
   }
 
   async list(args: KvListArgs = {}): Promise<KvListResponse> {

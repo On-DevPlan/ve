@@ -79,7 +79,6 @@ export function createShortcutStore(): ShortcutStoreLite {
     await kvV1Service.set({
       key: BLOB_KEY,
       value: JSON.stringify(groups),
-      visibility: 'private',
       tags: [...SHORTCUT_TAGS],
     });
   }
