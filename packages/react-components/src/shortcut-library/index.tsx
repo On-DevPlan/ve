@@ -61,6 +61,168 @@ export default function ShortcutLibrary() {
   const [showSettings, setShowSettings] = useState(false);
   // 键盘预览折叠态 —— 默认展开;用户手动收起后写入 LS,下次进详情页保持
   const [previewCollapsed, setPreviewCollapsed] = useState<boolean>(loadPreviewCollapsed);
+
+  // 拖拽布局:sidebar 宽度 + 键盘预览高度(都不持久化,组件实例间独立)。
+  //
+  // 性能设计(冻结快照):拖拽期间内容子树【完全不参与 layout】。
+  //   - 每个可变面板 = 一层 panel(尺寸随 grid/flex 变)+ 一层 inner(冻结内容)。
+  //   - pointerdown 唯一一次读布局:读 panel 尺寸,给 inner 设固定 width/height +
+  //     contain:size layout paint → 浏览器知道 inner 尺寸与父级无关,外部尺寸变化
+  //     不传导进子树。每帧 layout 节点从"57 键 + N 行"降到常数级(几个容器)。
+  //   - pointermove / rAF:只写 --sidebar-w / --preview-h,面板层 reflow,内容层跳过。
+  //   - pointerup:解冻 inner + setState 同帧(避免解冻跳一下)。
+  const [sidebarWidth, setSidebarWidth] = useState(280);
+  const [previewHeight, setPreviewHeight] = useState(200);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  // 面板(尺寸变)与 inner(冻结内容)的引用
+  const sidebarPanelRef = useRef<HTMLDivElement | null>(null);
+  const sidebarInnerRef = useRef<HTMLDivElement | null>(null);
+  const mainPanelRef = useRef<HTMLElement | null>(null);
+  const mainInnerRef = useRef<HTMLDivElement | null>(null);
+  const previewRef = useRef<HTMLElement | null>(null);
+  const previewInnerRef = useRef<HTMLDivElement | null>(null);
+
+  const dragType = useRef<null | 'sidebar' | 'preview'>(null);
+  const dragStart = useRef<{ x: number; y: number; w: number; h: number }>(
+    { x: 0, y: 0, w: 0, h: 0 },
+  );
+  // rAF 去重标记 + 最新指针偏移(ref 写入,不触发渲染)
+  const rafId = useRef<number | null>(null);
+  const latest = useRef<{ dx: number; dy: number } | null>(null);
+
+  const SIDEBAR_MIN = 200;
+  const SIDEBAR_MAX = 500;
+  const PREVIEW_MIN = 80;
+  const PREVIEW_MAX = 500;
+
+  // pointerdown 冻结:读一次 panel 尺寸,inner 钉死(切断父尺寸→子树重排)
+  function freezePanels() {
+    const pairs: Array<[HTMLElement | null, HTMLElement | null]> = [
+      [sidebarPanelRef.current, sidebarInnerRef.current],
+      [mainPanelRef.current, mainInnerRef.current], // main 是 root 的子 panel,inner 是 main 内容
+      [previewRef.current, previewInnerRef.current],
+    ];
+    for (const [panel, inner] of pairs) {
+      if (!panel || !inner) continue;
+      // clientWidth/Height 不含 border,精确对齐内容区(避免解冻瞬间跳 2px)
+      inner.style.width = `${panel.clientWidth}px`;
+      inner.style.height = `${panel.clientHeight}px`;
+      inner.style.contain = 'size layout paint';
+    }
+  }
+
+  // pointerup 解冻:清除 inner 固定尺寸(与 setState 同帧,避免跳一下)
+  function unfreezePanels() {
+    for (const inner of [sidebarInnerRef.current, mainInnerRef.current, previewInnerRef.current]) {
+      if (!inner) continue;
+      inner.style.width = '';
+      inner.style.height = '';
+      inner.style.contain = '';
+    }
+  }
+
+  function startDrag(type: 'sidebar' | 'preview', e: React.PointerEvent<HTMLElement>) {
+    e.preventDefault();
+    // 指针捕获:移出元素/窗口也不丢事件
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+
+    dragType.current = type;
+    dragStart.current = {
+      x: e.clientX,
+      y: e.clientY,
+      w: sidebarWidth,
+      h: previewHeight,
+    };
+
+    // 冻结内容层(只读一次布局),禁文本选择 + 改光标 + 禁 transition
+    freezePanels();
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = type === 'sidebar' ? 'col-resize' : 'row-resize';
+    rootRef.current?.classList.add('sl-sl-dragging');
+  }
+
+  // rAF 每帧一次:直改 CSS 变量 → 内容实时跟随(一次 Layout)。夹紧纯数学,不读 DOM。
+  function frame() {
+    rafId.current = null;
+    const p = latest.current;
+    if (!p) return;
+    if (dragType.current === 'sidebar') {
+      const w = Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, dragStart.current.w + p.dx));
+      rootRef.current?.style.setProperty('--sl-sl-sidebar-w', `${w}px`);
+    } else if (dragType.current === 'preview') {
+      const h = Math.min(PREVIEW_MAX, Math.max(PREVIEW_MIN, dragStart.current.h - p.dy));
+      previewRef.current?.style.setProperty('--sl-sl-preview-h', `${h}px`);
+    }
+    latest.current = null;
+  }
+
+  // pointerup:恢复样式,解冻 inner + 同步 React state(同一事件处理器 = 同帧,避免跳一下)
+  function endDrag(e: PointerEvent) {
+    if (rafId.current !== null) {
+      cancelAnimationFrame(rafId.current);
+      rafId.current = null;
+    }
+    document.body.style.userSelect = '';
+    document.body.style.cursor = '';
+    rootRef.current?.classList.remove('sl-sl-dragging');
+    const t = dragType.current;
+    if (t) {
+      if (t === 'sidebar') {
+        setSidebarWidth(Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, dragStart.current.w + (e.clientX - dragStart.current.x))));
+      } else {
+        setPreviewHeight(Math.min(PREVIEW_MAX, Math.max(PREVIEW_MIN, dragStart.current.h - (e.clientY - dragStart.current.y))));
+      }
+    }
+    unfreezePanels();
+    latest.current = null;
+    dragType.current = null;
+  }
+
+  // 用 ref 持有最新 endDrag,供 useEffect 的 window 监听引用(避免闭包过期 + lint 依赖报错)
+  const endDragRef = useRef<(e: PointerEvent) => void>(() => {});
+  endDragRef.current = endDrag;
+
+  useEffect(() => {
+    function onMove(e: PointerEvent) {
+      if (!dragType.current) return;
+      latest.current = { dx: e.clientX - dragStart.current.x, dy: e.clientY - dragStart.current.y };
+      // rAF 去重:一帧内多次 pointermove 只调度一次 frame
+      if (rafId.current === null) rafId.current = requestAnimationFrame(frame);
+    }
+    function onUp(e: PointerEvent) {
+      endDragRef.current(e);
+    }
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+      if (rafId.current !== null) cancelAnimationFrame(rafId.current);
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+    };
+  }, []);
+
+  // 键盘可达性:splitter 可聚焦,方向键按固定步长直接提交(低频,允许走 Layout)
+  const SPLIT_STEP = 16;
+  function onSplitterKeyDown(type: 'sidebar' | 'preview', e: React.KeyboardEvent) {
+    if (e.key === 'ArrowRight' && type === 'sidebar') {
+      e.preventDefault();
+      setSidebarWidth((v) => Math.min(SIDEBAR_MAX, v + SPLIT_STEP));
+    } else if (e.key === 'ArrowLeft' && type === 'sidebar') {
+      e.preventDefault();
+      setSidebarWidth((v) => Math.max(SIDEBAR_MIN, v - SPLIT_STEP));
+    } else if (e.key === 'ArrowUp' && type === 'preview') {
+      e.preventDefault();
+      setPreviewHeight((v) => Math.min(PREVIEW_MAX, v + SPLIT_STEP));
+    } else if (e.key === 'ArrowDown' && type === 'preview') {
+      e.preventDefault();
+      setPreviewHeight((v) => Math.max(PREVIEW_MIN, v - SPLIT_STEP));
+    }
+  }
+
   // 长按 popup 状态(由 Keyboard 子组件回调触发)
   const [longPressPopup, setLongPressPopup] = useState<PopupState | null>(null);
   // 物理键盘 / 鼠标当前被按住的 code 集合。键持续按住时,对应的 visual key
@@ -354,52 +516,85 @@ export default function ShortcutLibrary() {
   }, [hoveredShortcut]);
 
   return (
-    <div className="sl-sl-root">
-      <div className={`sl-sl-userkv-bar sl-sl-userkv-bar--${auth.jwtAuthState}`}>
-        {auth.jwtAuthState === 'logged-in' && auth.token ? (
-          <span className="sl-sl-sync-pill">已登录 {auth.jwtUser?.email ?? ''}</span>
-        ) : (
-          <button className="sl-sl-btn sl-sl-btn--ghost" onClick={loginModal.open}>
-            登录
-          </button>
-        )}
-        <button
-          className="sl-sl-icon-btn"
-          aria-label="设置"
-          title="设置"
-          onClick={() => setShowSettings(true)}
+    <div
+      ref={rootRef}
+      className="sl-sl-root"
+      style={{ ['--sl-sl-sidebar-w' as string]: `${sidebarWidth}px` }}
+    >
+      <div
+        ref={sidebarPanelRef}
+        className="sl-sl-panel sl-sl-panel--sidebar"
+      >
+        <div
+          ref={sidebarInnerRef}
+          className="sl-sl-panel__inner"
         >
-          ⚙
-        </button>
-        {auth.jwtAuthState === 'logged-in' && (
-          <button
-            className="sl-sl-btn sl-sl-btn--ghost"
-            onClick={() =>
-              void logoutWithConfirm({
-                saveMode: store.saveMode,
-                dirty: store.dirty,
-                warnOnDirtyExit: store.warnOnDirtyExit,
-                // 返回 promise,让 logoutWithConfirm 在失败时弹「保存失败」alert
-                flushDirty: () => store.flushDirty(),
-              })
+          <Sidebar
+            groups={store.groups}
+            selectedGroupId={store.selectedGroupId}
+            onSelect={store.setSelectedGroupId}
+            onAdd={store.addGroup}
+            onRename={store.renameGroup}
+            onDelete={store.deleteGroup}
+            filter={store.query}
+            footer={
+              <div className="sl-sl-sidebar-foot">
+                {auth.jwtAuthState === 'logged-in' && auth.token ? (
+                  <span className="sl-sl-sync-pill">
+                    已登录 {auth.jwtUser?.email ?? ''}
+                  </span>
+                ) : (
+                  <button className="sl-sl-btn sl-sl-btn--ghost" onClick={loginModal.open}>
+                    登录
+                  </button>
+                )}
+                <div className="sl-sl-sidebar-foot__row">
+                  <button
+                    className="sl-sl-icon-btn"
+                    aria-label="设置"
+                    title="设置"
+                    onClick={() => setShowSettings(true)}
+                  >
+                    ⚙
+                  </button>
+                  {auth.jwtAuthState === 'logged-in' && (
+                    <button
+                      className="sl-sl-btn sl-sl-btn--ghost"
+                      onClick={() =>
+                        void logoutWithConfirm({
+                          saveMode: store.saveMode,
+                          dirty: store.dirty,
+                          warnOnDirtyExit: store.warnOnDirtyExit,
+                          // 返回 promise,让 logoutWithConfirm 在失败时弹「保存失败」alert
+                          flushDirty: () => store.flushDirty(),
+                        })
+                      }
+                    >
+                      退出
+                    </button>
+                  )}
+                </div>
+              </div>
             }
-          >
-            退出
-          </button>
-        )}
+          />
+        </div>
       </div>
-
-      <Sidebar
-        groups={store.groups}
-        selectedGroupId={store.selectedGroupId}
-        onSelect={store.setSelectedGroupId}
-        onAdd={store.addGroup}
-        onRename={store.renameGroup}
-        onDelete={store.deleteGroup}
-        filter={store.query}
+      <div
+        className="sl-sl-resize-handle sl-sl-resize-handle--col"
+        role="separator"
+        aria-orientation="vertical"
+        aria-valuenow={sidebarWidth}
+        aria-label="调整侧栏宽度"
+        tabIndex={0}
+        onPointerDown={(e) => startDrag('sidebar', e)}
+        onKeyDown={(e) => onSplitterKeyDown('sidebar', e)}
       />
 
-      <main className="sl-sl-main">
+      <main ref={mainPanelRef} className="sl-sl-main">
+        <div
+          ref={mainInnerRef}
+          className="sl-sl-panel__inner sl-sl-panel__inner--main"
+        >
         <header className="sl-sl-topbar">
           <input
             className="sl-sl-input sl-sl-topbar__search"
@@ -440,7 +635,27 @@ export default function ShortcutLibrary() {
           </div>
         )}
 
-        <section className={`sl-sl-preview ${previewCollapsed ? 'is-collapsed' : ''}`}>
+        {!previewCollapsed && (
+          <div
+            className="sl-sl-resize-handle sl-sl-resize-handle--row"
+            role="separator"
+            aria-orientation="horizontal"
+            aria-valuenow={previewHeight}
+            aria-label="调整键盘预览高度"
+            tabIndex={0}
+            onPointerDown={(e) => startDrag('preview', e)}
+            onKeyDown={(e) => onSplitterKeyDown('preview', e)}
+          />
+        )}
+        <section
+          ref={previewRef}
+          className={`sl-sl-preview ${previewCollapsed ? 'is-collapsed' : ''}`}
+          style={previewCollapsed ? undefined : { ['--sl-sl-preview-h' as string]: `${previewHeight}px` }}
+        >
+          <div
+            ref={previewInnerRef}
+            className="sl-sl-panel__inner sl-sl-panel__inner--preview"
+          >
           <div className="sl-sl-preview__head">
             <span className="sl-sl-preview__title">键盘预览</span>
             <span className="sl-sl-preview__hint">
@@ -474,7 +689,9 @@ export default function ShortcutLibrary() {
               onDoubleClickKey={handleDoubleClickKey}
             />
           )}
+          </div>
         </section>
+        </div>
       </main>
 
       {showImport && (

@@ -12,7 +12,7 @@
 // @vitest-environment jsdom
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { jwtAuth, TOKEN_KEY } from '../src/shared/auth-store';
+import { jwtAuth, TOKEN_KEY } from '../src/api/http/auth-store';
 import { setBearerProvider } from '../src/api/http/request';
 
 function mockJSON(status: number, body: unknown): Response {

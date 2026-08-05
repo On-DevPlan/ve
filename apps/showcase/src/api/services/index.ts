@@ -9,3 +9,5 @@
 
 export * from './userV1';
 export * from './kvV1';
+export * from './groupV1';
+export * from './groupInvitationV1';

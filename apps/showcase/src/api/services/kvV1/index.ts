@@ -58,6 +58,7 @@ export class KvV1Service extends HttpService {
     const qs = new URLSearchParams();
     if (args.limit !== undefined) qs.set('limit', String(args.limit));
     if (args.offset !== undefined) qs.set('offset', String(args.offset));
+    if (args.groupId !== undefined && args.groupId > 0) qs.set('groupId', String(args.groupId));
     // tags 是重复参数(tags=a&tags=b = 含 a 或 b);match=all 表示全部命中
     for (const tag of args.tags ?? []) qs.append('tags', tag);
     if (args.match) qs.set('match', args.match);

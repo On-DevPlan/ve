@@ -1,4 +1,8 @@
-// shared/auth-store.ts —— JWT/Bearer 认证单例(shortcut-library 云同步用)。
+// api/http/auth-store.ts —— JWT/Bearer 认证单例(shortcut-library 云同步用)。
+//
+// 为什么在这里(而不是 shared/):JWT token 管理 / bearer 注入 / 401 降级
+// 都是 API 传输层的事,和 request.ts 是同一层。shared/ 只保留跨框架共享的
+// UI 桥接(登录弹窗 useLoginModal 等),不装 API 状态。
 //
 // 曾经这里还有一个 cookie-auth 的 5 态 authStore + SSR AsyncLocalStorage,已在
 // cookie 路径移除时砍掉(登录/会话全走 JWT,见下)。只保留 userV1/kvV1 需要的
@@ -18,8 +22,11 @@
 //   任意操作中 → syncing → logged-in / error / logged-out
 
 import { ref } from 'vue';
-import { userV1Service, type UserInfo } from '@api';
-import { setBearerProvider, setBearerUnauthorizedHandler } from '@api/http/request';
+// 目录内部一律走相对路径,不 import '@api'(barrel)——
+// '@api' 会经 index → components → createShortcutStore → 本文件 形成循环。
+// 见 api/services/README.md「目录内部 import 规则」。
+import { userV1Service, type UserInfo } from '../services';
+import { setBearerProvider, setBearerUnauthorizedHandler } from './request';
 
 export const TOKEN_KEY = 'sl-userkv:v1:token';
 const EMAIL_KEY = 'sl-userkv:v1:email';

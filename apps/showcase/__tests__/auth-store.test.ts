@@ -11,8 +11,8 @@
 // @vitest-environment jsdom
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { jwtAuth, getJwtAuthSnapshot, subscribeJwtAuth, TOKEN_KEY } from '../src/shared/auth-store';
-import type { JwtAuthStatus } from '../src/shared/auth-store';
+import { jwtAuth, getJwtAuthSnapshot, subscribeJwtAuth, TOKEN_KEY } from '../src/api/http/auth-store';
+import type { JwtAuthStatus } from '../src/api/http/auth-store';
 import { setBearerProvider } from '../src/api/http/request';
 describe('jwtAuth (additive path)', () => {
   beforeEach(() => {

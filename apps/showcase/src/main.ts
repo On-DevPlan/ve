@@ -32,7 +32,7 @@ import { SearchKey } from './composables/useSearch';
 import { usePlatform } from './composables/usePlatform';
 import { defaultTokens } from './theme/tokens';
 import { applyThemeToDocument } from './theme/apply-theme';
-import { jwtAuth } from '@/shared/auth-store';
+import { jwtAuth } from '@/api/http/auth-store';
 
 async function bootstrap() {
   // 0) JWT user-auth 会话恢复(userV1/kvV1 用)。

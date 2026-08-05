@@ -41,6 +41,8 @@ export interface KvListArgs {
   tags?: string[];
   /** any = 任一命中(默认),all = 全部命中 */
   match?: 'any' | 'all';
+  /** 工作空间 id;0 或不传 = 默认组 */
+  groupId?: number;
 }
 
 /** GET /kv/tags facet 返回项 */

@@ -99,9 +99,12 @@
 - `api/components/*` → `../../services/...`(不 import `@api`,避免
   `index → components → createShortcutStore → index` 循环)
 - `api/services/*` → `../http/request`、`../registry`、`../../registry`
-- `shared/auth-store.ts` → `@api`(外部调用方,合法)
+- `api/http/auth-store.ts` → `../services`、`./request`(目录内相对路径,不
+  import `@api`,避免 `index → components → createShortcutStore → auth-store` 循环)
 
-依赖方向:`shared → api`,单向。`api` 完全不认识 `shared`。
+依赖方向:`shared → api`,单向。`api` 完全不认识 `shared`。JWT 认证状态机
+(auth-store)属于 API 传输层,随 request.ts 一起放在 `api/http/`;`shared/` 只留
+跨框架共享的 UI 桥接(登录弹窗 useLoginModal、router-accessor 等)。
 
 ## 关联阅读
 
