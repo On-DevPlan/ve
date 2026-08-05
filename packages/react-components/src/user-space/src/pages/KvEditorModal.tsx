@@ -11,11 +11,17 @@ export interface KvEditorModalProps {
   /** 编辑模式初始值;新建传 null */
   initial: KvView | null;
   saving: boolean;
+  /**
+   * 是否允许写入。false 时 value/tags/ttl 输入框与「保存」按钮均 disabled,
+   * 编辑模式下给读者一个真正的只读详情视图(只有 Key 始终锁定,见下方)。
+   * 默认 true,保持非 reader 行为不变。
+   */
+  canWrite?: boolean;
   onSave: (payload: { key: string; value: string; tags: string[]; ttl: number }) => Promise<void>;
   onClose: () => void;
 }
 
-export default function KvEditorModal({ open, mode, initial, saving, onSave, onClose }: KvEditorModalProps) {
+export default function KvEditorModal({ open, mode, initial, saving, canWrite = true, onSave, onClose }: KvEditorModalProps) {
   const [key, setKey] = useState('');
   const [value, setValue] = useState('');
   const [tagsText, setTagsText] = useState('');
@@ -73,7 +79,7 @@ export default function KvEditorModal({ open, mode, initial, saving, onSave, onC
               className="sl-us-input sl-us-input--textarea"
               value={value}
               onChange={(e) => setValue(e.target.value)}
-              disabled={saving}
+              disabled={saving || !canWrite}
               rows={6}
             />
           </label>
@@ -83,7 +89,7 @@ export default function KvEditorModal({ open, mode, initial, saving, onSave, onC
               className="sl-us-input"
               value={tagsText}
               onChange={(e) => setTagsText(e.target.value)}
-              disabled={saving}
+              disabled={saving || !canWrite}
               placeholder="prod, cache"
             />
           </label>
@@ -95,7 +101,7 @@ export default function KvEditorModal({ open, mode, initial, saving, onSave, onC
               min={0}
               value={ttlDays}
               onChange={(e) => setTtlDays(Number(e.target.value))}
-              disabled={saving}
+              disabled={saving || !canWrite}
             />
           </label>
         </div>
@@ -103,7 +109,7 @@ export default function KvEditorModal({ open, mode, initial, saving, onSave, onC
           <button className="sl-us-btn" onClick={onClose} disabled={saving}>取消</button>
           <button
             className="sl-us-btn sl-us-btn--primary"
-            disabled={saving || !key.trim() || mode === 'edit' && !initial}
+            disabled={saving || !canWrite || !key.trim() || mode === 'edit' && !initial}
             onClick={() => void onSave({
               key: key.trim(),
               value,

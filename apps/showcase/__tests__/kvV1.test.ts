@@ -93,6 +93,17 @@ describe('kvV1 service (throw model)', () => {
     expect((mockFetch.mock.calls[0][1] as RequestInit).method).toBe('DELETE');
   });
 
+  it('delete without groupId omits query string (locks default-group behavior)', async () => {
+    const mockFetch = vi.fn().mockResolvedValue(mockJSON(200, { code: 0, message: 'ok' }));
+    global.fetch = mockFetch;
+
+    await kvV1Service.delete({ key: 'k' });
+
+    const url = mockFetch.mock.calls[0][0] as string;
+    expect(url).toBe('/api/v1/kv/k');
+    expect((mockFetch.mock.calls[0][1] as RequestInit).method).toBe('DELETE');
+  });
+
   it('list with pagination appends query string', async () => {
     const mockFetch = vi.fn().mockResolvedValue(
       mockJSON(200, { code: 0, data: { items: [], total: 0 } }),

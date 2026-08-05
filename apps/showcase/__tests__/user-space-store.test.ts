@@ -60,7 +60,7 @@ describe('user-space store KV CRUD', () => {
     );
     const store = createUserSpaceStore();
     const view = await store.getKvDetail(42, 'k');
-    expect(fetchMock).toHaveBeenCalledWith('/api/v1/kv/k?groupId=42', expect.anything());
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/kv/k?groupId=42', expect.objectContaining({ method: 'GET' }));
     expect(view).toMatchObject({ key: 'k', value: 'v', groupId: 42, groupName: 'g', myRole: 'writer' });
   });
 
@@ -77,7 +77,7 @@ describe('user-space store KV CRUD', () => {
     );
     const store = createUserSpaceStore();
     const result = await store.listKvs(42, { page: 2, pageSize: 10, tags: ['prod'] });
-    expect(fetchMock).toHaveBeenCalledWith('/api/v1/kv?limit=10&offset=10&groupId=42&tags=prod', expect.anything());
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/kv?limit=10&offset=10&groupId=42&tags=prod', expect.objectContaining({ method: 'GET' }));
     expect(result.total).toBe(2);
     expect(result.page).toBe(2);
     expect(result.pageSize).toBe(10);

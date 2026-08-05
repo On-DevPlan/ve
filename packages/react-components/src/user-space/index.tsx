@@ -14,6 +14,7 @@ import Members from './src/pages/Members';
 import Invitations from './src/pages/Invitations';
 import Inventory from './src/pages/Inventory';
 import KvEditorModal from './src/pages/KvEditorModal';
+import { hasMinRole } from '@api/components/user-space';
 import type {
   GroupInvitationView,
   GroupMemberView,
@@ -72,6 +73,9 @@ export default function UserSpace() {
     return groups.find((g) => g.id === currentSelected) ?? null;
   }, [currentSelected, groups]);
 
+  // 写权限:reader 只读,writer+ 才有写操作
+  const canWrite = selectedGroup ? hasMinRole(selectedGroup.myRole, 'writer') : false;
+
   // 切换组时清空子视图缓存,避免脏数据
   useEffect(() => {
     setMembers([]);
@@ -114,25 +118,25 @@ export default function UserSpace() {
     }
   }, [currentSelected, store]);
 
-  const loadKv = useCallback(async () => {
+  const loadKv = useCallback(async (page: number, tag: string | null) => {
     if (!currentSelected) return;
     setKvLoading(true);
     setKvError(null);
     try {
-      const result = await store.listKvs(currentSelected, { page: kvPage, pageSize: KV_PAGE_SIZE, tags: kvTag ? [kvTag] : undefined });
+      const result = await store.listKvs(currentSelected, { page, pageSize: KV_PAGE_SIZE, tags: tag ? [tag] : undefined });
       setKv(result);
     } catch (e) {
       setKvError(e instanceof Error ? e.message : 'load kv failed');
     } finally {
       setKvLoading(false);
     }
-  }, [currentSelected, kvPage, kvTag, store]);
+  }, [currentSelected, store]);
 
   useEffect(() => {
     if (view === 'members') void loadMembers();
     if (view === 'invitations') void loadInvitations();
-    if (view === 'inventory') void loadKv();
-  }, [view, loadMembers, loadInvitations, loadKv]);
+    if (view === 'inventory') void loadKv(kvPage, kvTag);
+  }, [view, loadMembers, loadInvitations, loadKv, kvPage, kvTag]);
 
   // ── 动作封装(展示态) ──────────────────────────────
   async function withError(fn: () => Promise<void>): Promise<void> {
@@ -246,7 +250,7 @@ export default function UserSpace() {
       await store.createKv(currentSelected, payload);
       setKvEditorOpen(false);
       setKvPage(1); // 新建后回到第一页,新 key 在前
-      await loadKv();
+      await loadKv(1, kvTag);
     });
   }
 
@@ -255,7 +259,7 @@ export default function UserSpace() {
     await withError(async () => {
       await store.updateKv(currentSelected, payload);
       setKvEditorOpen(false);
-      await loadKv();
+      await loadKv(kvPage, kvTag);
     });
   }
 
@@ -264,8 +268,12 @@ export default function UserSpace() {
     await withError(async () => {
       await store.deleteKv(currentSelected, item.key);
       // 末页删空则回退一页
-      if (kv && kv.items.length === 1 && kvPage > 1) setKvPage((p) => p - 1);
-      await loadKv();
+      let nextPage = kvPage;
+      if (kv && kv.items.length === 1 && kvPage > 1) {
+        nextPage = kvPage - 1;
+        setKvPage(nextPage);
+      }
+      await loadKv(nextPage, kvTag);
     });
   }
 
@@ -410,13 +418,14 @@ export default function UserSpace() {
                   onCreate={() => { setKvEditorMode('create'); setKvEditorInit(null); setKvEditorOpen(true); }}
                   onEdit={(item) => { setKvEditorMode('edit'); setKvEditorInit(item); setKvEditorOpen(true); }}
                   onDelete={handleDeleteKv}
-                  onReload={loadKv}
+                  onReload={() => loadKv(kvPage, kvTag)}
                 />
                 <KvEditorModal
                   open={kvEditorOpen}
                   mode={kvEditorMode}
                   initial={kvEditorInit}
                   saving={saving}
+                  canWrite={canWrite}
                   onSave={kvEditorMode === 'create' ? handleCreateKv : handleUpdateKv}
                   onClose={() => setKvEditorOpen(false)}
                 />
