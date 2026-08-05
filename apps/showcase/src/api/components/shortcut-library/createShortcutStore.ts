@@ -1,7 +1,7 @@
-// api/components/shortcut-library/createShortcutStore.ts —— 快捷键库的持久化封装。
+// api/components/shortcut-library/createShortcutStore.ts —— 快捷键库的持久化封装(按 item 的增删改查)。
 //
 // 职责:把 kvV1Service 的通用 KV 读写,包成 shortcut-library 组件要的
-// load / save / importGroups 三个业务动作。组件只认这三个方法,不认 KV 协议。
+// pull / create* / update* / delete* 细粒度业务动作。组件只认这些方法,不认 KV 协议。
 //
 // 为什么 import 走相对路径 '../../services' 而不是 '@api':
 //   '@api' 解析到 api/index.ts,而 index.ts 又 `export * from './components'`
@@ -9,121 +9,252 @@
 //   createShortcutStore → index)。ESM 循环虽然能靠 hoisting 侥幸跑通,但
 //   求值顺序取决于谁先被 import,一旦有人在 index 顶层加副作用就会拿到
 //   undefined。**目录内部一律走相对路径,'@api' 只留给 src/api/ 外部调用方。**
+//
+// 数据模型:一个 item(group / shortcut)= 一个 KV key,统一 tag 'shortcut-library'。
+//   - group:    sl-group-<id>     → { id, name, order, createdAt, updatedAt }
+//   - shortcut: sl-shortcut-<id>  → { id, groupId, order, combo, description, condition, createdAt, updatedAt }
+// 拉取 = GET /kv?tags=shortcut-library 分页取全,按 order 重建 groups[]。
+// 增删改都是单 key 的 POST /kv(幂等 upsert)或 DELETE /kv/:key,没有"整体 snapshot
+// 上传"——前端某时刻快照为空/异常,也不会触发任何写,不会清空远端。
+// 旧版本把所有数据塞进单个 'shortcuts' blob 整体覆盖,pull 时一次性迁移成多 key。
 
 import { jwtAuth } from '../../http/auth-store';
 import { kvV1Service, ApiError } from '../../services';
-import type { Group } from './types';
+import type { Group, Shortcut } from './types';
 
-const BLOB_KEY = 'shortcuts';
-/** 快捷键库数据落 kv 时打的 tag —— 未来可按 tag 过滤/区分不同组件的数据。 */
-const SHORTCUT_TAGS = ['shortcut-library'] as const;
+const TAG = 'shortcut-library';
+const GROUP_PREFIX = 'sl-group-';
+const SHORTCUT_PREFIX = 'sl-shortcut-';
+/** 旧版本的单 blob key(整体覆盖时代)—— 拉取时检测并迁移。 */
+const LEGACY_KEY = 'shortcuts';
+/** 后端 kv "键不存在" 的业务 code(信封 {code,message,data} 的 code 字段)。 */
+const KV_CODE_NOT_FOUND = 50;
+/** 单页 list 拉取条数,按 total 分页取全。 */
+const LIST_LIMIT = 200;
+
+function groupKey(id: string): string {
+  return `${GROUP_PREFIX}${id}`;
+}
+function shortcutKey(id: string): string {
+  return `${SHORTCUT_PREFIX}${id}`;
+}
 
 /**
- * 后端 kv "键不存在" 的业务 code(信封 {code,message,data} 的 code 字段)。
- *
- * load() 把它当成"还没存过"→ 返回空数组,而不是抛错:首次登录的用户
- * 必然没有 blob,那是正常状态不是故障。其它 code 一律透传给调用方。
+ * 组件读写数据的唯一入口 —— 细粒度增删改查,没有整体 snapshot 上传。
+ * 两个实现:云端(本文件,逐 key 请求)与本地 LSStore(整库写,见 store.ts)。
  */
-const KV_CODE_NOT_FOUND = 50;
-
-export interface ImportInput {
-  groups: { name: string; shortcuts: { combo: Group['shortcuts'][number]['combo']; description: string; condition?: string }[] }[];
-  errors: string[];
+export interface ShortcutCrudStore {
+  /** 拉取最新:list 全部 tag=shortcut-library 的 key,重建 groups[](含旧 blob 迁移)。 */
+  pull(): Promise<Group[]>;
+  /** 新建分组(order = 侧栏位置,由调用方从本地数组派生)。 */
+  createGroup(g: Group, order: number): Promise<void>;
+  /** 改分组(改名);order 不变也一起传,保持幂等 upsert。 */
+  updateGroup(g: Group, order: number): Promise<void>;
+  deleteGroup(id: string): Promise<void>;
+  /** 新建快捷键(order = 组内位置)。 */
+  createShortcut(groupId: string, s: Shortcut, order: number): Promise<void>;
+  updateShortcut(groupId: string, s: Shortcut, order: number): Promise<void>;
+  deleteShortcut(id: string): Promise<void>;
 }
 
-export interface ImportStats {
-  groupsAdded: number;
-  groupsAppended: number;
-  shortcutsAdded: number;
-  errors: string[];
+interface GroupRecord {
+  id: string;
+  name: string;
+  order: number;
+  createdAt: number;
+  updatedAt: number;
 }
-
-export interface ShortcutStoreLite {
-  load(): Promise<Group[]>;
-  save(groups: Group[]): Promise<void>;
-  importGroups(data: ImportInput): Promise<ImportStats>;
-}
-
-function shortId(): string {
-  return Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+interface ShortcutRecord {
+  id: string;
+  groupId: string;
+  order: number;
+  combo: Shortcut['combo'];
+  description: string;
+  condition?: string;
+  createdAt: number;
+  updatedAt: number;
 }
 
 /**
  * 建一个 shortcut-library 持久化实例。
  *
- * 三个方法都是**独立闭包**,不依赖 `this` —— 因为调用方常这样用:
- *   const { load, save } = createShortcutStore();
- * 如果内部写 `this.load()`,解构后 `this` 是 undefined,运行时崩。
- * 所以 load / save 先声明为局部函数,importGroups 直接调它们。
+ * 所有方法都是**独立闭包**,不依赖 `this` —— 因为调用方常这样用:
+ *   const { pull, createShortcut } = createShortcutStore();
+ * 如果内部写 `this.createShortcut()`,解构后 `this` 是 undefined,运行时崩。
  */
-export function createShortcutStore(): ShortcutStoreLite {
-  async function load(): Promise<Group[]> {
-    if (!jwtAuth.state.token) return [];
+export function createShortcutStore(): ShortcutCrudStore {
+  async function requireLoggedIn(): Promise<void> {
+    if (!jwtAuth.state.token) throw new Error('not logged in');
+  }
+
+  /** 分页拉取全部 tag=shortcut-library 的 KV item。 */
+  async function listAll(): Promise<Array<{ key: string; value: string }>> {
+    const items: Array<{ key: string; value: string }> = [];
+    let offset = 0;
+    for (;;) {
+      const page = await kvV1Service.list({ tags: [TAG], match: 'any', limit: LIST_LIMIT, offset });
+      items.push(...page.items);
+      if (items.length >= page.total || page.items.length === 0) break;
+      offset += page.items.length;
+    }
+    return items;
+  }
+
+  function safeParse<T>(raw: string): T | null {
     try {
-      const item = await kvV1Service.get({ key: BLOB_KEY });
-      try {
-        return JSON.parse(item.value) as Group[];
-      } catch {
-        // blob 内容坏了(手改过 / 半写入)——当空库处理,让用户能重新存
-        return [];
-      }
-    } catch (e) {
-      // 键不存在 = 首次使用,不是故障
-      if (e instanceof ApiError && e.code === KV_CODE_NOT_FOUND) return [];
-      throw e;
+      return JSON.parse(raw) as T;
+    } catch {
+      return null;
     }
   }
 
-  async function save(groups: Group[]): Promise<void> {
-    if (!jwtAuth.state.token) throw new Error('not logged in');
+  /** 用已解析的 group/shortcut 记录重建组件要的 Group[](丢孤儿、按 order 排序)。 */
+  function assemble(groups: Map<string, GroupRecord>, shortcuts: Map<string, ShortcutRecord>): Group[] {
+    const sortedGroups = [...groups.values()].sort((a, b) => a.order - b.order || a.createdAt - b.createdAt);
+    return sortedGroups.map((g) => ({
+      id: g.id,
+      name: g.name,
+      createdAt: g.createdAt,
+      updatedAt: g.updatedAt,
+      shortcuts: [...shortcuts.values()]
+        .filter((s) => s.groupId === g.id)
+        .sort((a, b) => a.order - b.order || a.createdAt - b.createdAt)
+        .map((s) => ({ id: s.id, combo: s.combo, description: s.description, condition: s.condition, createdAt: s.createdAt })),
+    }));
+  }
+
+  async function pull(): Promise<Group[]> {
+    if (!jwtAuth.state.token) return [];
+    const groups = new Map<string, GroupRecord>();
+    const shortcuts = new Map<string, ShortcutRecord>();
+    let sawNewKeys = false;
+
+    for (const item of await listAll()) {
+      if (item.key.startsWith(GROUP_PREFIX)) {
+        const rec = safeParse<GroupRecord>(item.value);
+        if (rec?.id) {
+          groups.set(rec.id, rec);
+          sawNewKeys = true;
+        }
+      } else if (item.key.startsWith(SHORTCUT_PREFIX)) {
+        const rec = safeParse<ShortcutRecord>(item.value);
+        if (rec?.id) {
+          shortcuts.set(rec.id, rec);
+          sawNewKeys = true;
+        }
+      }
+    }
+
+    // 没有任何新 schema 的 key → 尝试把旧 'shortcuts' blob 迁移成多 key。
+    if (!sawNewKeys) {
+      const migrated = await tryMigrateLegacy();
+      if (migrated) return migrated;
+    }
+
+    return assemble(groups, shortcuts);
+  }
+
+  /** 旧版单 blob → 逐条写新 key 再删旧 key;没有旧 blob 返回 null。 */
+  async function tryMigrateLegacy(): Promise<Group[] | null> {
+    let item;
+    try {
+      item = await kvV1Service.get({ key: LEGACY_KEY });
+    } catch (e) {
+      if (e instanceof ApiError && e.code === KV_CODE_NOT_FOUND) return null;
+      throw e;
+    }
+    const legacy = safeParse<Group[]>(item.value);
+    if (!Array.isArray(legacy)) return null;
+
+    // 逐条落新 key(幂等 upsert);任一条失败就整体中止,旧 blob 保留,下次 pull 重试
+    const writes: Promise<unknown>[] = [];
+    legacy.forEach((g, gi) => {
+      writes.push(
+        kvV1Service.set({
+          key: groupKey(g.id),
+          value: JSON.stringify({ id: g.id, name: g.name, order: gi, createdAt: g.createdAt, updatedAt: g.updatedAt }),
+          tags: [TAG],
+        }),
+      );
+      g.shortcuts.forEach((s, si) => {
+        writes.push(
+          kvV1Service.set({
+            key: shortcutKey(s.id),
+            value: JSON.stringify({
+              id: s.id,
+              groupId: g.id,
+              order: si,
+              combo: s.combo,
+              description: s.description,
+              condition: s.condition,
+              createdAt: s.createdAt,
+              updatedAt: g.updatedAt,
+            }),
+            tags: [TAG],
+          }),
+        );
+      });
+    });
+    await Promise.all(writes);
+    // 全部落盘后再删旧 blob,避免迁移到一半丢数据
+    await kvV1Service.delete({ key: LEGACY_KEY });
+
+    return assemble(
+      new Map(legacy.map((g, gi) => [g.id, { id: g.id, name: g.name, order: gi, createdAt: g.createdAt, updatedAt: g.updatedAt }])),
+      new Map(
+        legacy.flatMap((g) =>
+          g.shortcuts.map((s, si) => [
+            s.id,
+            { id: s.id, groupId: g.id, order: si, combo: s.combo, description: s.description, condition: s.condition, createdAt: s.createdAt, updatedAt: g.updatedAt },
+          ]),
+        ),
+      ),
+    );
+  }
+
+  // ---- 细粒度增删改查(每 key 一个请求) ----
+  // create / update 都是幂等 upsert(POST /kv),语义区分,实现共用。
+
+  async function putGroup(g: Group, order: number): Promise<void> {
+    await requireLoggedIn();
     await kvV1Service.set({
-      key: BLOB_KEY,
-      value: JSON.stringify(groups),
-      tags: [...SHORTCUT_TAGS],
+      key: groupKey(g.id),
+      value: JSON.stringify({ id: g.id, name: g.name, order, createdAt: g.createdAt, updatedAt: g.updatedAt }),
+      tags: [TAG],
     });
   }
 
-  async function importGroups(data: ImportInput): Promise<ImportStats> {
-    const stats: ImportStats = {
-      groupsAdded: 0,
-      groupsAppended: 0,
-      shortcutsAdded: 0,
-      errors: [...data.errors],
-    };
-    // 不走 this.load() —— 见函数头注释
-    const current = await load();
-    const next = [...current];
-    for (const g of data.groups) {
-      const existing = next.find((eg) => eg.name.toLowerCase() === g.name.toLowerCase());
-      if (existing) {
-        const added = g.shortcuts.map((s) => ({
-          id: shortId(),
-          combo: s.combo,
-          description: s.description,
-          condition: s.condition,
-          createdAt: Date.now(),
-        }));
-        existing.shortcuts = [...existing.shortcuts, ...added];
-        existing.updatedAt = Date.now();
-        stats.groupsAppended++;
-        stats.shortcutsAdded += added.length;
-      } else {
-        const now = Date.now();
-        const shortcuts = g.shortcuts.map((s) => ({
-          id: shortId(),
-          combo: s.combo,
-          description: s.description,
-          condition: s.condition,
-          createdAt: now,
-        }));
-        next.push({ id: shortId(), name: g.name, shortcuts, createdAt: now, updatedAt: now });
-        stats.groupsAdded++;
-        stats.shortcutsAdded += shortcuts.length;
-      }
-    }
-    await save(next);
-    return stats;
+  async function putShortcut(groupId: string, s: Shortcut, order: number): Promise<void> {
+    await requireLoggedIn();
+    await kvV1Service.set({
+      key: shortcutKey(s.id),
+      value: JSON.stringify({
+        id: s.id,
+        groupId,
+        order,
+        combo: s.combo,
+        description: s.description,
+        condition: s.condition,
+        createdAt: s.createdAt,
+        updatedAt: Date.now(),
+      }),
+      tags: [TAG],
+    });
   }
 
-  return { load, save, importGroups };
+  return {
+    pull,
+    createGroup: putGroup,
+    updateGroup: putGroup,
+    deleteGroup: async (id: string) => {
+      await requireLoggedIn();
+      await kvV1Service.delete({ key: groupKey(id) });
+    },
+    createShortcut: putShortcut,
+    updateShortcut: putShortcut,
+    deleteShortcut: async (id: string) => {
+      await requireLoggedIn();
+      await kvV1Service.delete({ key: shortcutKey(id) });
+    },
+  };
 }

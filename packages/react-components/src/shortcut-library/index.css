@@ -284,6 +284,48 @@
   color: var(--sl-color-text-mute, #9ca3af);
   font-family: var(--sl-font-mono, ui-monospace, "JetBrains Mono", monospace);
 }
+/* 表头右侧:条件筛选器 + 主操作按钮排成一行 */
+.sl-sl-table__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sl-sl-filter {
+  /* 原生 <select> 各浏览器外观不一致(箭头/内边距/focus 环),统一去掉,
+     换成自定义 chevron,与旁边主按钮同高、同 6px 圆角 */
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  box-sizing: border-box;
+  font: inherit;
+  font-size: 14px;
+  height: 32px;
+  padding: 0 34px 0 12px;
+  max-width: 220px;
+  border: 1px solid var(--sl-color-border, #e4e4e7);
+  border-radius: 6px;
+  background-color: var(--sl-color-surface, #fff);
+  /* feather chevron-down,stroke 用 text-soft 灰,压在右侧内边距区 */
+  background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='16'%20height='16'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='%236b7280'%20stroke-width='2'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Cpolyline%20points='6%209%2012%2015%2018%209'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 11px center;
+  background-size: 14px;
+  color: var(--sl-color-text, #1f2328);
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, background-color 0.15s;
+}
+.sl-sl-filter:hover {
+  border-color: var(--sl-color-text-soft, #6b7280);
+  background-color: var(--sl-color-surface-alt, #f4f4f5);
+}
+.sl-sl-filter:focus-visible {
+  border-color: var(--sl-color-primary, #2563eb);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+.sl-sl-filter:active {
+  background-color: var(--sl-color-surface-alt, #f4f4f5);
+}
 .sl-sl-table__empty {
   padding: 60px 20px;
   text-align: center;
@@ -851,8 +893,8 @@
 }
 
 /* ===== Sidebar 底部账户/同步区 =====
-   登录入口 / 登录态 / 设置 / 退出收在侧边栏底部(取代原顶部整条 userkv-bar)。
-   footer 由宿主注入,渲染在 <aside> 内部列表之后,list flex:1 自动让位。 */
+   未登录时显示登录入口,设置齿轮常驻。已登录态与退出由全局 host UI 承担,
+   库内不再重复。footer 由宿主注入,渲染在 <aside> 内部列表之后,list flex:1 自动让位。 */
 .sl-sl-sidebar-foot {
   flex: 0 0 auto;
   border-top: 1px solid var(--sl-color-border, #e4e4e7);
@@ -862,77 +904,18 @@
   gap: 8px;
   font-size: 13px;
 }
-/* 主操作(登录按钮 / 登录态 pill)占满一行,长邮箱截断 */
-.sl-sl-sidebar-foot > .sl-sl-btn,
-.sl-sl-sidebar-foot > .sl-sl-sync-pill {
-  width: 100%;
-}
+/* 主操作(登录按钮)占满一行 */
 .sl-sl-sidebar-foot > .sl-sl-btn {
+  width: 100%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-}
-.sl-sl-sidebar-foot > .sl-sl-sync-pill {
-  box-sizing: border-box;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
 }
 .sl-sl-sidebar-foot__row {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
-}
-
-/* Sync status pill —— 登录态胶囊(已登录 email) */
-.sl-sl-sync-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 10px 3px 8px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 500;
-  border: 1px solid var(--sl-color-border, #e4e4e7);
-  background: var(--sl-color-surface, #fff);
-  color: var(--sl-color-text, #1f2328);
-  cursor: default;
-  user-select: none;
-}
-.sl-sl-sync-pill__dot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--sl-color-success, #10b981);
-  flex-shrink: 0;
-}
-.sl-sl-sync-pill--syncing {
-  border-color: color-mix(in srgb, var(--sl-color-info, #3b82f6) 40%, var(--sl-color-border, #e4e4e7));
-}
-.sl-sl-sync-pill--syncing .sl-sl-sync-pill__dot {
-  background: var(--sl-color-info, #3b82f6);
-  animation: sl-sl-sync-spin 1s linear infinite;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sl-color-info, #3b82f6) 20%, transparent);
-}
-@keyframes sl-sl-sync-spin {
-  0% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(1.5); opacity: 0.5; }
-  100% { transform: scale(1); opacity: 1; }
-}
-.sl-sl-sync-pill--error {
-  border-color: var(--sl-color-danger, #ef4444);
-  background: color-mix(in srgb, var(--sl-color-danger, #ef4444) 8%, var(--sl-color-surface, #fff));
-  color: var(--sl-color-danger, #b91c1c);
-  cursor: pointer;
-}
-.sl-sl-sync-pill--error .sl-sl-sync-pill__dot {
-  background: var(--sl-color-danger, #ef4444);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sl-color-danger, #ef4444) 20%, transparent);
-}
-.sl-sl-sync-pill--error:hover {
-  background: color-mix(in srgb, var(--sl-color-danger, #ef4444) 14%, var(--sl-color-surface, #fff));
 }
 
 /* ===== Sync mode toggle (auto / manual) =====

@@ -48,11 +48,27 @@ export default function ShortcutTable({
   const [draftCondition, setDraftCondition] = useState('');
   // 删除二次确认:第一下 × 变 ?,再点同一行的 ? 才真删;切分组/失焦自动取消。
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  // 条件筛选:'' 表示全部;选中某个 condition 值时只显示条件完全相同的行。
+  const [condFilter, setCondFilter] = useState('');
 
   // 触发条件:切换分组(group.id 变化)→ 清掉 confirmDeleteId,避免"?"跨分组残留。
   useEffect(() => {
     setConfirmDeleteId(null);
   }, [group.id]);
+
+  // 当前分组内去重后的 condition 值(纯备注,可为空;非空才进选项)。
+  // 排序保证选项稳定,免得切分组时下拉项顺序跳动。
+  const conditionOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of group.shortcuts) if (s.condition) set.add(s.condition);
+    return [...set].sort();
+  }, [group.shortcuts]);
+
+  // 切分组 / 组内数据变化时,若选中的条件已不存在(分组被删/条件被改),
+  // 重置回"全部条件",避免下拉停留在一个悬空值上。
+  useEffect(() => {
+    setCondFilter((prev) => (prev && conditionOptions.includes(prev) ? prev : ''));
+  }, [conditionOptions]);
 
   // 冲突判定:同一 group 内,combo 完全相同(comboKey 一致)→ 算冲突。
   // 不区分修饰键大小写、不区分修饰键左右(comboKey 已经规范化),
@@ -66,10 +82,11 @@ export default function ShortcutTable({
     return conflicts;
   }, [group.shortcuts]);
 
-  // 筛选条件:query 非空时,description / condition / comboLabel 三者之一大小写不敏感
-  // 包含子串即命中;空 query 不过滤(显示全部)。
+  // 筛选:条件筛选(精确匹配)与搜索词(query)是 AND 关系 —— 先按条件收窄,
+  // 再按 query 在 description / condition / comboLabel 里做大小写不敏感包含匹配。
   const q = query.trim().toLowerCase();
   const filtered = group.shortcuts.filter((s) => {
+    if (condFilter && s.condition !== condFilter) return false;
     if (!q) return true;
     if (s.description.toLowerCase().includes(q)) return true;
     if (s.condition?.toLowerCase().includes(q)) return true;
@@ -105,13 +122,30 @@ export default function ShortcutTable({
           <h2 className="sl-sl-table__title">{group.name}</h2>
           <span className="sl-sl-table__sub">{group.shortcuts.length} 条快捷键</span>
         </div>
-        <button
-          className="sl-sl-btn sl-sl-btn--primary"
-          onClick={startAdd}
-          disabled={adding}
-        >
-          + 新增快捷键
-        </button>
+        <div className="sl-sl-table__actions">
+          {/* 条件筛选:仅当组里存在带 condition 的快捷键才显示,否则是噪音。
+              选中后精确匹配,与右上角搜索框(全局)做 AND。 */}
+          {conditionOptions.length > 0 && (
+            <select
+              className="sl-sl-filter"
+              value={condFilter}
+              onChange={(e) => setCondFilter(e.target.value)}
+              aria-label="按条件筛选"
+            >
+              <option value="">全部条件</option>
+              {conditionOptions.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          )}
+          <button
+            className="sl-sl-btn sl-sl-btn--primary"
+            onClick={startAdd}
+            disabled={adding}
+          >
+            + 新增快捷键
+          </button>
+        </div>
       </header>
 
       {group.shortcuts.length === 0 && !adding ? (
@@ -246,8 +280,12 @@ export default function ShortcutTable({
             </tbody>
           </table>
           {filtered.length === 0 && group.shortcuts.length > 0 && (
-            // 触发条件:组里有快捷键但全被 query 过滤掉 → 显示无匹配空状态。
-            <div className="sl-sl-table__empty">没有匹配 &ldquo;{query}&rdquo; 的快捷键</div>
+            // 触发条件:组里有快捷键但全被条件筛选 / 搜索词过滤掉 → 显示无匹配空状态。
+            <div className="sl-sl-table__empty">
+              {condFilter
+                ? `没有条件为“${condFilter}”${q ? ` 且匹配“${query}”` : ''} 的快捷键`
+                : `没有匹配“${query}”的快捷键`}
+            </div>
           )}
         </div>
       )}
