@@ -65,8 +65,15 @@ export default function ShortcutLibrary() {
   // 拖拽布局:sidebar 宽度 + 键盘预览高度(都不持久化,组件实例间独立)
   const [sidebarWidth, setSidebarWidth] = useState(280);
   const [previewHeight, setPreviewHeight] = useState(200);
+  // refs:拖拽期间直改 CSS 变量(不触发 React 重渲染),只有 CSS 变量变化触发浏览器原生 reflow。
+  // 这是卡顿根因的修复:之前每次 pointermove 都 setState → 整棵树(含 canvas Keyboard)重渲染 + layout thrash。
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const previewRef = useRef<HTMLElement | null>(null);
   const dragType = useRef<null | 'sidebar' | 'preview'>(null);
   const dragStart = useRef<{ x: number; y: number; w: number; h: number }>({ x: 0, y: 0, w: 0, h: 0 });
+  // rAF 节流:pointermove 高频事件合并到一帧一次(屏幕刷新率),避免 setState/DOM 写入堆积
+  const rafId = useRef<number | null>(null);
+  const latest = useRef<{ w: number; h: number } | null>(null);
 
   function startDrag(type: 'sidebar' | 'preview', e: React.PointerEvent<HTMLElement>) {
     e.preventDefault();
@@ -79,22 +86,54 @@ export default function ShortcutLibrary() {
     };
   }
 
+  // 拖拽期间把最新值写进 CSS 变量(root / preview 元素的 style),零 React 重渲染
+  function applyDrag(w: number, h: number) {
+    if (dragType.current === 'sidebar') {
+      rootRef.current?.style.setProperty('--sl-sl-sidebar-w', `${Math.min(500, Math.max(200, w))}px`);
+    } else if (dragType.current === 'preview') {
+      previewRef.current?.style.setProperty('--sl-sl-preview-h', `${Math.min(500, Math.max(80, h))}px`);
+    }
+  }
+
+  // pointerup:同步最终值到 React state(一次渲染),供后续持久化/初始渲染使用
+  function commitDrag() {
+    if (latest.current) {
+      const { w, h } = latest.current;
+      setSidebarWidth(Math.min(500, Math.max(200, w)));
+      setPreviewHeight(Math.min(500, Math.max(80, h)));
+      latest.current = null;
+    }
+    dragType.current = null;
+  }
+
   useEffect(() => {
     function onMove(e: PointerEvent) {
       const t = dragType.current;
       if (!t) return;
-      if (t === 'sidebar') {
-        setSidebarWidth(Math.min(500, Math.max(200, dragStart.current.w + (e.clientX - dragStart.current.x))));
-      } else {
-        setPreviewHeight(Math.min(500, Math.max(80, dragStart.current.h - (e.clientY - dragStart.current.y))));
+      const w = dragStart.current.w + (e.clientX - dragStart.current.x);
+      const h = dragStart.current.h - (e.clientY - dragStart.current.y);
+      latest.current = { w, h };
+      // rAF 节流:一帧内多次 pointermove 只应用最后一次
+      if (rafId.current === null) {
+        rafId.current = requestAnimationFrame(() => {
+          rafId.current = null;
+          if (latest.current) applyDrag(latest.current.w, latest.current.h);
+        });
       }
     }
-    function onUp() { dragType.current = null; }
+    function onUp() {
+      if (rafId.current !== null) {
+        cancelAnimationFrame(rafId.current);
+        rafId.current = null;
+      }
+      commitDrag();
+    }
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
     return () => {
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
+      if (rafId.current !== null) cancelAnimationFrame(rafId.current);
     };
   }, []);
 
@@ -392,6 +431,7 @@ export default function ShortcutLibrary() {
 
   return (
     <div
+      ref={rootRef}
       className="sl-sl-root"
       style={{ ['--sl-sl-sidebar-w' as string]: `${sidebarWidth}px` }}
     >
@@ -491,6 +531,7 @@ export default function ShortcutLibrary() {
           />
         )}
         <section
+          ref={previewRef}
           className={`sl-sl-preview ${previewCollapsed ? 'is-collapsed' : ''}`}
           style={previewCollapsed ? undefined : { ['--sl-sl-preview-h' as string]: `${previewHeight}px` }}
         >
