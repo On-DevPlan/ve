@@ -119,7 +119,7 @@ export default function UserSpace() {
     setKvLoading(true);
     setKvError(null);
     try {
-      const result = await store.listKvs(currentSelected, { page: kvPage, pageSize: KV_PAGE_SIZE, tags: kvTag ?? undefined });
+      const result = await store.listKvs(currentSelected, { page: kvPage, pageSize: KV_PAGE_SIZE, tags: kvTag ? [kvTag] : undefined });
       setKv(result);
     } catch (e) {
       setKvError(e instanceof Error ? e.message : 'load kv failed');
