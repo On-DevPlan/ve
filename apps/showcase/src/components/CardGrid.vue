@@ -59,9 +59,11 @@ const visible = computed(() =>
   results.value.slice(vwin.value.startIndex, vwin.value.endIndex),
 );
 
-// 网格模板列 —— 用算出的列数固定列宽,保证与虚拟窗口列数一致
+// 网格模板列 —— 用算出的列数决定网格道数,每列用 minmax(0,1fr) 让卡片
+// 随容器宽度连续拉伸/收缩(不是固定 280px)。列数 N 仍由 CardGrid 的
+// ResizeObserver 测宽后算,虚拟切片按 N + 固定行高 150 算,行为不变。
 const gridStyle = computed(() => ({
-  gridTemplateColumns: `repeat(${vwin.value.columns}, ${CARD_WIDTH}px)`,
+  gridTemplateColumns: `repeat(${vwin.value.columns}, minmax(0, 1fr))`,
   gap: `${CARD_GAP}px`,
   transform: `translateY(${vwin.value.offsetY}px)`,
 }));
@@ -149,7 +151,7 @@ onBeforeUnmount(() => {
 .card-grid {
   display: grid;
   /* grid-template-columns / gap / transform 由 gridStyle 内联注入 */
-  justify-content: center;
+  justify-content: start;
 }
 .card-grid__empty {
   padding: 32px;
