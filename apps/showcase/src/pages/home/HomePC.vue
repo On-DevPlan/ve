@@ -66,30 +66,9 @@ function togglePlatform(p: 'pc' | 'mobile') {
     :class="{ 'is-nav-collapsed': navCollapsed }"
   >
     <aside class="sidebar">
-      <div class="sidebar__head">
-        <div class="brand">
-          wb / showcase
-          <small>Style Library — 2026</small>
-        </div>
-        <button
-          class="nav-toggle"
-          type="button"
-          :aria-label="navCollapsed ? '展开导航' : '收回导航'"
-          :title="navCollapsed ? '展开导航' : '收回导航'"
-          @click="toggleNav"
-        >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.8"
-            stroke-linecap="round"
-          >
-            <path d="M3 6h18M3 12h18M3 18h18" />
-          </svg>
-        </button>
+      <div class="brand">
+        wb / showcase
+        <small>Style Library — 2026</small>
       </div>
 
       <div class="search">
@@ -157,7 +136,28 @@ function togglePlatform(p: 'pc' | 'mobile') {
 
     <section class="main">
       <header class="page-head">
-        <h1>组件<em>展示</em></h1>
+        <div class="page-head__title">
+          <button
+            class="nav-toggle"
+            type="button"
+            :aria-label="navCollapsed ? '展开导航' : '收回导航'"
+            :title="navCollapsed ? '展开导航' : '收回导航'"
+            @click="toggleNav"
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+            >
+              <path d="M3 6h18M3 12h18M3 18h18" />
+            </svg>
+          </button>
+          <h1>组件<em>展示</em></h1>
+        </div>
         <div class="page-head__meta">
           <div class="crumb">
             Home · {{ group ?? 'All' }} · {{ filteredCount }}
@@ -237,19 +237,6 @@ function togglePlatform(p: 'pc' | 'mobile') {
   padding-left: 0; padding-right: 0;
   border-right-width: 0;
 }
-.sidebar__head {
-  display: flex; align-items: flex-start; justify-content: space-between; gap: 8px;
-}
-.nav-toggle {
-  flex-shrink: 0;
-  margin-top: 6px;
-  width: 30px; height: 30px;
-  display: flex; align-items: center; justify-content: center;
-  background: none; border: 1px solid var(--line); border-radius: 2px;
-  color: var(--ink-soft); cursor: pointer;
-  transition: color .15s, border-color .15s, background .15s;
-}
-.nav-toggle:hover { color: var(--ink); border-color: var(--ink); background: rgba(255,255,255,.5); }
 .brand {
   font-family: "Cormorant Garamond", "Songti SC", serif;
   font-size: 30px; font-weight: 500; letter-spacing: -0.01em;
@@ -327,9 +314,22 @@ function togglePlatform(p: 'pc' | 'mobile') {
 /* 折叠后主区变宽,收缩侧留白让卡片网格用满 */
 .home-pc.is-nav-collapsed .main { padding-left: 40px; padding-right: 40px; }
 .page-head {
-  display: flex; align-items: baseline; justify-content: space-between;
+  display: flex; align-items: center; justify-content: space-between;
   padding-bottom: 18px; border-bottom: 1px solid var(--line); margin-bottom: 40px;
 }
+.page-head__title {
+  display: flex; align-items: center; gap: 14px;
+}
+/* 主区汉堡 —— 始终可见,展开/收起 nav */
+.nav-toggle {
+  flex-shrink: 0;
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  background: none; border: 1px solid var(--line); border-radius: 2px;
+  color: var(--ink-soft); cursor: pointer;
+  transition: color .15s, border-color .15s, background .15s;
+}
+.nav-toggle:hover { color: var(--ink); border-color: var(--ink); background: rgba(255,255,255,.5); }
 .page-head h1 {
   font-family: "Cormorant Garamond", "Songti SC", serif; font-size: 42px; font-weight: 500;
 }
