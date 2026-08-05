@@ -13,10 +13,13 @@ import Overview from './src/pages/Overview';
 import Members from './src/pages/Members';
 import Invitations from './src/pages/Invitations';
 import Inventory from './src/pages/Inventory';
+import KvEditorModal from './src/pages/KvEditorModal';
 import type {
   GroupInvitationView,
   GroupMemberView,
   GroupSummary,
+  KvListResult,
+  KvView,
   ViewMode,
 } from './src/types';
 
@@ -46,13 +49,15 @@ export default function UserSpace() {
   const [invitationsLoading, setInvitationsLoading] = useState(false);
   const [invitationsError, setInvitationsError] = useState<string | null>(null);
 
-  const [inventory, setInventory] = useState<{
-    groupId: number;
-    total: number;
-    keys: { key: string; valuePreview: string; valueLength: number; tags: string[] }[];
-  } | null>(null);
-  const [inventoryLoading, setInventoryLoading] = useState(false);
-  const [inventoryError, setInventoryError] = useState<string | null>(null);
+  const [kv, setKv] = useState<KvListResult | null>(null);
+  const [kvLoading, setKvLoading] = useState(false);
+  const [kvError, setKvError] = useState<string | null>(null);
+  const [kvPage, setKvPage] = useState(1);
+  const [kvTag, setKvTag] = useState<string | null>(null);
+  const [kvEditorOpen, setKvEditorOpen] = useState(false);
+  const [kvEditorMode, setKvEditorMode] = useState<'create' | 'edit'>('create');
+  const [kvEditorInit, setKvEditorInit] = useState<KvView | null>(null);
+  const KV_PAGE_SIZE = 10;
 
   // 选中态:默认进第一个组 / 用户手动选过的优先
   const currentSelected = useMemo(() => {
@@ -71,10 +76,13 @@ export default function UserSpace() {
   useEffect(() => {
     setMembers([]);
     setInvitations([]);
-    setInventory(null);
+    setKv(null);
+    setKvPage(1);
+    setKvTag(null);
+    setKvEditorOpen(false);
     setMembersError(null);
     setInvitationsError(null);
-    setInventoryError(null);
+    setKvError(null);
   }, [currentSelected]);
 
   // ── 各视图 lazy load ───────────────────────────────
@@ -106,25 +114,25 @@ export default function UserSpace() {
     }
   }, [currentSelected, store]);
 
-  const loadInventory = useCallback(async () => {
+  const loadKv = useCallback(async () => {
     if (!currentSelected) return;
-    setInventoryLoading(true);
-    setInventoryError(null);
+    setKvLoading(true);
+    setKvError(null);
     try {
-      const inv = await store.inventory(currentSelected, 10);
-      setInventory(inv);
+      const result = await store.listKvs(currentSelected, { page: kvPage, pageSize: KV_PAGE_SIZE, tags: kvTag ?? undefined });
+      setKv(result);
     } catch (e) {
-      setInventoryError(e instanceof Error ? e.message : 'load inventory failed');
+      setKvError(e instanceof Error ? e.message : 'load kv failed');
     } finally {
-      setInventoryLoading(false);
+      setKvLoading(false);
     }
-  }, [currentSelected, store]);
+  }, [currentSelected, kvPage, kvTag, store]);
 
   useEffect(() => {
     if (view === 'members') void loadMembers();
     if (view === 'invitations') void loadInvitations();
-    if (view === 'inventory') void loadInventory();
-  }, [view, loadMembers, loadInvitations, loadInventory]);
+    if (view === 'inventory') void loadKv();
+  }, [view, loadMembers, loadInvitations, loadKv]);
 
   // ── 动作封装(展示态) ──────────────────────────────
   async function withError(fn: () => Promise<void>): Promise<void> {
@@ -229,6 +237,36 @@ export default function UserSpace() {
     });
     if (!joined) throw new Error('accept failed');
     return joined;
+  }
+
+  // ── KV CRUD handlers ─────────────────────────────
+  async function handleCreateKv(payload: { key: string; value: string; tags: string[]; ttl: number }): Promise<void> {
+    if (!currentSelected) return;
+    await withError(async () => {
+      await store.createKv(currentSelected, payload);
+      setKvEditorOpen(false);
+      setKvPage(1); // 新建后回到第一页,新 key 在前
+      await loadKv();
+    });
+  }
+
+  async function handleUpdateKv(payload: { key: string; value: string; tags: string[]; ttl: number }): Promise<void> {
+    if (!currentSelected) return;
+    await withError(async () => {
+      await store.updateKv(currentSelected, payload);
+      setKvEditorOpen(false);
+      await loadKv();
+    });
+  }
+
+  async function handleDeleteKv(item: KvView): Promise<void> {
+    if (!currentSelected) return;
+    await withError(async () => {
+      await store.deleteKv(currentSelected, item.key);
+      // 末页删空则回退一页
+      if (kv && kv.items.length === 1 && kvPage > 1) setKvPage((p) => p - 1);
+      await loadKv();
+    });
   }
 
   // ── 渲染 ─────────────────────────────────────────
@@ -357,13 +395,32 @@ export default function UserSpace() {
               />
             )}
             {view === 'inventory' && (
-              <Inventory
-                group={selectedGroup}
-                inventory={inventory}
-                loading={inventoryLoading}
-                error={inventoryError}
-                onReload={loadInventory}
-              />
+              <>
+                <Inventory
+                  group={selectedGroup}
+                  kv={kv}
+                  loading={kvLoading}
+                  error={kvError}
+                  saving={saving}
+                  page={kvPage}
+                  pageSize={KV_PAGE_SIZE}
+                  selectedTag={kvTag}
+                  onPageChange={(p) => setKvPage(p)}
+                  onTagChange={(t) => { setKvTag(t); setKvPage(1); }}
+                  onCreate={() => { setKvEditorMode('create'); setKvEditorInit(null); setKvEditorOpen(true); }}
+                  onEdit={(item) => { setKvEditorMode('edit'); setKvEditorInit(item); setKvEditorOpen(true); }}
+                  onDelete={handleDeleteKv}
+                  onReload={loadKv}
+                />
+                <KvEditorModal
+                  open={kvEditorOpen}
+                  mode={kvEditorMode}
+                  initial={kvEditorInit}
+                  saving={saving}
+                  onSave={kvEditorMode === 'create' ? handleCreateKv : handleUpdateKv}
+                  onClose={() => setKvEditorOpen(false)}
+                />
+              </>
             )}
           </>
         ) : (

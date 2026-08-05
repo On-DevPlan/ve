@@ -522,3 +522,29 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* KV 管理 */
+.sl-us-input--compact { width: auto; }
+.sl-us-pager { display: flex; align-items: center; gap: 8px; }
+.sl-us-pager__info { font-size: 12px; color: var(--sl-color-text-muted, #6b7280); }
+.sl-us-pager__page { font-size: 12px; color: var(--sl-color-text-muted, #6b7280); }
+
+.sl-us-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+
+.sl-us-modal-backdrop {
+  position: fixed; inset: 0; z-index: 1000;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+}
+.sl-us-modal {
+  width: min(560px, 92vw); max-height: 86vh; overflow-y: auto;
+  background: var(--sl-color-surface, #ffffff);
+  border: 1px solid var(--sl-color-border, #e5e7eb);
+  border-radius: 10px; padding: 16px;
+  font-family: var(--sl-font-family, system-ui, sans-serif);
+  color: var(--sl-color-text, #1f2328);
+}
+.sl-us-modal__head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.sl-us-modal__title { margin: 0; font-size: 16px; font-weight: 600; }
+.sl-us-modal__body { display: flex; flex-direction: column; }
+.sl-us-modal__foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
