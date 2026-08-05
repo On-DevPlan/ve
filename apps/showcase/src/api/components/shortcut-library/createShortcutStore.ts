@@ -10,7 +10,7 @@
 //   求值顺序取决于谁先被 import,一旦有人在 index 顶层加副作用就会拿到
 //   undefined。**目录内部一律走相对路径,'@api' 只留给 src/api/ 外部调用方。**
 
-import { jwtAuth } from '@/shared/auth-store';
+import { jwtAuth } from '../../http/auth-store';
 import { kvV1Service, ApiError } from '../../services';
 import type { Group } from './types';
 

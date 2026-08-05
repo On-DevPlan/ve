@@ -227,8 +227,22 @@ describe('feature 3 — long-press mapping popup + flash throttle', () => {
     expect(keyboard).toMatch(/onPointerLeave=/);
     expect(keyboard).toMatch(/onPointerOut=/);
     expect(keyboard).toMatch(/onPointerCancel=/);
-    expect(keyboard).toMatch(/onPress\?/);
-    expect(keyboard).toMatch(/onRelease\?/);
+    // 1:1 键盘改造后,Props 改成必选(回调必须显式提供),不再有可选 '?'
+    expect(keyboard).toMatch(/onPress: \(code: string\) => void/);
+    expect(keyboard).toMatch(/onRelease: \(code: string\) => void/);
+  });
+
+  it('Keyboard data lives in keyboard-layout.ts (full 104-key table)', () => {
+    // 改造前 Keyboard.tsx 内联 ROWS;改造后拆到独立 data 模块。
+    // 这里 grep 数据文件,确保 nav cluster + 异形键都在(回归保护)。
+    const layout = readFileSync(
+      resolve(__dirname, '../src/shortcut-library/src/data/keyboard-layout.ts'),
+      'utf8',
+    );
+    expect(layout).toMatch(/F1/);
+    expect(layout).toMatch(/PrintScreen/);
+    expect(layout).toMatch(/NumpadEnter/);
+    expect(layout).toMatch(/Numpad0/);
   });
 
   it('pointerDown now ADDS is-on (hold-to-popup is the new visual feedback)', () => {
@@ -287,10 +301,15 @@ describe('feature 4 — row-hover description tooltip', () => {
 });
 
 describe('feature 5 — navigation cluster keys', () => {
-  it('renders the 6-key nav cluster in Keyboard ROWS', () => {
-    // Insert/Home/PageUp 上排,Delete/End/PageDown 下排 —— 标准导航簇,补在方向键上方
+  it('renders the 6-key nav cluster in Keyboard layout data', () => {
+    // 1:1 键盘改造后,数据从 Keyboard.tsx 搬到 src/data/keyboard-layout.ts。
+    // 这里 grep 数据文件,确认 nav 6 键都在(回归保护)。
+    const layout = readFileSync(
+      resolve(__dirname, '../src/shortcut-library/src/data/keyboard-layout.ts'),
+      'utf8',
+    );
     for (const code of ['Insert', 'Home', 'PageUp', 'Delete', 'End', 'PageDown']) {
-      expect(keyboard, `${code} must appear in ROWS`).toMatch(new RegExp(`code: '${code}'`));
+      expect(layout, `${code} must appear in NAV_ROWS`).toMatch(new RegExp(`code: '${code}'`));
     }
   });
 
@@ -309,11 +328,11 @@ describe('feature 6 — hover + double-click-pin reveal', () => {
   it('Keyboard wires mouse hover + double-click', () => {
     // 悬停(仅鼠标)与双击是新加的两个"显示快捷键"入口,与长按汇入同一个 popup
     expect(keyboard).toMatch(/onMouseEnter=/);
-    expect(keyboard).toMatch(/onMouseLeave=/);
+    expect(keyboard).toMatch(/onPointerLeave=/);
     expect(keyboard).toMatch(/onDoubleClick=/);
-    expect(keyboard).toMatch(/onHoverEnter\?/);
-    expect(keyboard).toMatch(/onHoverLeave\?/);
-    expect(keyboard).toMatch(/onDblClick\?/);
+    expect(keyboard).toMatch(/onKeyHoverEnter/);
+    expect(keyboard).toMatch(/onKeyHoverLeave/);
+    expect(keyboard).toMatch(/onDoubleClickKey/);
   });
 
   it('index.tsx holds one unified popup — no pin concept at all', () => {

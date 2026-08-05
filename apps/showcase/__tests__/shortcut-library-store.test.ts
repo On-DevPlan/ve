@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { jwtAuth } from '../src/shared/auth-store';
+import { jwtAuth } from '../src/api/http/auth-store';
 import { createShortcutStore } from '../src/api/components/shortcut-library/createShortcutStore';
 
 const originalState = jwtAuth.state;

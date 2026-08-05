@@ -2,5 +2,5 @@
 // 组件不重新实现 JWT 管理;仅 re-export host 的 hook + 类型。
 // jwtAuth 单例一并 re-export,供退出登录等命令式调用使用。
 
-export { useJwtAuth, getJwtAuthSnapshot, jwtAuth } from '@/shared/auth-store';
-export type { JwtAuthStatus } from '@/shared/auth-store';
+export { useJwtAuth, getJwtAuthSnapshot, jwtAuth } from '@/api/http/auth-store';
+export type { JwtAuthStatus } from '@/api/http/auth-store';

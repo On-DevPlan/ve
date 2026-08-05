@@ -16,7 +16,7 @@ import SearchBar from '../../components/SearchBar.vue';
 import { useRegistry } from '../../composables/useRegistry';
 import { useSearch } from '../../composables/useSearch';
 import { usePlatform } from '../../composables/usePlatform';
-import { jwtAuth } from '@/shared/auth-store';
+import { jwtAuth } from '@/api/http/auth-store';
 import { useLoginModalState } from '@/shared/useLoginModal';
 
 const router = useRouter();

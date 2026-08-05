@@ -7,7 +7,8 @@
 // 启动校验:route 重叠即 throw。重复注册在同一 dev process 中是 bug,
 // 在 nginx 里是 "location conflict"。fail-fast 总比"prod 路由错"好。
 //
-// 当前 list:userV1(JWT 邮箱登录)/ kvV1(JWT 键值存储)。
+// 当前 list:userV1(JWT 邮箱登录)/ kvV1(JWT 键值存储)/ groupV1(工作空间 CRUD +
+// 成员 + 邀请)/ groupInvitationV1(邀请撤销 / 接受,与 groupV1 同后端不同前缀)。
 // 新增后端:先写 service,再回来加 entry —— 没有对应 service 实现的占位
 // entry 不留在 registry 里。
 //
@@ -24,6 +25,8 @@ import type { ApiRegistry, BackendRegistration } from './types';
 export const apiPaths = {
   userV1: '/api/v1/user',
   kvV1: '/api/v1/kv',
+  groupV1: '/api/v1/groups',
+  groupInvitationV1: '/api/v1/group-invitations',
 } as const;
 export type ApiPathLiteral = (typeof apiPaths)[keyof typeof apiPaths];
 
@@ -42,6 +45,22 @@ const registry = {
       prod: 'http://47.110.80.47:8988',
     },
     route: apiPaths.kvV1,
+  },
+  // 工作空间 CRUD / 成员 / 组内邀请 —— 同一后端但前缀不同,按 SPEC §types
+  // 拆成两个 backend entry 而不是数组 route。
+  groupV1: {
+    target: {
+      dev: 'http://47.110.80.47:8988',
+      prod: 'http://47.110.80.47:8988',
+    },
+    route: apiPaths.groupV1,
+  },
+  groupInvitationV1: {
+    target: {
+      dev: 'http://47.110.80.47:8988',
+      prod: 'http://47.110.80.47:8988',
+    },
+    route: apiPaths.groupInvitationV1,
   },
 } as const satisfies ApiRegistry;
 
