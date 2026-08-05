@@ -1142,7 +1142,7 @@
   left: 20px;
 }
 
-/* ===== 拖拽调整布局的 resize handle + guide line ===== */
+/* ===== 拖拽调整布局的 resize handle ===== */
 .sl-sl-root {
   position: relative;
   /* contain:隔离 layout/paint,防止拖拽 reflow 外溢到 ShadowRoot 外的宿主 */
@@ -1151,6 +1151,17 @@
 .sl-sl-main {
   position: relative;
   contain: layout paint;
+}
+
+/* 拖拽期间:禁所有 transition(reflow 后不触发动画重绘),缩小 keyboard/table 重绘范围 */
+.sl-sl-root.sl-sl-dragging *,
+.sl-sl-root.sl-sl-dragging *::before,
+.sl-sl-root.sl-sl-dragging *::after {
+  transition: none !important;
+}
+.sl-sl-root.sl-sl-dragging .sl-sl-kb,
+.sl-sl-root.sl-sl-dragging .sl-sl-table__viewport {
+  contain: paint;
 }
 
 .sl-sl-resize-handle {
@@ -1187,26 +1198,4 @@
 .sl-sl-resize-handle--row:focus-visible {
   background: var(--sl-color-primary, #2563eb);
   opacity: 0.5;
-}
-
-/* guide line:拖拽期间唯一变化的视觉(transform 纯合成,零 Layout/Paint) */
-.sl-sl-guide {
-  position: absolute;
-  z-index: 20;
-  opacity: 0;
-  pointer-events: none;
-  will-change: transform;
-  background: var(--sl-color-primary, #2563eb);
-}
-.sl-sl-guide--col {
-  top: 0;
-  bottom: 0;
-  left: 0;
-  width: 2px;
-}
-.sl-sl-guide--row {
-  left: 0;
-  right: 0;
-  top: 0;
-  height: 2px;
 }

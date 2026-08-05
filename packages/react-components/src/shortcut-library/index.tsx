@@ -64,25 +64,23 @@ export default function ShortcutLibrary() {
 
   // 拖拽布局:sidebar 宽度 + 键盘预览高度(都不持久化,组件实例间独立)。
   //
-  // 性能设计(stage 3):拖拽期间【零 Layout / 零 Paint】。
-  //   - pointermove 只把最新坐标写进 ref,rAF 每帧一次只更新 guide line 的
-  //     transform(纯合成层,不触发 reflow/repaint)
-  //   - 真实布局(grid-template-columns / flex-basis)只在 pointerup 提交一次
-  //   - move 中绝不读布局属性(offsetWidth/getBoundingClientRect),避免强制同步布局
+  // 性能设计(live resize):拖拽期间内容【实时跟随】,代价是每帧一次 Layout。
+  // 降到最低成本的手段:
+  //   - pointermove 只写 ref,rAF 去重每帧一次 frame() → 直改 CSS 变量(实时)
+  //   - move 中绝不读布局属性(避免强制同步布局)
+  //   - 拖拽期间 root 挂 .sl-sl-dragging:禁所有 transition(reflow 后不触发动画
+  //     重绘)+ 对 keyboard/table 加 contain:paint(缩小重绘范围)
+  //   - pointerup 同步 React state 一次(供初始渲染/未来持久化)
   const [sidebarWidth, setSidebarWidth] = useState(280);
   const [previewHeight, setPreviewHeight] = useState(200);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const previewRef = useRef<HTMLElement | null>(null);
-  // 两条 guide line:拖拽期间跟随指针的视觉反馈(transform 移动)
-  const colGuideRef = useRef<HTMLDivElement | null>(null);
-  const rowGuideRef = useRef<HTMLDivElement | null>(null);
 
   const dragType = useRef<null | 'sidebar' | 'preview'>(null);
-  // pointerdown 只读一次几何(起始坐标 / 当前值 / preview 基线 top),move 不再读 DOM
-  const dragStart = useRef<{ x: number; y: number; w: number; h: number; previewTop: number }>(
-    { x: 0, y: 0, w: 0, h: 0, previewTop: 0 },
+  const dragStart = useRef<{ x: number; y: number; w: number; h: number }>(
+    { x: 0, y: 0, w: 0, h: 0 },
   );
-  // rAF 去重标记 + 最新指针坐标(ref 写入,不触发渲染)
+  // rAF 去重标记 + 最新指针偏移(ref 写入,不触发渲染)
   const rafId = useRef<number | null>(null);
   const latest = useRef<{ dx: number; dy: number } | null>(null);
 
@@ -102,46 +100,38 @@ export default function ShortcutLibrary() {
       y: e.clientY,
       w: sidebarWidth,
       h: previewHeight,
-      // row guide 基线 = preview 相对 main 的 top(pointerdown 只读这一次)
-      previewTop: type === 'preview' ? (previewRef.current?.offsetTop ?? 0) : 0,
     };
 
-    // 拖拽期间全局禁止文本选择 + 改光标,避免选择干扰
+    // 拖拽期间:禁文本选择 + 改光标 + 挂 dragging class(禁 transition / 缩重绘范围)
     document.body.style.userSelect = 'none';
     document.body.style.cursor = type === 'sidebar' ? 'col-resize' : 'row-resize';
-    if (type === 'sidebar') colGuideRef.current?.style.setProperty('opacity', '1');
-    else rowGuideRef.current?.style.setProperty('opacity', '1');
+    rootRef.current?.classList.add('sl-sl-dragging');
   }
 
-  // rAF 每帧一次:只更新 guide line 的 transform(纯合成),夹紧/吸附纯数学
+  // rAF 每帧一次:直改 CSS 变量 → 内容实时跟随(一次 Layout)。夹紧纯数学,不读 DOM。
   function frame() {
     rafId.current = null;
     const p = latest.current;
     if (!p) return;
     if (dragType.current === 'sidebar') {
       const w = Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, dragStart.current.w + p.dx));
-      colGuideRef.current?.style.setProperty(
-        'transform',
-        `translate3d(${w}px, 0, 0)`,
-      );
+      rootRef.current?.style.setProperty('--sl-sl-sidebar-w', `${w}px`);
     } else if (dragType.current === 'preview') {
-      const top = dragStart.current.previewTop - p.dy;
-      rowGuideRef.current?.style.setProperty('transform', `translate3d(0, ${top}px, 0)`);
+      const h = Math.min(PREVIEW_MAX, Math.max(PREVIEW_MIN, dragStart.current.h - p.dy));
+      previewRef.current?.style.setProperty('--sl-sl-preview-h', `${h}px`);
     }
     latest.current = null;
   }
 
-  // pointerup:隐藏 guide,恢复样式,【提交一次】真实布局(setState → React 一次渲染)。
-  // 用 pointerup 事件坐标算终值(不依赖 latest——它可能已被 frame 清空)。
+  // pointerup:恢复样式,同步一次 React state(终值用 pointerup 事件坐标算,不依赖 latest)
   function endDrag(e: PointerEvent) {
     if (rafId.current !== null) {
       cancelAnimationFrame(rafId.current);
       rafId.current = null;
     }
-    colGuideRef.current?.style.setProperty('opacity', '0');
-    rowGuideRef.current?.style.setProperty('opacity', '0');
     document.body.style.userSelect = '';
     document.body.style.cursor = '';
+    rootRef.current?.classList.remove('sl-sl-dragging');
     const t = dragType.current;
     if (t) {
       if (t === 'sidebar') {
@@ -546,11 +536,6 @@ export default function ShortcutLibrary() {
         onPointerDown={(e) => startDrag('sidebar', e)}
         onKeyDown={(e) => onSplitterKeyDown('sidebar', e)}
       />
-      <div
-        ref={colGuideRef}
-        className="sl-sl-guide sl-sl-guide--col"
-        aria-hidden="true"
-      />
 
       <main className="sl-sl-main">
         <header className="sl-sl-topbar">
@@ -605,11 +590,6 @@ export default function ShortcutLibrary() {
             onKeyDown={(e) => onSplitterKeyDown('preview', e)}
           />
         )}
-        <div
-          ref={rowGuideRef}
-          className="sl-sl-guide sl-sl-guide--row"
-          aria-hidden="true"
-        />
         <section
           ref={previewRef}
           className={`sl-sl-preview ${previewCollapsed ? 'is-collapsed' : ''}`}
