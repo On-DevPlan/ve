@@ -26,11 +26,19 @@ export const router = createRouter({
       name: 'home',
       component: () => import('../pages/HomePage.vue'),
     },
+    // 登录路由版(login-form 在 pages/login/LoginPage.vue)
+    {
+      path: '/login',
+      name: 'login',
+      component: () => import('../pages/login/LoginPage.vue'),
+      meta: { public: true },
+    },
     // 通配 404 —— 任何未命中路由都落这里(顺序必须在最后)
     {
       path: '/:pathMatch(.*)*',
       name: 'not-found',
       component: () => import('../pages/NotFoundPage.vue'),
+      meta: { public: true },
     },
   ],
 });

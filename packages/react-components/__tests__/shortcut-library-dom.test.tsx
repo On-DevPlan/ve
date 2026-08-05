@@ -44,6 +44,7 @@ import { act } from 'react';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import ShortcutLibrary from '../src/shortcut-library';
+import SettingsPanel from '../src/shortcut-library/src/pages/SettingsPanel';
 
 // jsdom does not run Vite's CSS pipeline. Inject the stylesheet as a <style>
 // node so getComputedStyle can resolve our rules. This is the standard
@@ -199,5 +200,35 @@ describe('shortcut-library: rendered DOM contracts', () => {
         .querySelector('.sl-sl-preview')!
         .classList.contains('is-collapsed'),
     ).toBe(true);
+  });
+
+  it('logged-out SettingsPanel shows login trigger and no password form', async () => {
+    // Default jwtAuth state is logged-out (no token). SettingsPanel must
+    // render a login trigger that opens the host LoginModal — and must NOT
+    // render an inline password form (that UI moved to the host modal).
+    await act(async () => {
+      root.render(
+        <SettingsPanel
+          open
+          onClose={() => {}}
+          saveMode="auto"
+          onChangeSaveMode={() => {}}
+          warnOnDirtyExit
+          onToggleWarnOnDirtyExit={() => {}}
+          dirty={false}
+          saving={false}
+          onFlushDirty={() => {}}
+        />,
+      );
+    });
+
+    // SettingsPanel renders through a portal to document.body (index.tsx
+    // mounts the same way), so query the body, not the render container.
+    const auth = document.body.querySelector('.sl-sl-settings__auth');
+    expect(auth, 'auth section missing').not.toBeNull();
+    const button = auth!.querySelector('button');
+    expect(button, 'login trigger missing').not.toBeNull();
+    expect(button!.textContent).toBe('登录');
+    expect(document.body.querySelector('input[type="password"]')).toBeNull();
   });
 });

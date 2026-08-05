@@ -13,11 +13,16 @@ import SearchBar from '../../components/SearchBar.vue';
 import { useRegistry } from '../../composables/useRegistry';
 import { useSearch } from '../../composables/useSearch';
 import { usePlatform } from '../../composables/usePlatform';
+import { jwtAuth } from '@/shared/auth-store';
+import { useLoginModalState } from '@/shared/useLoginModal';
 
 const router = useRouter();
 const registry = useRegistry();
 const { group } = useSearch();
 const { platform } = usePlatform();
+const { open: openLogin } = useLoginModalState();
+// jwtAuth.state getter 读内部 Vue ref,computed 会跟踪 → 登录态变化时重渲染
+const jwtState = computed(() => jwtAuth.state);
 
 const groups = computed(() => {
   const set = new Set<string>();
@@ -120,9 +125,32 @@ function togglePlatform(p: 'pc' | 'mobile') {
     <section class="main">
       <header class="page-head">
         <h1>组件<em>展示</em></h1>
-        <div class="crumb">
-          Home · {{ group ?? 'All' }} · {{ filteredCount }}
-          <span :class="'crumb__platform crumb__platform--' + platform">{{ platform }}</span>
+        <div class="page-head__meta">
+          <div class="crumb">
+            Home · {{ group ?? 'All' }} · {{ filteredCount }}
+            <span :class="'crumb__platform crumb__platform--' + platform">{{ platform }}</span>
+          </div>
+          <div class="crumb-auth">
+            <template v-if="jwtState.token">
+              <span
+                class="crumb-user"
+                :title="jwtState.jwtUser?.email ?? ''"
+              >{{ jwtState.jwtUser?.email }}</span>
+              <button
+                class="crumb-login crumb-login--ghost"
+                @click="jwtAuth.logout()"
+              >
+                退出
+              </button>
+            </template>
+            <button
+              v-else
+              class="crumb-login"
+              @click="openLogin"
+            >
+              登录
+            </button>
+          </div>
         </div>
       </header>
       <CardGrid @open="open" />
@@ -201,6 +229,40 @@ function togglePlatform(p: 'pc' | 'mobile') {
 .sidebar__foot .platform--pc { color: #2563eb; }
 .sidebar__foot .platform--mobile { color: #7c3aed; }
 
+/* 鉴权态 chip:与 sidebar__foot 分两行,样式紧凑 */
+.auth-chip {
+  display: flex; align-items: center; gap: 6px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px; color: var(--ink-mute);
+  padding: 6px 0;
+  border-top: 1px dashed var(--line);
+}
+.auth-chip__dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--ink-mute); display: inline-block;
+}
+.auth-chip__dot--mute { background: #d4d4d8; }
+.auth-chip__dot--err { background: #ef4444; }
+.auth-chip--authenticated .auth-chip__dot { background: #22c55e; }
+.auth-chip--restoring .auth-chip__dot { background: #f59e0b; animation: pulse 1.4s ease-in-out infinite; }
+.auth-chip__avatar {
+  width: 18px; height: 18px; border-radius: 50%; object-fit: cover;
+  border: 1px solid var(--line);
+}
+.auth-chip__name { color: var(--ink); }
+.auth-chip__btn {
+  margin-left: auto;
+  background: transparent; border: 1px solid var(--line); border-radius: 2px;
+  padding: 2px 8px; font-family: inherit; font-size: 10px; color: var(--ink-soft);
+  cursor: pointer;
+}
+.auth-chip__btn:hover { background: var(--ink); color: #fff; border-color: var(--ink); }
+.auth-chip a { color: var(--ink); text-decoration: underline; }
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
 /* === 主体 === */
 .main { padding: 5px 72px 96px; }
 .page-head {
@@ -218,6 +280,24 @@ function togglePlatform(p: 'pc' | 'mobile') {
 .crumb__platform { font-size: 9px; padding: 2px 6px; border-radius: 2px; letter-spacing: 0.12em; }
 .crumb__platform--pc { background: #2563eb; color: #fff; }
 .crumb__platform--mobile { background: #7c3aed; color: #fff; }
+.page-head__meta { display: flex; align-items: center; gap: 16px; }
+.crumb-auth {
+  display: flex; align-items: center; gap: 8px;
+  font-family: "JetBrains Mono", monospace; font-size: 11px;
+}
+.crumb-user {
+  color: var(--ink-mute); max-width: 160px; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap;
+}
+.crumb-login {
+  font-family: "JetBrains Mono", monospace; font-size: 11px;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  padding: 4px 12px; border: 1px solid var(--line); border-radius: 2px;
+  background: transparent; color: var(--ink-soft); cursor: pointer;
+  transition: border-color .15s, color .15s;
+}
+.crumb-login:hover { border-color: var(--ink); color: var(--ink); }
+.crumb-login--ghost { border-color: transparent; padding-left: 0; padding-right: 0; }
 
 .main :deep(.card-grid__viewport) { min-height: 0; }
 .main :deep(.card-grid) {

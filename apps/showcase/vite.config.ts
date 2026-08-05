@@ -3,9 +3,11 @@
 //
 // 这个文件做的事:
 //   1) 装上 Vue 与 React 两个插件,让 .vue 与 .tsx/.jsx 都能被 Vite 编译
-//   2) 装上 manifest-plugin(spec §6.1),让 dev/prod 都能生成 component manifest
-//   3) 配置 dev/preview 服务端口
-//   4) 配 manualChunks(spec §8.1 分包):
+//   2) 装上 apiGateway(spec §5) —— 取代旧 mfeDynamicProxy + activeId,
+//      单一事实源读 @/api/registry,dev 与 prod nginx 共用 normalize
+//   3) 装上 manifest-plugin(spec §6.1),让 dev/prod 都能生成 component manifest
+//   4) 配置 dev/preview 服务端口
+//   5) 配 manualChunks(spec §8.1 分包):
 //      - 每个 vue 组件单独 chunk(vc-<id>)
 //      - 每个 react 组件单独 chunk(rc-<id>)
 //      - React / Vue 运行时各自走 vendor chunk
@@ -15,52 +17,64 @@ import { defineConfig } from 'vite'; // Vite 配置工厂
 import vue from '@vitejs/plugin-vue'; // Vue 3 SFC 插件
 import react from '@vitejs/plugin-react'; // React 19 插件
 // 仓库内 workspace 包:
-//   - manifestPlugin: 生成 component manifest(dev/prod 都用)
-//   - mfeDynamicProxy: 组件级 dev proxy,声明见各 component.config.ts 的 `api` 字段
-//   - scanConfigs: 启动时扫描所有 component.config.ts,喂给 mfeDynamicProxy
-import { manifestPlugin, mfeDynamicProxy, scanConfigs } from '@style-library/manifest-generator';
+import { manifestPlugin } from '@style-library/manifest-generator';
+import { genNginxOut } from './src/api/gen-nginx';
 import path from 'node:path'; // 用于 resolve 绝对路径
 import { fileURLToPath } from 'node:url'; // URL → 路径
-
+import { apiGateway } from './src/api/to-vite-proxy';
+import type { Plugin } from 'vite';
 // ESM 里没有 __dirname,临时造一个指向当前文件目录
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// 所有组件 component.config.ts 的 glob(manifestPlugin 和 mfeDynamicProxy 共用)
+// 所有组件 component.config.ts 的 glob(manifestPlugin 用)
 const COMPONENT_ROOTS = [
   path.resolve(__dirname, '../../packages/vue-components/src/*/component.config.ts'),
   path.resolve(__dirname, '../../packages/react-components/src/*/component.config.ts'),
 ];
 
 /**
- * 异步扫描所有 component.config.ts,把 configs 喂给 mfeDynamicProxy。
- * Vite 支持 defineConfig(async () => config),所以我们这里用 async。
- *
- * 注意:scanConfigs 会动态 import 每个 component.config.ts,验证 schema。
- * manifestPlugin 内部也会独立调一次 scanConfigs —— 两次扫描是浪费但无副作用,
- * 启动开销可忽略(几十个组件 ~50ms)。后续可以提取共享缓存。
+ * apiGateway 不需要 scanConfigs,直接读 @/api/registry(import 时已经 evaluate)。
+ * 但 registry 自身在 import 时会做路径冲突校验,所以即便不预扫也能在网关构建阶段
+ * 抛错。这里 config 是同步对象 —— `defineConfig` 接受同步函数或对象,
+ * 异步函数会导致 TS2769(Vite 5 的 UserConfigFnObject 重载不支持 async)。
  */
-async function buildMfeProxyPlugin() {
-  const scanned = await scanConfigs({ roots: COMPONENT_ROOTS });
-  return mfeDynamicProxy({ configs: scanned.map((s) => s.config) });
+function buildGatewayPlugin() {
+  return apiGateway();
 }
 
-export default defineConfig(async () => ({
-  // 插件栈:Vue SFC → React JSX → mfe proxy → manifest
+export default defineConfig(() => ({
+  // 插件栈:Vue SFC → React JSX → api gateway → manifest
   plugins: [
     vue(),
     react(),
-    await buildMfeProxyPlugin(),
+    buildGatewayPlugin(),
     manifestPlugin({ componentRoots: COMPONENT_ROOTS }),
+    {
+      name: 'gen-nginx-locations',
+      apply: 'build',
+      closeBundle() {
+        const out = genNginxOut({ verbose: true });
+        console.log(`[gen-nginx] wrote ${out}`);
+      },
+    } satisfies Plugin,
   ],
   // dev server:0.0.0.0 让局域网设备也能访问
-  // 注意:server.proxy 已彻底移除 —— 组件的 dev 依赖通过各 component.config.ts
-  // 的 `api` 字段声明,由 mfeDynamicProxy 在挂载时按需激活。
+  // 注意:server.proxy 已被 apiGateway 完全取代 —— 所有 /api/* 由 registry 集中处理,
+  // 不再需要按 activeId 切换。
   server: {
     host: '0.0.0.0',
     port: 5173,
   },
   // 生产预览:与 dev 同 host,默认端口 4173
   preview: { host: '0.0.0.0', port: 4173 },
+  resolve: {
+    alias: {
+      // '@/foo' → src/foo,贯穿 shared/ 与 api/
+      '@': path.resolve(__dirname, 'src'),
+      // '@api' → src/api/ 目录(收口);'@api/components/...' 等深路径直接拼到该目录
+      '@api': path.resolve(__dirname, 'src/api'),
+    },
+  },
   build: {
     // ESNext 产物,让现代浏览器直接吃,避免 Vite 降级到 ES2015
     target: 'esnext',

@@ -39,17 +39,15 @@ RUN pnpm install --frozen-lockfile
 ENV NODE_OPTIONS="--openssl-legacy-provider"
 
 # Drives `pnpm --filter @style-library/showcase build` via root script.
+# vite.config.ts registers the gen-nginx-locations plugin, which during build
+# writes nginx/api-locations/generated.conf from the same registry the dev
+# server reads (apps/showcase/src/api/registry.ts). One source of truth for
+# dev and prod routing.
 RUN pnpm run build
 
-# Generate nginx location blocks from each component's component.config.ts
-# `api` field — the same declaration the vite dev server reads via
-# mfeDynamicProxy. This is what keeps dev and prod routing in lockstep.
-#
-# Fails the build (not the deploy) on: context conflicts between components,
-# a missing prod target, or an unsafe context string. Better to break here
-# than to ship a config that is syntactically valid but routes wrong.
-RUN node --experimental-strip-types scripts/gen-nginx.mjs --env prod \
- && cat nginx/api-locations/generated.conf
+# `cat` the generated file so the build log captures the nginx config that
+# ships in the image — fail-fast visibility if the registry gets a weird entry.
+RUN cat nginx/api-locations/generated.conf
 
 # ---- Stage 2: runtime ----
 FROM nginx:alpine

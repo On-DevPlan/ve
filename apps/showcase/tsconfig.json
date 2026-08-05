@@ -2,7 +2,13 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "jsx": "preserve",
-    "types": ["vite/client", "vitest/globals"]
+    "types": ["vite/client", "vitest/globals"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "@api": ["src/api/index"],
+      "@api/*": ["src/api/*"]
+    }
   },
   "include": ["src/**/*", "__tests__/**/*", "vite.config.ts"]
 }

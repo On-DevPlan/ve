@@ -2,7 +2,7 @@
 // App.vue —— 整个 showcase 的根组件,只放 RouterView 与全局样式。
 //
 // 职责:
-//   1) 提供 RouterView 让 vue-router 决定渲染 HomePage / DetailPage / NotFoundPage
+//   1) 提供 RouterView 让 vue-router 决定渲染 HomePage / DetailPage / LoginPage / NotFoundPage
 //   2) 注入全局基础样式(字体 / 文本色 / 背景)与 box-sizing reset
 //   3) 不在这里做业务初始化 —— 全部交给 main.ts 的 bootstrap()
 //
@@ -14,7 +14,9 @@ import { RouterView } from 'vue-router';
 </script>
 
 <template>
-  <RouterView />
+  <div class="app-root">
+    <RouterView />
+  </div>
 </template>
 
 <style>

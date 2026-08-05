@@ -164,6 +164,11 @@ export interface ComponentConfig {
    *   - prod: scripts/gen-nginx.mjs 读同一份声明,生成 nginx location 片段。
    * 两端共用 normalizeApi() 归一化,保证不会出现"本地能跑、上线 404"。
    *
+   * @deprecated 自 apps/showcase 切换到 apiGateway + registry.ts 单一事实源后,
+   *   组件 config 不再携带代理规则。请在 apps/showcase/src/api/registry.ts
+   *   集中声明后端 + 路径。保留类型仅为向后兼容(外部 schema / 老组件配置),
+   *   一段时间后(预计 v0.3)从类型里彻底移除。
+   *
    * 两种写法任选:
    *   - 数组:[{ context, target, ... }, ...] 显式穷举,适合多后端/复杂规则
    *   - 对象映射:{ 逻辑名: 'target' | ApiRule } key 自动推 context 为 '/api/<key>'
