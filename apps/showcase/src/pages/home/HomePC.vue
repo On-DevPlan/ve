@@ -5,8 +5,11 @@
 //   1) 左 sidebar:品牌 + 搜索 + 分组/框架筛选 + 平台切换
 //   2) 主区:衬线标题 + 卡片网格(走 CardGrid 虚拟滚动)
 //   3) 卡片"open"事件映射到 router.push
+//
+// 2026-08:新增 nav 折叠。navCollapsed 状态在 260px ↔ 0 间切换,
+// 主区随之变宽,CardGrid 的 ResizeObserver 自动重算列数(响应式)。
 
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import CardGrid from '../../components/CardGrid.vue';
 import SearchBar from '../../components/SearchBar.vue';
@@ -23,6 +26,12 @@ const { platform } = usePlatform();
 const { open: openLogin } = useLoginModalState();
 // jwtAuth.state getter 读内部 Vue ref,computed 会跟踪 → 登录态变化时重渲染
 const jwtState = computed(() => jwtAuth.state);
+
+// nav 折叠:true = sidebar 收回(0 宽),主区占满
+const navCollapsed = ref(false);
+function toggleNav() {
+  navCollapsed.value = !navCollapsed.value;
+}
 
 const groups = computed(() => {
   const set = new Set<string>();
@@ -52,11 +61,35 @@ function togglePlatform(p: 'pc' | 'mobile') {
 </script>
 
 <template>
-  <div class="home-pc">
+  <div
+    class="home-pc"
+    :class="{ 'is-nav-collapsed': navCollapsed }"
+  >
     <aside class="sidebar">
-      <div class="brand">
-        wb / showcase
-        <small>Style Library — 2026</small>
+      <div class="sidebar__head">
+        <div class="brand">
+          wb / showcase
+          <small>Style Library — 2026</small>
+        </div>
+        <button
+          class="nav-toggle"
+          type="button"
+          :aria-label="navCollapsed ? '展开导航' : '收回导航'"
+          :title="navCollapsed ? '展开导航' : '收回导航'"
+          @click="toggleNav"
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+          >
+            <path d="M3 6h18M3 12h18M3 18h18" />
+          </svg>
+        </button>
       </div>
 
       <div class="search">
@@ -178,6 +211,12 @@ function togglePlatform(p: 'pc' | 'mobile') {
   color: var(--ink);
   font-family: "Inter Tight", "PingFang SC", "Helvetica Neue", sans-serif;
   -webkit-font-smoothing: antialiased;
+  transition: grid-template-columns .3s ease;
+}
+
+/* nav 折叠:sidebar 收成 0,主区占满;CardGrid ResizeObserver 自动重算列数 */
+.home-pc.is-nav-collapsed {
+  grid-template-columns: 0 1fr;
 }
 
 /* === 左侧栏 === */
@@ -190,7 +229,27 @@ function togglePlatform(p: 'pc' | 'mobile') {
   border-right: 1px solid var(--line);
   padding: 40px 28px;
   display: flex; flex-direction: column; gap: 28px;
+  overflow: hidden;
+  transition: padding .3s ease, border-width .3s ease;
 }
+/* 折叠时 sidebar 内容整体隐藏(宽度已由 grid 收为 0,这里保证不溢出) */
+.home-pc.is-nav-collapsed .sidebar {
+  padding-left: 0; padding-right: 0;
+  border-right-width: 0;
+}
+.sidebar__head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 8px;
+}
+.nav-toggle {
+  flex-shrink: 0;
+  margin-top: 6px;
+  width: 30px; height: 30px;
+  display: flex; align-items: center; justify-content: center;
+  background: none; border: 1px solid var(--line); border-radius: 2px;
+  color: var(--ink-soft); cursor: pointer;
+  transition: color .15s, border-color .15s, background .15s;
+}
+.nav-toggle:hover { color: var(--ink); border-color: var(--ink); background: rgba(255,255,255,.5); }
 .brand {
   font-family: "Cormorant Garamond", "Songti SC", serif;
   font-size: 30px; font-weight: 500; letter-spacing: -0.01em;
@@ -264,7 +323,9 @@ function togglePlatform(p: 'pc' | 'mobile') {
 }
 
 /* === 主体 === */
-.main { padding: 5px 72px 96px; }
+.main { padding: 5px 72px 96px; transition: padding .3s ease; }
+/* 折叠后主区变宽,收缩侧留白让卡片网格用满 */
+.home-pc.is-nav-collapsed .main { padding-left: 40px; padding-right: 40px; }
 .page-head {
   display: flex; align-items: baseline; justify-content: space-between;
   padding-bottom: 18px; border-bottom: 1px solid var(--line); margin-bottom: 40px;
@@ -300,12 +361,10 @@ function togglePlatform(p: 'pc' | 'mobile') {
 .crumb-login--ghost { border-color: transparent; padding-left: 0; padding-right: 0; }
 
 .main :deep(.card-grid__viewport) { min-height: 0; }
+/* 不覆盖列数 —— CardGrid 虚拟滚动用 ResizeObserver 量容器宽,内联注入
+   repeat(N, 280px)。这里只加间距,列数交给子组件自适应。 */
 .main :deep(.card-grid) {
   padding-top: 24px;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 24px;
-  justify-content: stretch;
 }
 .main :deep(.card) {
   background: var(--paper);
@@ -362,5 +421,31 @@ function togglePlatform(p: 'pc' | 'mobile') {
 .main :deep(.card-grid__empty) {
   padding: 32px; color: var(--ink-mute); text-align: center;
   font-family: "Inter Tight", "PingFang SC", sans-serif;
+}
+
+/* === 响应式 === */
+/* 中等宽度(1024 以下):主区左右留白减半,多给卡片网格空间 */
+@media (max-width: 1024px) {
+  .main { padding-left: 32px; padding-right: 32px; }
+}
+
+/* 窄屏(760 以下):nav 默认收回,侧栏以覆盖层出现;主区占满 */
+@media (max-width: 760px) {
+  .home-pc { grid-template-columns: 1fr; }
+  .home-pc.is-nav-collapsed { grid-template-columns: 1fr; }
+  .sidebar {
+    position: fixed; left: 0; top: 0; bottom: 0; z-index: 40;
+    width: 240px;
+    transform: translateX(0);
+    transition: transform .3s ease;
+    padding: 32px 24px;
+  }
+  .home-pc.is-nav-collapsed .sidebar {
+    transform: translateX(-100%);
+    padding-left: 24px; padding-right: 24px;
+    border-right-width: 1px;
+  }
+  .main { padding-left: 20px; padding-right: 20px; }
+  .home-pc.is-nav-collapsed .main { padding-left: 20px; padding-right: 20px; }
 }
 </style>
