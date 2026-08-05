@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0 --port 4173",
+    "gen:nginx": "tsx src/api/gen-nginx.ts",
     "test": "vitest run"
   },
   "dependencies": {
@@ -17,6 +18,8 @@
     "@style-library/mount-adapters": "workspace:*",
     "@style-library/react-components": "workspace:*",
     "@style-library/vue-components": "workspace:*",
+    "@vue/reactivity": "^3.5.40",
+    "http-proxy": "^1.18.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "remotion": "4.0.505",
@@ -24,6 +27,9 @@
     "vue-router": "^4.4.0"
   },
   "devDependencies": {
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/http-proxy": "^1.17.16",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.0",
@@ -31,6 +37,7 @@
     "@vue/test-utils": "^2.4.0",
     "esbuild": "^0.21.0",
     "jsdom": "^25.0.0",
+    "tsx": "^4.23.4",
     "typescript": "^5.4.0",
     "vite": "^5.4.0",
     "vitest": "^2.1.0"

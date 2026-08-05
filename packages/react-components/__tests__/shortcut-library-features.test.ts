@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 // 用真解析器校验提示词里的示例 —— 见 "every TOML example inside the prompt parses"
-import { parseImportToml } from '../src/shortcut-library/src/import-parser';
+import { parseImportToml } from '../src/shortcut-library/src/engine/import-parser';
 
 /**
  * Source-level regression tests for the four product features added on top
@@ -23,11 +23,11 @@ const indexTsx = readFileSync(
   'utf8',
 );
 const importModal = readFileSync(
-  resolve(__dirname, '../src/shortcut-library/src/ImportModal.tsx'),
+  resolve(__dirname, '../src/shortcut-library/src/pages/ImportModal.tsx'),
   'utf8',
 );
 const parser = readFileSync(
-  resolve(__dirname, '../src/shortcut-library/src/import-parser.ts'),
+  resolve(__dirname, '../src/shortcut-library/src/engine/import-parser.ts'),
   'utf8',
 );
 const types = readFileSync(
@@ -35,19 +35,19 @@ const types = readFileSync(
   'utf8',
 );
 const useShortcuts = readFileSync(
-  resolve(__dirname, '../src/shortcut-library/src/useShortcuts.ts'),
+  resolve(__dirname, '../src/shortcut-library/src/hooks/useShortcuts.ts'),
   'utf8',
 );
 const keyboard = readFileSync(
-  resolve(__dirname, '../src/shortcut-library/src/Keyboard.tsx'),
+  resolve(__dirname, '../src/shortcut-library/src/pages/Keyboard.tsx'),
   'utf8',
 );
 const table = readFileSync(
-  resolve(__dirname, '../src/shortcut-library/src/ShortcutTable.tsx'),
+  resolve(__dirname, '../src/shortcut-library/src/pages/ShortcutTable.tsx'),
   'utf8',
 );
 const keymap = readFileSync(
-  resolve(__dirname, '../src/shortcut-library/src/keymap.ts'),
+  resolve(__dirname, '../src/shortcut-library/src/engine/keymap.ts'),
   'utf8',
 );
 
@@ -126,7 +126,7 @@ describe('feature 1 — copy-format prompt', () => {
   it('updated doc + parser agree on the condition field', () => {
     // If the doc promises condition but parser rejects it, user gets
     // mysterious "未知字段" errors on import. Keep them in sync.
-    const docPath = resolve(__dirname, '../src/shortcut-library/IMPORT_FORMAT.md');
+    const docPath = resolve(__dirname, '../src/shortcut-library/src/IMPORT_FORMAT.md');
     const doc = readFileSync(docPath, 'utf8');
     expect(doc).toMatch(/condition/);
     expect(parser).toMatch(/key === 'condition'/);

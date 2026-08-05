@@ -1,9 +1,31 @@
 ---
 ref: component-level-dev-proxy
 parent: dev-server-patterns
+status: deprecated
+superseded-by: apps/showcase/src/api/
+deprecated-at: 2026-08-03
 ---
 
 # 组件级 API 代理(dev + prod 共用一张表)
+
+> **⚠️ DEPRECATED — 历史档案**
+>
+> 本 ref 描述的是旧的 "组件级 `api` 字段 + `mfeDynamicProxy` + `activeId`"
+> 设计。2026-08 起,网关事实源已迁出 `component.config.ts`,集中在:
+>
+> - **dev**: `apps/showcase/src/api/to-vite-proxy.ts`(vite plugin `apiGateway()`)
+> - **prod**: `vite build` 内联插件(closeBundle 调 `apps/showcase/src/api/gen-nginx.ts` 的 `genNginxOut()`,写 `nginx/api-locations/generated.conf`)
+> - **配置**: `apps/showcase/src/api/registry.ts`(路径单一源 `apiPaths` + entry;`BackendId` 从 registry key 自动推导)
+>
+> `ComponentConfig.api` 字段仍保留在 `@style-library/component-contract`
+> 类型中(标 `@deprecated`),仅作向后兼容。
+>
+> **如果今天还在写"组件需要后端"**:在 `registry.ts` 的 `apiPaths` 加一行 + 加 entry,
+> 写 `apps/showcase/src/api/services/<id>/index.ts`(继承 `HttpService`,`BASE = apiPaths.<id>`)+
+> `types.ts`。组件 `import ... from '@api'` 引用;组件业务封装放 `api/components/<id>/`。
+> 不要回退到 `component.config.ts` 的 `api` 字段 —— 那是过去的设计。
+>
+> 本 ref 保留以便阅读历史 PR / commit message 时理解"为什么改"。
 
 `vite.config.ts` 不应硬编码组件特定的 proxy(如 shortcut-library 需要 `:8080`)。proxy 是**组件的 dev 依赖**,应由组件自己声明,host 零感知。
 
@@ -134,8 +156,12 @@ void fetch(`/__mfe/deactivate?id=${encodeURIComponent(this.id)}`).catch(() => {}
 
 ## prod 侧:nginx 生成
 
+> ⚠️ 下述 `pnpm gen:nginx` 命令已移除(2026-08 起),现由 `vite build` 的内联插件
+> (closeBundle → `genNginxOut()`)自动生成 `nginx/api-locations/generated.conf`。
+> 保留下面的历史命令仅作档案。
+
 ```bash
-pnpm gen:nginx        # → nginx/api-locations/generated.conf(gitignored)
+pnpm gen:nginx        # → nginx/api-locations/generated.conf(gitignored)[已移除,见上]
 ```
 
 Docker builder 阶段自动跑;产物 `COPY` 到 runtime 镜像的 `/etc/nginx/api-locations/`,由 `default.conf` 在 `server{}` 内 `include`。
@@ -210,6 +236,7 @@ curl -i 'http://localhost:5173/__mfe/activate?id=nonexistent-component'
 
 ```bash
 # 生成 + 肉眼检查(重点:有没有 localhost 泄漏)
+# [命令已移除:现由 vite build 内联插件生成;手动触发用 tsx apps/showcase/src/api/gen-nginx.ts]
 pnpm gen:nginx && cat nginx/api-locations/generated.conf
 
 # 单测(20 个,覆盖尾斜杠 / ^~ / 环境隔离 / 冲突检测)

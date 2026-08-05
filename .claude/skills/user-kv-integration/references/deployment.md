@@ -50,17 +50,19 @@ curl -i -X POST http://<host>/definitely-not-a-route
 
 ### 为什么本地正常
 
-`mfeDynamicProxy` 活在 `configureServer(server: ViteDevServer)` 里 —— 它是 **Vite dev-server 中间件**。生产环境是 nginx 托管静态 `dist/`,没有 Vite,没有 dev server。因此:
+`apiGateway()` 活在 `configureServer(server: ViteDevServer)` 里 —— 它是 **Vite dev-server 中间件**,读 `apps/showcase/src/api/registry.ts` 把 `/api/*` 转给不同后端。生产环境是 nginx 托管静态 `dist/`,没有 Vite,没有 dev server。因此:
 
-- `component.config.ts` 的 `api` 字段在生产**默认无效**(除非接了下面的生成器)
-- `/__mfe/activate` 在生产也只拿到 `index.html`;`DetailPage.vue` 里的 `.catch(() => {})` 把它**静默吞掉**
+- `apps/showcase/src/api/registry.ts` 的 `target.prod` 在生产**默认无效**(除非跑 `pnpm gen:nginx` 生成 nginx 配置文件)
+- 旧设计里 `/__mfe/activate` 这种 fetch 钩子**已删除** —— 现在 dev 端是常驻 dispatch,无 activate/deactivate 协议
 - 所以直到发出第一个 POST 之前,一切看起来都正常
+
+> 旧设计细节参见 `.claude/skills/web-work-flow/references/component-level-dev-proxy.md` 顶部 deprecation banner。
 
 ## 解法:同源反向代理
 
 在 nginx 加 `/api` 反代。**不要**改前端 `baseUrl` 去直连后端端口 —— 原因见下一节。
 
-`ve` 仓库的做法是从 `component.config.ts` 的 `api` 字段**构建期生成** nginx location(`pnpm gen:nginx`),保证 dev/prod 路由永远一致。手写版本长这样:
+`ve` 仓库的做法是从 `apps/showcase/src/api/registry.ts` 单一事实源**构建期生成** nginx location(`pnpm --filter @style-library/showcase gen:nginx`),保证 dev/prod 路由永远一致。手写版本长这样:
 
 ```nginx
 server {

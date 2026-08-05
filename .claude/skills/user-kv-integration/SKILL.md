@@ -47,13 +47,14 @@ description: Use when integrating a frontend component with the user/kv API at /
    dev│            │prod
       ▼            ▼
  Vite 中间件    nginx location
- (mfeDynamic-   (gen-nginx.mjs
-  Proxy)         构建期生成)
+ (apiGateway()  (gen-nginx.ts
+  from           构建期生成)
+  registry.ts)
       │            │
       ▼            ▼
  :8080 (本机)   :8988 (生产后端)
 
-  两端读同一份 component.config.ts 的 api 字段 —— 详见 [[deployment]]
+  两端读同一份 apps/showcase/src/api/registry.ts —— 详见 [[deployment]]
 ```
 
 ## 三件套最小实现
@@ -190,8 +191,8 @@ onBlur={() => confirmDeleteId === id && setConfirmDeleteId(null)}
 | 上线部署 / 405 排查 | [[deployment]] | nginx 反代、CORS、容器网络 |
 | 后端 user/kv 设计 | dev_ctr_hello/.claude/skills/user-kv-invitecode/SKILL.md | 完整说明(数据库 / 路由 / 中间件) |
 | 后端 kv 模块命令 | `dev_ctr_hello/internal/service/kv/` | 服务端 upsert bug 位置(目前用 workaround) |
-| 组件级 API 声明(dev + prod) | `ve/packages/react-components/src/shortcut-library/component.config.ts` 的 `api` 字段 | 改 target,不动 vite.config.ts / default.conf |
-| nginx 路由生成器 | `ve/packages/manifest-generator/src/nginx-emit.ts` | 从同一份 api 声明生成 prod location |
+| 组件级 API 声明(dev + prod) | `apps/showcase/src/api/registry.ts` | 改 target,不动 vite.config.ts / default.conf |
+| nginx 路由生成器 | `apps/showcase/src/api/gen-nginx.ts` | 从 registry 单一事实源生成 prod location |
 | ShortcutStore 抽象 | `ve/packages/react-components/src/shortcut-library/store.ts` | LSStore + UserKVStore 都 implements |
 
 ## 验证

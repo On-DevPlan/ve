@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseImportToml, resolveCombo } from '../src/shortcut-library/src/import-parser';
+import { parseImportToml, resolveCombo } from '../src/shortcut-library/src/engine/import-parser';
 import type { KeyStroke } from '../src/shortcut-library/src/types';
 
 describe('resolveCombo', () => {

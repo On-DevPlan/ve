@@ -77,7 +77,7 @@ flowchart TB
 | `capabilities` | CapabilityConfig | ⚠️ | fullscreen/resizable 透传,Host 未做能力闸门 |
 | `docs` | DocsConfig | ⚠️ | 透传,无消费者 |
 | `loaderUrl` | string | ✅ | loaders.ts setLoaders 优先用它覆盖 glob |
-| **`api`** | ApiRule array or Record | 🔵 | **dev-only**。vite-plugin 在 buildStart 扫描 → 喂给 mfeDynamicProxy → 不进 manifest → 不进生产 |
+| **`api`** | ApiRule array or Record | 🟡 | **@deprecated**。事实源已迁到 `apps/showcase/src/api/registry.ts`(路径单一源 `apiPaths` + entry;service 在 `services/<id>/`,收口 `@api`)。详见 [[component-level-dev-proxy]] 顶部 deprecation banner |
 
 ## 3. ManifestEntry 字段(构建产物)
 
@@ -107,7 +107,7 @@ ComponentConfig 写 `entry: './index.tsx'`,但 loader glob 仍写死 `index.{vue
 
 ### 4.4 dev-only 字段
 
-- `ComponentConfig.api` → 仅 mfeDynamicProxy 用,见 [[component-level-dev-proxy]]
+- `ComponentConfig.api` → **已废弃**。当前事实源在 `apps/showcase/src/api/registry.ts`(`apiPaths` 字面量 + entry;`BackendId` 自动推导),service 在 `services/<id>/`(`BASE = apiPaths.<id>`,继承 `HttpService`),通过 `@api` 统一收口;dev `apiGateway()` 与 prod nginx(vite build 内联)都由 registry 归一化。旧 ref 见 [[component-level-dev-proxy]] 顶部 banner
 - `componentRoots` 是 vite plugin 配置,不进 config
 
 ## 5. 校验链:谁负责什么
@@ -146,7 +146,7 @@ flowchart TB
 
 - 审计与 P0/P1/P2 完整清单: `docs/architecture/framework-architecture-review.md`
 - 对账机制已落地: `docs/architecture/manifest-loader-reconciliation.md`
-- Dev-only proxy 模式: [[component-level-dev-proxy]]
+- Dev-only proxy 模式(已废弃): [[component-level-dev-proxy]] 顶部 banner
 - 加组件教程: [[how-to-add-component]]
 - 类型契约源: `packages/component-contract/src/types.ts`
 - JSON Schema: `packages/component-contract/src/{component-config,manifest}.schema.json`

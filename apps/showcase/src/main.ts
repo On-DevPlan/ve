@@ -1,6 +1,7 @@
 // main.ts —— showcase 应用启动入口。
 //
 // 启动流程(spec §8.1):
+//   0) jwtAuth.init          —— 尝试用 LS token 恢复 JWT 会话(不阻塞 manifest 加载)
 //   1) applyThemeToDocument —— 把默认主题 token 写到 documentElement
 //   2) loadManifest          —— 异步拉取 ComponentManifest(dev 中间件 / prod 静态)
 //   3) createRegistry        —— 建全局注册表,把 manifest 灌入
@@ -20,6 +21,7 @@
 import { createApp } from 'vue';
 import App from './App.vue';
 import { router } from './router';
+import { setRouter } from '@/shared/router-accessor';
 import { loadManifest } from './manifest-loader';
 import { createRegistry } from './registry/ComponentRegistry';
 import { createSearchIndex } from './registry/SearchIndex';
@@ -28,10 +30,17 @@ import { setLoaders, LoadersKey } from './registry/loaders';
 import { RegistryKey } from './composables/useRegistry';
 import { SearchKey } from './composables/useSearch';
 import { usePlatform } from './composables/usePlatform';
-import { defaultTokens } from './theme/tokens';    
+import { defaultTokens } from './theme/tokens';
 import { applyThemeToDocument } from './theme/apply-theme';
+import { jwtAuth } from '@/shared/auth-store';
 
 async function bootstrap() {
+  // 0) JWT user-auth 会话恢复(userV1/kvV1 用)。
+  //    fire-and-forget:UI 不等 init 结果;token 恢复后 useJwtAuth 自动 rerender
+  void jwtAuth.init();
+
+  // 0.5) 主题先行 —— 在挂载 Vue app 前就把 CSS 变量铺好,首屏就能拿到正确样式
+
   // 1) 主题先行 —— 在挂载 Vue app 前就把 CSS 变量铺好,首屏就能拿到正确样式
   applyThemeToDocument(defaultTokens);
 
@@ -66,6 +75,7 @@ async function bootstrap() {
   app.provide(SearchKey, search);
   app.provide(LoadersKey, loaders);
   app.use(router);
+  setRouter(router);
   app.mount('#app');
 }
 
