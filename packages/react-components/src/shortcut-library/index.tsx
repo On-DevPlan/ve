@@ -62,80 +62,138 @@ export default function ShortcutLibrary() {
   // 键盘预览折叠态 —— 默认展开;用户手动收起后写入 LS,下次进详情页保持
   const [previewCollapsed, setPreviewCollapsed] = useState<boolean>(loadPreviewCollapsed);
 
-  // 拖拽布局:sidebar 宽度 + 键盘预览高度(都不持久化,组件实例间独立)
+  // 拖拽布局:sidebar 宽度 + 键盘预览高度(都不持久化,组件实例间独立)。
+  //
+  // 性能设计(stage 3):拖拽期间【零 Layout / 零 Paint】。
+  //   - pointermove 只把最新坐标写进 ref,rAF 每帧一次只更新 guide line 的
+  //     transform(纯合成层,不触发 reflow/repaint)
+  //   - 真实布局(grid-template-columns / flex-basis)只在 pointerup 提交一次
+  //   - move 中绝不读布局属性(offsetWidth/getBoundingClientRect),避免强制同步布局
   const [sidebarWidth, setSidebarWidth] = useState(280);
   const [previewHeight, setPreviewHeight] = useState(200);
-  // refs:拖拽期间直改 CSS 变量(不触发 React 重渲染),只有 CSS 变量变化触发浏览器原生 reflow。
-  // 这是卡顿根因的修复:之前每次 pointermove 都 setState → 整棵树(含 canvas Keyboard)重渲染 + layout thrash。
   const rootRef = useRef<HTMLDivElement | null>(null);
   const previewRef = useRef<HTMLElement | null>(null);
+  // 两条 guide line:拖拽期间跟随指针的视觉反馈(transform 移动)
+  const colGuideRef = useRef<HTMLDivElement | null>(null);
+  const rowGuideRef = useRef<HTMLDivElement | null>(null);
+
   const dragType = useRef<null | 'sidebar' | 'preview'>(null);
-  const dragStart = useRef<{ x: number; y: number; w: number; h: number }>({ x: 0, y: 0, w: 0, h: 0 });
-  // rAF 节流:pointermove 高频事件合并到一帧一次(屏幕刷新率),避免 setState/DOM 写入堆积
+  // pointerdown 只读一次几何(起始坐标 / 当前值 / preview 基线 top),move 不再读 DOM
+  const dragStart = useRef<{ x: number; y: number; w: number; h: number; previewTop: number }>(
+    { x: 0, y: 0, w: 0, h: 0, previewTop: 0 },
+  );
+  // rAF 去重标记 + 最新指针坐标(ref 写入,不触发渲染)
   const rafId = useRef<number | null>(null);
-  const latest = useRef<{ w: number; h: number } | null>(null);
+  const latest = useRef<{ dx: number; dy: number } | null>(null);
+
+  const SIDEBAR_MIN = 200;
+  const SIDEBAR_MAX = 500;
+  const PREVIEW_MIN = 80;
+  const PREVIEW_MAX = 500;
 
   function startDrag(type: 'sidebar' | 'preview', e: React.PointerEvent<HTMLElement>) {
     e.preventDefault();
+    // 指针捕获:移出元素/窗口也不丢事件
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+
     dragType.current = type;
     dragStart.current = {
       x: e.clientX,
       y: e.clientY,
       w: sidebarWidth,
       h: previewHeight,
+      // row guide 基线 = preview 相对 main 的 top(pointerdown 只读这一次)
+      previewTop: type === 'preview' ? (previewRef.current?.offsetTop ?? 0) : 0,
     };
+
+    // 拖拽期间全局禁止文本选择 + 改光标,避免选择干扰
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = type === 'sidebar' ? 'col-resize' : 'row-resize';
+    if (type === 'sidebar') colGuideRef.current?.style.setProperty('opacity', '1');
+    else rowGuideRef.current?.style.setProperty('opacity', '1');
   }
 
-  // 拖拽期间把最新值写进 CSS 变量(root / preview 元素的 style),零 React 重渲染
-  function applyDrag(w: number, h: number) {
+  // rAF 每帧一次:只更新 guide line 的 transform(纯合成),夹紧/吸附纯数学
+  function frame() {
+    rafId.current = null;
+    const p = latest.current;
+    if (!p) return;
     if (dragType.current === 'sidebar') {
-      rootRef.current?.style.setProperty('--sl-sl-sidebar-w', `${Math.min(500, Math.max(200, w))}px`);
+      const w = Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, dragStart.current.w + p.dx));
+      colGuideRef.current?.style.setProperty(
+        'transform',
+        `translate3d(${w}px, 0, 0)`,
+      );
     } else if (dragType.current === 'preview') {
-      previewRef.current?.style.setProperty('--sl-sl-preview-h', `${Math.min(500, Math.max(80, h))}px`);
+      const top = dragStart.current.previewTop - p.dy;
+      rowGuideRef.current?.style.setProperty('transform', `translate3d(0, ${top}px, 0)`);
     }
+    latest.current = null;
   }
 
-  // pointerup:同步最终值到 React state(一次渲染),供后续持久化/初始渲染使用
-  function commitDrag() {
-    if (latest.current) {
-      const { w, h } = latest.current;
-      setSidebarWidth(Math.min(500, Math.max(200, w)));
-      setPreviewHeight(Math.min(500, Math.max(80, h)));
-      latest.current = null;
+  // pointerup:隐藏 guide,恢复样式,【提交一次】真实布局(setState → React 一次渲染)。
+  // 用 pointerup 事件坐标算终值(不依赖 latest——它可能已被 frame 清空)。
+  function endDrag(e: PointerEvent) {
+    if (rafId.current !== null) {
+      cancelAnimationFrame(rafId.current);
+      rafId.current = null;
     }
+    colGuideRef.current?.style.setProperty('opacity', '0');
+    rowGuideRef.current?.style.setProperty('opacity', '0');
+    document.body.style.userSelect = '';
+    document.body.style.cursor = '';
+    const t = dragType.current;
+    if (t) {
+      if (t === 'sidebar') {
+        setSidebarWidth(Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, dragStart.current.w + (e.clientX - dragStart.current.x))));
+      } else {
+        setPreviewHeight(Math.min(PREVIEW_MAX, Math.max(PREVIEW_MIN, dragStart.current.h - (e.clientY - dragStart.current.y))));
+      }
+    }
+    latest.current = null;
     dragType.current = null;
   }
 
   useEffect(() => {
     function onMove(e: PointerEvent) {
-      const t = dragType.current;
-      if (!t) return;
-      const w = dragStart.current.w + (e.clientX - dragStart.current.x);
-      const h = dragStart.current.h - (e.clientY - dragStart.current.y);
-      latest.current = { w, h };
-      // rAF 节流:一帧内多次 pointermove 只应用最后一次
-      if (rafId.current === null) {
-        rafId.current = requestAnimationFrame(() => {
-          rafId.current = null;
-          if (latest.current) applyDrag(latest.current.w, latest.current.h);
-        });
-      }
+      if (!dragType.current) return;
+      latest.current = { dx: e.clientX - dragStart.current.x, dy: e.clientY - dragStart.current.y };
+      // rAF 去重:一帧内多次 pointermove 只调度一次 frame
+      if (rafId.current === null) rafId.current = requestAnimationFrame(frame);
     }
-    function onUp() {
-      if (rafId.current !== null) {
-        cancelAnimationFrame(rafId.current);
-        rafId.current = null;
-      }
-      commitDrag();
+    function onUp(e: PointerEvent) {
+      endDrag(e);
     }
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
     return () => {
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
       if (rafId.current !== null) cancelAnimationFrame(rafId.current);
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
     };
   }, []);
+
+  // 键盘可达性:splitter 可聚焦,方向键按固定步长直接提交(低频,允许走 Layout)
+  const SPLIT_STEP = 16;
+  function onSplitterKeyDown(type: 'sidebar' | 'preview', e: React.KeyboardEvent) {
+    if (e.key === 'ArrowRight' && type === 'sidebar') {
+      e.preventDefault();
+      setSidebarWidth((v) => Math.min(SIDEBAR_MAX, v + SPLIT_STEP));
+    } else if (e.key === 'ArrowLeft' && type === 'sidebar') {
+      e.preventDefault();
+      setSidebarWidth((v) => Math.max(SIDEBAR_MIN, v - SPLIT_STEP));
+    } else if (e.key === 'ArrowUp' && type === 'preview') {
+      e.preventDefault();
+      setPreviewHeight((v) => Math.min(PREVIEW_MAX, v + SPLIT_STEP));
+    } else if (e.key === 'ArrowDown' && type === 'preview') {
+      e.preventDefault();
+      setPreviewHeight((v) => Math.max(PREVIEW_MIN, v - SPLIT_STEP));
+    }
+  }
 
   // 长按 popup 状态(由 Keyboard 子组件回调触发)
   const [longPressPopup, setLongPressPopup] = useState<PopupState | null>(null);
@@ -480,7 +538,18 @@ export default function ShortcutLibrary() {
       />
       <div
         className="sl-sl-resize-handle sl-sl-resize-handle--col"
+        role="separator"
+        aria-orientation="vertical"
+        aria-valuenow={sidebarWidth}
+        aria-label="调整侧栏宽度"
+        tabIndex={0}
         onPointerDown={(e) => startDrag('sidebar', e)}
+        onKeyDown={(e) => onSplitterKeyDown('sidebar', e)}
+      />
+      <div
+        ref={colGuideRef}
+        className="sl-sl-guide sl-sl-guide--col"
+        aria-hidden="true"
       />
 
       <main className="sl-sl-main">
@@ -527,9 +596,20 @@ export default function ShortcutLibrary() {
         {!previewCollapsed && (
           <div
             className="sl-sl-resize-handle sl-sl-resize-handle--row"
+            role="separator"
+            aria-orientation="horizontal"
+            aria-valuenow={previewHeight}
+            aria-label="调整键盘预览高度"
+            tabIndex={0}
             onPointerDown={(e) => startDrag('preview', e)}
+            onKeyDown={(e) => onSplitterKeyDown('preview', e)}
           />
         )}
+        <div
+          ref={rowGuideRef}
+          className="sl-sl-guide sl-sl-guide--row"
+          aria-hidden="true"
+        />
         <section
           ref={previewRef}
           className={`sl-sl-preview ${previewCollapsed ? 'is-collapsed' : ''}`}
