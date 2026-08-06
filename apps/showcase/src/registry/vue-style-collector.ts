@@ -34,7 +34,7 @@
 //    注意 root 必须是 vite 的 config.root(apps/showcase),与 plugin-vue 的
 //    createDescriptor(filename, source, { root }) 取值一致。
 
-import { parse, compileStyle } from '@vue/compiler-sfc';
+import { babelParse, parse, compileStyle, type SFCScriptBlock } from '@vue/compiler-sfc';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import type { Plugin } from 'vite';
@@ -106,6 +106,86 @@ function compareVueNames(a: string, b: string): number {
   const r = rank(a) - rank(b);
   if (r !== 0) return r;
   return a < b ? -1 : a > b ? 1 : 0;
+}
+
+/**
+ * 判定一个 specifier 是否"裸 npm 包 CSS"(需要由 vite 从 node_modules 解析)。
+ * 排除:相对路径(/ ./ ../)、URL、绝对路径、hash 路由。
+ */
+function isBareThirdPartyCss(specifier: string): boolean {
+  const pathname = specifier.split(/[?#]/, 1)[0];
+  return (
+    /\.css$/i.test(pathname) &&
+    !specifier.startsWith('.') && !specifier.startsWith('/') &&
+    !specifier.startsWith('#') &&
+    !/^[a-z][a-z\d+.-]*:/i.test(specifier) &&
+    !/^[a-z]:[\\/]/i.test(specifier)
+  );
+}
+
+/** 根据 SFC script block 的 lang 选择 babel parser plugins。 */
+function scriptParserPlugins(block: SFCScriptBlock): unknown[] {
+  const plugins: unknown[] = ['importAttributes'];
+  const lang = block.lang?.toLowerCase();
+  if (lang === 'ts' || lang === 'tsx' || lang === 'mts' || lang === 'cts') {
+    plugins.push('typescript', 'explicitResourceManagement', 'decorators-legacy');
+  }
+  if (lang === 'jsx' || lang === 'tsx') plugins.push('jsx');
+  return plugins;
+}
+
+/**
+ * 用 babel AST 提取某个 script block 里的静态 `import '*.css'` 字面量。
+ * 只收 ImportDeclaration,排除 `import type`。
+ */
+function extractStaticCssImports(block: SFCScriptBlock): string[] {
+  const ast = babelParse(block.content, {
+    sourceType: 'module',
+    plugins: scriptParserPlugins(block) as Parameters<typeof babelParse>[1]['plugins'],
+  });
+  const imports: string[] = [];
+  for (const node of ast.program.body) {
+    if (node.type === 'ImportDeclaration' &&
+        node.importKind !== 'type' &&
+        typeof node.source.value === 'string' &&
+        isBareThirdPartyCss(node.source.value)) {
+      imports.push(node.source.value);
+    }
+  }
+  return imports;
+}
+
+/**
+ * 扫描 vue 组件目录,按组件 id 聚合所有 SFC script block 里的
+ * 静态 `import '*.css'` 字面量(裸 npm 包)。
+ *
+ * 用途:openlayers 之类的第三方 CSS 通过 `import 'ol/ol.css'` 被 vite cssCodeSplit
+ * inline 进 component CSS chunk 而**不**生成 <link>。组件挂载到 ShadowRoot 后,
+ * DOM 在 shadow 内、selector 跨不进 → 控件裸渲染。本函数把这些 specifier 收出来,
+ * 在 generateVueStylesCode 里以 `?inline` 后缀和 SFC <style> 一起塞进 cssMap。
+ */
+export function collectThirdPartyCssImports(
+  vueComponentsRoot: string,
+): Record<string, string[]> {
+  if (!existsSync(vueComponentsRoot) || !statSync(vueComponentsRoot).isDirectory()) return {};
+  const byId = new Map<string, string[]>();
+  for (const componentId of readdirSync(vueComponentsRoot).sort()) {
+    const dir = path.join(vueComponentsRoot, componentId);
+    if (!statSync(dir).isDirectory()) continue;
+    const vueFiles: string[] = [];
+    walkVueFiles(dir, vueFiles);
+    const set = new Set<string>();
+    for (const file of vueFiles) {
+      const source = readFileSync(file, 'utf-8');
+      const { descriptor } = parse(source, { filename: file });
+      const scripts = [descriptor.script, descriptor.scriptSetup]
+        .filter((b): b is SFCScriptBlock => b !== null)
+        .sort((a, b) => a.loc.start.offset - b.loc.start.offset);
+      for (const block of scripts) extractStaticCssImports(block).forEach(set.add, set);
+    }
+    if (set.size > 0) byId.set(componentId, [...set]);
+  }
+  return Object.fromEntries(byId);
 }
 
 function walkVueFiles(dir: string, acc: string[]): void {
@@ -203,17 +283,28 @@ export function compileRawScopedCss(
  *
  * 关键:`import('/abs/.../__vscoped__index.0.css?inline')` 是**字面量**,vite 静态分析
  *   可分包;resolveId 拦截伪 .css,vite CSS 插件接管 ?inline。
+ *
+ * 第三参数 `thirdPartyCssImports`(可选)收录 SFC script 里静态 `import '*.css'` 的
+ *   裸 npm specifier(componentId → specifier[]),把它们以 `?inline` 后缀和 SFC <style>
+ *   一起塞进同一 componentId 的 lazy loader,与组件 CSS 一起进 ShadowRoot —— 修
+ *   `import 'ol/ol.css'` 之类被 vite cssCodeSplit 内联进 chunk 但不生成 <link>
+ *   导致 ShadowRoot 拿不到样式的 bug。第三参数默认 `{}`,不破坏既有 2 参数调用。
  */
 export function generateVueStylesCode(
   blocks: StyleBlockEntry[],
   opts: { root: string; isProduction: boolean },
+  thirdPartyCssImports: Record<string, string[]> = {},
 ): string {
   // compileRawScopedCss 验证仍做(dev 期早曝):抛错即早曝,结果丢弃(CSS 文本由 vite CSS 插件产出)。
   blocks.forEach((b) => { void compileRawScopedCss(b, opts); });
 
   const byId = new Map<string, string[]>();
+  // 第三方 CSS 必须在 SFC <style> 之前:ol.css 定义 :root 变量等,scoped CSS 可能引用。
+  for (const [componentId, cssImports] of Object.entries(thirdPartyCssImports)) {
+    byId.set(componentId, cssImports.map(withInlineQuery));
+  }
   blocks.forEach((b) => {
-    const p = pseudoCssPath(b.file, b.index) + '?inline';
+    const p = `${pseudoCssPath(b.file, b.index)}?inline`;
     const arr = byId.get(b.componentId) ?? [];
     arr.push(p);
     byId.set(b.componentId, arr);
@@ -230,10 +321,19 @@ export function generateVueStylesCode(
   return `export default {\n${entries}\n};\n`;
 }
 
+/** 给 module id 加 `?inline` 后缀(已有 inline 则不重复加;已有 `?` 用 `&` 拼)。 */
+function withInlineQuery(id: string): string {
+  return /[?&]inline\b/.test(id) ? id : `${id}${id.includes('?') ? '&' : '?'}inline`;
+}
+
 export function vueStyleCollector(opts: { vueComponentsRoot: string }): Plugin {
   let code: string | null = null;
   // 伪 CSS 路径(无 query) → style block,供 load() 反查。
   const pseudoBlocks = new Map<string, StyleBlockEntry>();
+  // 第三方 CSS 绝对路径(无 query)集合,供 resolveId 重委托时认领。
+  const thirdPartyCssPaths = new Set<string>();
+  // 传给 vite resolver 的 importer —— 用一个真实 SFC,确保 npm CSS 从 vue-components 包而非 apps/showcase 解析。
+  let cssResolutionImporter: string | undefined;
   let root = '';
   let isProduction = false;
 
@@ -252,18 +352,39 @@ export function vueStyleCollector(opts: { vueComponentsRoot: string }): Plugin {
       // 本插件算 prod id、plugin-vue 算 dev id → scoped 静默失效。
       isProduction = config.isProduction;
       const blocks = collectVueStyleBlocks(opts.vueComponentsRoot);
+      const thirdPartyCssImports = collectThirdPartyCssImports(opts.vueComponentsRoot);
       pseudoBlocks.clear();
       for (const b of blocks) {
         pseudoBlocks.set(pseudoCssPath(b.file, b.index), b);
       }
-      code = generateVueStylesCode(blocks, { root, isProduction });
+      thirdPartyCssPaths.clear();
+      // 第三方 CSS 路径集合用于 resolveId 拦截 —— 我们要拦下来再用真实 SFC importer 重委托,
+      // 否则 vite 会从 apps/showcase 的 node_modules 找 `ol/ol.css`(那里没装),直接报错。
+      const vueFiles: string[] = [];
+      if (existsSync(opts.vueComponentsRoot) && statSync(opts.vueComponentsRoot).isDirectory()) {
+        walkVueFiles(opts.vueComponentsRoot, vueFiles);
+      }
+      cssResolutionImporter = vueFiles[0];
+      for (const cssImports of Object.values(thirdPartyCssImports)) {
+        for (const spec of cssImports) {
+          thirdPartyCssPaths.add(stripQuery(toPosix(spec)));
+        }
+      }
+      code = generateVueStylesCode(blocks, { root, isProduction }, thirdPartyCssImports);
     },
-    resolveId(id) {
+    async resolveId(id) {
       // 拦截 1:虚拟模块本身。
       if (id === VIRTUAL_VUE_STYLES) return VIRTUAL_VUE_STYLES;
+      const cleanId = stripQuery(toPosix(id));
       // 拦截 2:伪 CSS 路径 —— 磁盘上不存在,必须我们认领,否则 vite 解析失败。
       // 原样返回(保留 `?inline` query),让 vite CSS 插件后续能读到 query。
-      if (pseudoBlocks.has(stripQuery(toPosix(id)))) return id;
+      if (pseudoBlocks.has(cleanId)) return id;
+      // 拦截 3:第三方 npm CSS —— 用真实 SFC 文件作 importer 重委托,
+      // 让 vite 从 vue-components 包的 node_modules 解析(而非 apps/showcase)。
+      if (cssResolutionImporter && /[?&]inline\b/.test(id) && thirdPartyCssPaths.has(cleanId)) {
+        const resolved = await this.resolve(id, cssResolutionImporter, { skipSelf: true });
+        return resolved ?? undefined;
+      }
       return undefined;
     },
     load(id) {

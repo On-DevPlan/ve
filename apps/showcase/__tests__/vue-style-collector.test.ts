@@ -4,6 +4,7 @@ import type { Plugin, ResolvedConfig } from 'vite';
 import {
   countStyleBlocks,
   collectVueStyleBlocks,
+  collectThirdPartyCssImports,
   generateVueStylesCode,
   compileRawScopedCss,
   pseudoCssPath,
@@ -39,8 +40,12 @@ function setup(opts?: { isProduction?: boolean }): Plugin {
   return plugin;
 }
 
-function callResolveId(plugin: Plugin, id: string): string | undefined {
-  return hook<(id: string) => string | undefined>(plugin.resolveId)(id);
+function callResolveId(plugin: Plugin, id: string): Promise<string | undefined> | string | undefined {
+  const fn = hook<(id: string) => unknown>(plugin.resolveId);
+  return (fn as (id: string) => unknown)(id) as
+    | Promise<string | undefined>
+    | string
+    | undefined;
 }
 
 function callLoad(plugin: Plugin, id: string): string | undefined {
@@ -157,17 +162,17 @@ describe('vue-style-collector', () => {
 
   // ---- v2 双拦截 ----
 
-  it('resolveId intercepts both the virtual module and pseudo .css paths', () => {
+  it('resolveId intercepts both the virtual module and pseudo .css paths', async () => {
     const plugin = setup();
     // 拦截 1:虚拟模块
-    expect(callResolveId(plugin, VIRTUAL_VUE_STYLES)).toBe(VIRTUAL_VUE_STYLES);
+    expect(await callResolveId(plugin, VIRTUAL_VUE_STYLES)).toBe(VIRTUAL_VUE_STYLES);
     // 拦截 2:伪 .css 路径(磁盘不存在,必须我们认领),query 原样保留
     const id = pseudoCssPath(path.join(fixtures, 'sample/index.vue'), 0);
-    expect(callResolveId(plugin, id)).toBe(id);
-    expect(callResolveId(plugin, `${id}?inline`)).toBe(`${id}?inline`);
+    expect(await callResolveId(plugin, id)).toBe(id);
+    expect(await callResolveId(plugin, `${id}?inline`)).toBe(`${id}?inline`);
     // 无关 id 不认领
-    expect(callResolveId(plugin, '/some/other/file.css')).toBeUndefined();
-    expect(callResolveId(plugin, 'vue')).toBeUndefined();
+    expect(await callResolveId(plugin, '/some/other/file.css')).toBeUndefined();
+    expect(await callResolveId(plugin, 'vue')).toBeUndefined();
   });
 
   it('load returns raw scoped CSS for pseudo .css paths (with and without query)', () => {
@@ -244,5 +249,38 @@ describe('vue-style-collector', () => {
     // 用相对的 forward-slash 字符串计算 id:这就是算法真正使用的形式
     const id = computeScopedId(root, file, '', false);
     expect(id).toMatch(/^[a-f0-9]{8}$/);
+  });
+
+  // ---- v3 扩展:第三方 SFC import CSS(specifier)进入 lazy loader map ----
+
+  it('collects static third-party CSS imports per componentId', () => {
+    // with-css-import/index.vue 顶层 `import 'pkg.css'` → 收为 { 'with-css-import': ['pkg.css'] }
+    const result = collectThirdPartyCssImports(fixtures);
+    expect(result['with-css-import']).toEqual(['pkg.css']);
+  });
+
+  it('prepends third-party CSS imports before SFC style imports', () => {
+    const blocks = collectVueStyleBlocks(fixtures);
+    const thirdParty = collectThirdPartyCssImports(fixtures);
+    const code = generateVueStylesCode(
+      blocks,
+      { root: fixtures, isProduction: false },
+      thirdParty,
+    );
+    // 第三方 pkg.css?inline 必须在 SFC __vscoped__... ?inline 之前
+    expect(code).toMatch(
+      /"with-css-import": \(\) => Promise\.all\(\[import\("pkg\.css\?inline"\),\s*import\("[^"]*__vscoped__index\.vue\.0\.css\?inline"\)\]\)\.then\(ms => ms\.map\(m => m\.default\)\),/,
+    );
+  });
+
+  it('generateVueStylesCode default third-party param preserves backward compat', () => {
+    // 现有 2 参数调用:third-party 默认 {} → 与 v3 行为完全一致,不该有 `pkg.css?inline`
+    const code = generateVueStylesCode(
+      collectVueStyleBlocks(fixtures),
+      { root: fixtures, isProduction: false },
+    );
+    expect(code).toMatch(/export default \{/);
+    expect(code).toMatch(/"sample": \(\) => Promise\.all/);
+    expect(code).not.toMatch(/pkg\.css\?inline/);
   });
 });
