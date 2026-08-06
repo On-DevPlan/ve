@@ -38,8 +38,12 @@ export function createReactMountAdapter(): MountAdapter {
         throw new Error('ReactMountAdapter: module.default is missing');
       }
 
-      // 把组件附带的 CSS adopt 进 shadowRoot
-      adoptStylesInto(context.shadowRoot);
+      // CSS 前置:有 cssReady(本地组件,host 已注入)则等就绪;没有(远程组件)回退扫 head。
+      if (context.cssReady) {
+        await context.cssReady;
+      } else {
+        adoptStylesInto(context.shadowRoot);
+      }
 
       // 在 ShadowRoot 里建 portal div 作为 React 根节点
       const portal = document.createElement('div');

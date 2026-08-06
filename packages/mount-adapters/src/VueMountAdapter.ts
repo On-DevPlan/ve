@@ -59,6 +59,13 @@ export function createVueMountAdapter(): MountAdapter {
         throw new Error('VueMountAdapter: module.default is missing');
       }
 
+      // CSS 前置:有 cssReady(本地组件,host 已注入)则等就绪;没有(远程组件)回退扫 head。
+      if (context.cssReady) {
+        await context.cssReady;
+      } else {
+        adoptStylesInto(context.shadowRoot);
+      }
+
       // 1) 创建 portal div 并挂到 ShadowRoot
       const portal = document.createElement('div');
       context.shadowRoot.appendChild(portal);
@@ -85,9 +92,6 @@ export function createVueMountAdapter(): MountAdapter {
           throw err;
         }
       }
-
-      // 4) 注入 SFC 样式(克隆 document.head 的 <style> 进 shadowRoot)
-      adoptStylesInto(context.shadowRoot);
 
       // 5) 路由切换时自动卸载
       context.signal.addEventListener('abort', () => app.unmount());

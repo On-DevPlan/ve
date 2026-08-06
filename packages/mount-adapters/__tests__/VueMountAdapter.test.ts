@@ -183,4 +183,20 @@ describe('VueMountAdapter', () => {
     firstMounted.unmount();
     secondMounted.unmount();
   });
+
+  it('waits for cssReady before mounting', async () => {
+    let resolveCss!: () => void;
+    const cssReady = new Promise<void>((r) => { resolveCss = r; });
+    const mountPromise = createVueMountAdapter().mount(
+      { default: VueFixture },
+      createContext({ cssReady }),
+    );
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(host.shadowRoot.querySelector(ADAPTER_PORTAL_SELECTOR)).toBeNull();
+    resolveCss();
+    const mounted = await mountPromise;
+    expect(host.shadowRoot.querySelector(ADAPTER_PORTAL_SELECTOR)).not.toBeNull();
+    mounted.unmount();
+  });
 });

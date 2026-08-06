@@ -246,4 +246,27 @@ describe('ReactMountAdapter', () => {
       }),
     ).resolves.toBeUndefined();
   });
+
+  it('waits for cssReady before rendering the portal', async () => {
+    let resolveCss!: () => void;
+    const cssReady = new Promise<void>((r) => { resolveCss = r; });
+    const mountPromise = createReactMountAdapter().mount(
+      { default: ReactFixture },
+      createContext({ cssReady }),
+    );
+    // cssReady 未 resolve:mount 应卡在 await,portal 未创建
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(host.shadowRoot.querySelector(ADAPTER_PORTAL_SELECTOR)).toBeNull();
+    // resolve 后 portal 出现
+    resolveCss();
+    let mounted: Awaited<ReturnType<ReturnType<typeof createReactMountAdapter>['mount']>>;
+    await act(async () => {
+      mounted = await mountPromise;
+    });
+    expect(host.shadowRoot.querySelector(ADAPTER_PORTAL_SELECTOR)).not.toBeNull();
+    await act(async () => {
+      mounted!.unmount();
+    });
+  });
 });
