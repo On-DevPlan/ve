@@ -67,11 +67,17 @@ export function useShortcuts() {
   );
 
   // 启动 + token 变化:按 JWT 态选 activeStore 并 load。
-  // host 的 jwtAuth.init() 已在应用启动时跑过(Task 10),这里只读当前 token。
-  // useJwtAuth() 每次渲染返回新快照,但 auth.token 是原始值,作为依赖稳定。
+  // 关键依赖 `auth.jwtAuthState`,不只是 `auth.token`:
+  //   - jwtAuth.init() 是 fire-and-forget(main.ts 里),存在一个「token 落 ref
+  //     已设但 jwtUser 还在拉 /user/info」的中间态。
+  //   - 如果只看 token,init 期间 useShortcuts 会选 cloudStore,然后
+  //     userSpace.getShortcuts() 的 requireAuth() 抛 not logged in,导致
+  //     页面空白 + 不会自动重试(init 完后再变 activeStore 没有触发源)。
+  //   - 把 jwtAuthState 也加入依赖,init 完成态变 → effect 重跑 → 再调一次
+  //     cloudStore.load(),这次 jwtUser 已就位,真正发请求。
   useEffect(() => {
     let cancelled = false;
-    const store = auth.token ? cloudStore : lsStore;
+    const store = auth.token && auth.jwtAuthState === 'logged-in' ? cloudStore : lsStore;
     setActiveStore(store);
     (async () => {
       try {
@@ -84,13 +90,13 @@ export function useShortcuts() {
       }
     })();
     return () => { cancelled = true; };
-  }, [auth.token, cloudStore, lsStore]);
+  }, [auth.token, auth.jwtAuthState, cloudStore, lsStore]);
 
   // token 变化(登录/登出)→ 保证 activeStore 指向正确的 store 实现
   useEffect(() => {
-    const want = auth.token ? cloudStore : lsStore;
+    const want = auth.token && auth.jwtAuthState === 'logged-in' ? cloudStore : lsStore;
     setActiveStore((prev) => (prev === want ? prev : want));
-  }, [auth.token, cloudStore, lsStore]);
+  }, [auth.token, auth.jwtAuthState, cloudStore, lsStore]);
 
   // 登出 → reset saveMode + dirty(但不弹窗 — 退出确认已经在 banner 按钮的
   // onClick 里处理了,这里只负责清理 + 重新 load)。
