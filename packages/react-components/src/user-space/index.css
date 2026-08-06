@@ -184,12 +184,14 @@
 /* Linear 风格:容器一条 hairline,active tab 用 font-weight 600 + -1px bottom
    + 2px 黑实线跨过横线 + 嵌入式 count badge(active 时反色) */
 .sl-us-tabs {
-  display: flex; gap: 0;
-  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 20px 0; /* 上 6 让 tab 和横线之间有呼吸感,下 0 让 active 下划线正好压线 */
   border-bottom: 1px solid var(--border);
 }
 .sl-us-tab {
-  padding: 8px 12px;
+  padding: 8px 14px;
   font-size: 12.5px;
   color: var(--fg-2);
   font-weight: 500;
