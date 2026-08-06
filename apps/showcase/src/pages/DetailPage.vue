@@ -26,6 +26,8 @@ import {
 } from '@style-library/mount-adapters';
 import { collectCss, cssMaps } from '../registry/css-maps';
 import { defaultTokens } from '../theme/tokens';
+import { createLoadingSkeleton, type LoadingSkeletonHandle } from '../shared/LoadingSkeleton/skeleton';
+import '../shared/LoadingSkeleton/skeleton.css';
 
 const route = useRoute();
 const registry = useRegistry();
@@ -97,6 +99,26 @@ async function mount(componentId: string) {
   const session = new MountSession(componentId, containerEl, defaultTokens);
   currentSession = session;
 
+  // 首次会话显骨架(spec §首屏体验);后续路由跳变不显。
+  // 标记写 sessionStorage 不挂在 try/catch 内 —— 即使 mount 之后抛错,visited
+  // 仍生效,刷新/二次进入同一会话不重复闪一次骨架。
+  const SKELETON_VISITED_KEY = 'sl-skel:visited';
+  const isFirstVisit = !sessionStorage.getItem(SKELETON_VISITED_KEY);
+  sessionStorage.setItem(SKELETON_VISITED_KEY, '1');
+
+  const skel: LoadingSkeletonHandle | null = isFirstVisit
+    ? createLoadingSkeleton(session.host.portalTarget, {
+        themeTokens: {
+          '--sl-color-border':
+            getComputedStyle(document.documentElement)
+              .getPropertyValue('--sl-color-border')
+              .trim() || '#d1d5db',
+          '--sl-radius-md': '6px',
+        },
+      })
+    : null;
+  if (skel) await skel.appear();
+
   try {
     const loader = loaders[entry.loaderKey];
     if (!loader) {
@@ -143,6 +165,12 @@ async function mount(componentId: string) {
     error.value = err instanceof Error ? err.message : String(err);
     session.cleanup();
     currentSession = null;
+  }
+
+  // 组件 mount 后启动骨架 fade(并行,不 await,组件 ready 后 < 350ms 骨架消失)。
+  // 放在 try/catch 之后:mount 失败 → 没有 fade,让 session.cleanup 把整个 portal 拆掉。
+  if (skel) {
+    void skel.fadeOut(() => skel.destroy());
   }
 }
 
