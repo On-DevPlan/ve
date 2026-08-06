@@ -144,4 +144,23 @@ describe('createShadowRootHost', () => {
     // 这里确认 alias 真的没了,防止后续误用。
     expect((host as Partial<ShadowRootHost>).ready).toBeUndefined();
   });
+
+  it('injectCss with @import falls back to <style> clone (no replaceSync throw)', () => {
+    // v2 回归:含 @import url(...) 的 raw CSS 走 adoptedStyleSheets.replaceSync 会抛
+    // "@import rules are not allowed here"(W3C construct-stylesheets 限制)。
+    // 兜底:整段降级到 <style data-sl-css> clone,浏览器允许 <style> 内 @import。
+    // jsdom 29.1.1 已走 <style> 降级路径(envSupportsAdopted === false),
+    // 所以这条用例天然覆盖 <style> 分支;真实浏览器里 adoptCssTexts 也会
+    // 主动检测 @import 走降级,不会触发 replaceSync。
+    const host = createShadowRootHost({ container });
+    const cssWithImport =
+      "@import url('https://cdn.jsdelivr.net/.../tabler-icons.min.css');\n.icon { color: red; }";
+    // 不应抛错
+    expect(() => host.injectCss([cssWithImport])).not.toThrow();
+    // 文本必须落进 shadowRoot(降级分支走 <style> clone)
+    const texts = shadowCssTexts(host.shadowRoot);
+    const found = texts.find((t) => t.includes('@import url') && t.includes('tabler-icons'));
+    expect(found).toBeDefined();
+    expect(found).toContain('.icon');
+  });
 });
