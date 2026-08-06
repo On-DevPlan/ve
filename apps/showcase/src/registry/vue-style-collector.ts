@@ -18,10 +18,10 @@
 //   scoped 失效。
 
 import { parse, compileStyle } from '@vue/compiler-sfc';
-import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import type { Plugin } from 'vite';
+import { computeScopedId } from '../../plugins/scoped-id';
 
 export const VIRTUAL_VUE_STYLES = 'virtual:vue-styles';
 
@@ -35,35 +35,8 @@ export interface StyleBlockEntry {
   source: string; // .vue 全文;production 模式参与 scopedId
 }
 
-/** 把 \\ 换成 /(win32 兼容;与 vite 内部 slash 实现一致)。 */
-function normalizePath(p: string): string {
-  return p.split('\\').join('/');
-}
-
-/**
- * 复刻 @vitejs/plugin-vue@5.2.4 createDescriptor 的 hash 实现:
- * sha256(input).hex.substring(0, 8)。
- * 见 node_modules/.pnpm/@vitejs+plugin-vue@.../dist/index.mjs:152-158。
- */
-function getHash(text: string): string {
-  return createHash('sha256').update(text).digest('hex').substring(0, 8);
-}
-
-/**
- * 计算组件的 scopedId,与 @vitejs/plugin-vue@5.2.4 的 descriptor.id 100% 一致。
- * dev:   sha256(normalizePath(relative(root, filename))).substring(0, 8)
- * prod:  sha256(normalizePath(relative(root, filename)) + source).substring(0, 8)
- * 源:createDescriptor(index.mjs:76-91) → descriptor.id = getHash(normalizedPath + (isProduction ? source : ""))
- */
-export function computeScopedId(
-  root: string,
-  filename: string,
-  source: string,
-  isProduction: boolean,
-): string {
-  const normalized = normalizePath(path.relative(root, filename));
-  return getHash(normalized + (isProduction ? source : ''));
-}
+// re-export scoped 算法,保持现有 import 路径(同仓库既有调用方 vue-style-collector.test.ts)。
+export { computeScopedId };
 
 /** 数一个 SFC 的 <style> block 个数;解析失败按 0 处理。 */
 export function countStyleBlocks(filePath: string): number {
