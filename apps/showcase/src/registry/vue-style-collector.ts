@@ -188,47 +188,46 @@ export function compileRawScopedCss(
 }
 
 /**
- * 生成 virtual:vue-styles 的模块源码。
+ * 生成 virtual:vue-styles 的模块源码(懒加载 loader map)。
  *
- * v1 形态(已废弃):`export const sN = "<raw css>"` —— CSS 文本硬编码在模块里,绕过 vite。
- * v2 形态:`import cN from "<伪 .css 路径>?inline"` —— CSS 文本由 vite CSS 插件产出。
+ * v2 形态(废弃):顶层静态 `import cN from "<伪 .css>?inline"` + `export const cssMap`。
+ *   问题:顶层 import 把所有组件的 CSS 全部 eager 拉进首页,违背评审 #6(单组件
+ *   详情页不该加载其他组件的 CSS)。
  *
- * 导出:
- *   - `cssIds`:伪 CSS 路径数组(调试/工具用,顺序与 blocks 一致)
- *   - `cssMap`:Record<componentId, string[]> 聚合
- *   - `default`:同 `cssMap` —— css-maps.ts 顶层 `import vueStylesMap from 'virtual:vue-styles'`
- *     消费的就是这个默认导出,签名 Record<componentId, string[]> 与 v1 保持一致。
+ * v3 形态(当前):每个 componentId 一个懒加载 loader,内部字面量动态 import,
+ *   按需拉取。default export 形态 `Record<componentId, () => Promise<string[]>>`。
+ *
+ * compileRawScopedCss 验证仍做(dev 期早曝):configResolved 阶段对每个 block 跑一遍
+ *   compileStyle,语法错误 / scopedId 算法异常在 dev server 启动时立即抛出,而不是等
+ *   某个组件被打开才暴。opts(root / isProduction)就是为这一步保留。
+ *
+ * 关键:`import('/abs/.../__vscoped__index.0.css?inline')` 是**字面量**,vite 静态分析
+ *   可分包;resolveId 拦截伪 .css,vite CSS 插件接管 ?inline。
  */
-export function generateVueStylesCode(blocks: StyleBlockEntry[]): string {
-  const byId = new Map<string, string[]>();
-  const imports: string[] = [];
-  const ids: string[] = [];
+export function generateVueStylesCode(
+  blocks: StyleBlockEntry[],
+  opts: { root: string; isProduction: boolean },
+): string {
+  // compileRawScopedCss 验证仍做(dev 期早曝):抛错即早曝,结果丢弃(CSS 文本由 vite CSS 插件产出)。
+  blocks.forEach((b) => { void compileRawScopedCss(b, opts); });
 
-  blocks.forEach((b, i) => {
-    const id = pseudoCssPath(b.file, b.index);
-    // `?inline` 让 vite CSS 插件返回 `export default "<处理后的 CSS 字符串>"`,
-    // 而不是把 CSS 作为副作用注入 <style> 标签。
-    imports.push(`import c${i} from ${JSON.stringify(`${id}?inline`)};`);
-    ids.push(JSON.stringify(id));
+  const byId = new Map<string, string[]>();
+  blocks.forEach((b) => {
+    const p = pseudoCssPath(b.file, b.index) + '?inline';
     const arr = byId.get(b.componentId) ?? [];
-    arr.push(`c${i}`);
+    arr.push(p);
     byId.set(b.componentId, arr);
   });
 
-  const mapEntries = [...byId.entries()]
-    .map(([id, refs]) => `  ${JSON.stringify(id)}: [${refs.join(', ')}],`)
+  const entries = [...byId.entries()]
+    .map(([id, paths]) =>
+      `  ${JSON.stringify(id)}: () => Promise.all([` +
+      paths.map((p) => `import(${JSON.stringify(p)})`).join(', ') +
+      `]).then(ms => ms.map(m => m.default)),`,
+    )
     .join('\n');
 
-  return [
-    imports.join('\n'),
-    '',
-    `export const cssIds = [${ids.join(', ')}];`,
-    '',
-    `export const cssMap = {\n${mapEntries}\n};`,
-    '',
-    'export default cssMap;',
-    '',
-  ].join('\n');
+  return `export default {\n${entries}\n};\n`;
 }
 
 export function vueStyleCollector(opts: { vueComponentsRoot: string }): Plugin {
@@ -257,7 +256,7 @@ export function vueStyleCollector(opts: { vueComponentsRoot: string }): Plugin {
       for (const b of blocks) {
         pseudoBlocks.set(pseudoCssPath(b.file, b.index), b);
       }
-      code = generateVueStylesCode(blocks);
+      code = generateVueStylesCode(blocks, { root, isProduction });
     },
     resolveId(id) {
       // 拦截 1:虚拟模块本身。
@@ -268,7 +267,7 @@ export function vueStyleCollector(opts: { vueComponentsRoot: string }): Plugin {
       return undefined;
     },
     load(id) {
-      // 拦截 1:虚拟模块 → 返回模块源码(一堆 import + cssIds/cssMap 导出)。
+      // 拦截 1:虚拟模块 → 返回懒加载 loader map 源码(每 componentId 一个 () => Promise.all([...import('伪 .css?inline')...]))。
       if (id === VIRTUAL_VUE_STYLES) return code ?? '';
       // 拦截 2:伪 CSS 路径 → 返回 raw scoped CSS(带 data-v-xxx)。
       // 到此为止,postcss / url() 重写 / @import 内联全部交给 vite CSS 插件。

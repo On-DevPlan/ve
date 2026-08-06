@@ -32,6 +32,9 @@ function setup(opts?: { isProduction?: boolean }): Plugin {
   hook<(c: ResolvedConfig) => void>(plugin.configResolved)({
     root: fixtures,
     command: opts?.isProduction ? 'build' : 'serve',
+    // configResolved 里 generateVueStylesCode 会调 compileRawScopedCss 做验证,
+    // 需要 isProduction 与 compileRawScopedCss 单测保持一致(false)。
+    isProduction: opts?.isProduction ?? false,
   } as ResolvedConfig);
   return plugin;
 }
@@ -102,40 +105,51 @@ describe('vue-style-collector', () => {
     expect(css).toContain(`data-v-${expected}`);
   });
 
-  // ---- v2 模块源码形态 ----
+  // ---- v3 模块源码形态(懒加载 loader map) ----
 
-  it('emits cssIds array and cssMap aggregate instead of v1 inline const strings', () => {
-    const code = generateVueStylesCode(collectVueStyleBlocks(fixtures));
-    expect(code).toMatch(/export const cssIds = \[/);
-    expect(code).toMatch(/export const cssMap = \{/);
-    expect(code).toMatch(/export default cssMap;/);
-    // v1 的 `export const sN = "<raw css>"` 必须彻底消失 —— 那正是绕过 vite CSS 的形态
+  it('emits a lazy loader map instead of v1 inline const strings / v2 eager imports', () => {
+    const code = generateVueStylesCode(collectVueStyleBlocks(fixtures), { root: fixtures, isProduction: false });
+    // 默认导出是 Record<componentId, () => Promise<string[]>>
+    expect(code).toMatch(/export default \{/);
+    // 每个 componentId 一个懒加载 loader,内部 Promise.all + 字面量 import
+    expect(code).toMatch(/"sample": \(\) => Promise\.all/);
+    expect(code).toMatch(/"multi": \(\) => Promise\.all/);
+    // v1 的 `export const sN = "<raw css>"` 必须彻底消失
     expect(code).not.toMatch(/export const s\d+ = /);
-    // 也不该再有硬编码的 raw CSS 文本(CSS 现在由 vite CSS 插件产出)
+    // v2 的 cssIds / cssMap 命名导出也消失(改成默认导出懒加载 map)
+    expect(code).not.toMatch(/export const cssIds/);
+    expect(code).not.toMatch(/export const cssMap/);
+    // 不该再有硬编码的 raw CSS 文本(CSS 现在由 vite CSS 插件产出)
     expect(code).not.toMatch(/data-v-[a-f0-9]{8}/);
+    // 不再有顶层静态 import(全部改为字面量动态 import)
+    expect(code).not.toMatch(/^import /m);
   });
 
-  it('imports every style block through a pseudo .css path with ?inline', () => {
+  it('emits one literal dynamic import per style block, each with ?inline', () => {
     const blocks = collectVueStyleBlocks(fixtures);
-    const code = generateVueStylesCode(blocks);
-    // 每个 style block 一条 import,且都带 ?inline(让 vite 返回 export default "<css>")
-    const importLines = code.match(/^import c\d+ from ".*";$/gm) ?? [];
-    expect(importLines).toHaveLength(blocks.length);
-    expect(importLines.every((l) => l.includes('?inline'))).toBe(true);
-    expect(importLines.every((l) => l.includes('__vscoped__'))).toBe(true);
-    expect(importLines.every((l) => l.includes('.css?inline'))).toBe(true);
+    const code = generateVueStylesCode(blocks, { root: fixtures, isProduction: false });
+    // 每个 style block 一条字面量动态 import,且都带 ?inline(让 vite 返回 export default "<css>")
+    const imports = code.match(/import\([^)]*\)/g) ?? [];
+    expect(imports).toHaveLength(blocks.length);
+    expect(imports.every((i) => i.includes('?inline'))).toBe(true);
+    expect(imports.every((i) => i.includes('__vscoped__'))).toBe(true);
+    expect(imports.every((i) => i.includes('.css?inline'))).toBe(true);
   });
 
-  it('aggregates css refs per componentId and keeps the default export shape', () => {
-    const code = generateVueStylesCode(collectVueStyleBlocks(fixtures));
-    // 聚合形状:每个 componentId 一个数组,多个 style block 归到同 id。
-    // css-maps.ts 消费的是 default export = Record<componentId, string[]>,签名与 v1 一致。
-    expect(code).toMatch(/\n {2}"sample": \[c\d+, c\d+\],\n/);
-    expect(code).toMatch(/\n {2}"multi": \[c\d+, c\d+\],\n/);
+  it('aggregates lazy loaders per componentId and keeps the default export shape', () => {
+    const code = generateVueStylesCode(collectVueStyleBlocks(fixtures), { root: fixtures, isProduction: false });
+    // sample 含 index.vue(1 block)+ Child.vue(1 block)→ 2 个 import;multi 含 index.vue(2 block)→ 2 个 import。
+    // 聚合到同一 componentId 的 loader,内部 Promise.all 顺序与 readdir 一致。
+    expect(code).toMatch(
+      /"sample": \(\) => Promise\.all\(\[import\("[^"]*__vscoped__index\.vue\.0\.css\?inline"\), import\("[^"]*__vscoped__Child\.vue\.0\.css\?inline"\)\]\)\.then\(ms => ms\.map\(m => m\.default\)\),/,
+    );
+    expect(code).toMatch(
+      /"multi": \(\) => Promise\.all\(\[import\("[^"]*__vscoped__index\.vue\.0\.css\?inline"\), import\("[^"]*__vscoped__index\.vue\.1\.css\?inline"\)\]\)\.then\(ms => ms\.map\(m => m\.default\)\),/,
+    );
   });
 
   it('does not emit ?vue&type=style import queries', () => {
-    const code = generateVueStylesCode(collectVueStyleBlocks(fixtures));
+    const code = generateVueStylesCode(collectVueStyleBlocks(fixtures), { root: fixtures, isProduction: false });
     // 不走 `.vue?vue&type=style&...&inline`:那个 id 扩展名是 .vue,
     // isCSSRequest 不命中 → rollup 拿 raw CSS 当 JS 解析 → `Expected ident`(v1 Task 5 复现)
     expect(code).not.toMatch(/\?vue&type=style/);
@@ -170,12 +184,14 @@ describe('vue-style-collector', () => {
     expect(callLoad(plugin, '/some/other/file.css')).toBeUndefined();
   });
 
-  it('load returns the virtual module source with imports for the virtual id', () => {
+  it('load returns the lazy loader map source for the virtual id', () => {
     const plugin = setup();
     const code = callLoad(plugin, VIRTUAL_VUE_STYLES)!;
-    expect(code).toMatch(/^import c0 from ".*\.css\?inline";$/m);
-    expect(code).toMatch(/export const cssIds = \[/);
-    expect(code).toMatch(/export default cssMap;/);
+    // v3 形态:默认导出懒加载 loader map,无顶层静态 import / 无 cssIds 命名导出
+    expect(code).toMatch(/export default \{/);
+    expect(code).toMatch(/\(\) => Promise\.all\(\[import\("[^"]*__vscoped__[^"]*\.css\?inline"\)/);
+    expect(code).not.toMatch(/export const cssIds/);
+    expect(code).not.toMatch(/export const cssMap/);
   });
 
   it('runs with enforce: pre so it resolves before vite built-in CSS plugins', () => {

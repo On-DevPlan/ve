@@ -138,8 +138,10 @@ describe('createShadowRootHost', () => {
     await expect(host.cssReady).rejects.toThrow('boom');
   });
 
-  it('keeps ready as a deprecated alias of cssReady (DetailPage compat)', () => {
+  it('no longer exposes a ready alias (DetailPage migrated to cssReady in Task 4)', () => {
     const host = createShadowRootHost({ container });
-    expect(host.ready).toBe(host.cssReady);
+    // Task 4 移除了 `ready: cssReady` deprecated alias:DetailPage 已全部改用 cssReady,
+    // 这里确认 alias 真的没了,防止后续误用。
+    expect((host as Partial<ShadowRootHost>).ready).toBeUndefined();
   });
 });

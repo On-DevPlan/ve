@@ -104,20 +104,23 @@ async function mount(componentId: string) {
     }
     // 并行拉组件实现 + CSS 文本(spec §5 架构):
     //   - loader() 负责拉组件 chunk,可能跨包 import,自然异步
-    //   - collectCss() 是纯函数,在 Promise.resolve() 内同步完成,但仍用 await
-    //     把"两个并行任务"的语义留在代码里,便于未来 collect 阶段变异步
-    // Promise.all 保证 loader 与 CSS 同步就位,任意一个 reject → mount 失败
+    //   - collectCss() 现在也是异步(懒加载 loader:per-component 拉对应 CSS chunk,评审 #6)
+    // CSS 获取失败不致命:failCss 把 cssReady reject 掉,adapter 走 adoptStylesInto 兜底
+    // 无样式渲染,不白屏;返回 null 让下面的 injectCss 跳过。
     const [mod, cssTexts] = await Promise.all([
       loader(),
-      Promise.resolve(collectCss(entry, cssMaps)),
+      collectCss(entry, cssMaps).catch((e) => {
+        session.host.failCss(e);
+        return null;
+      }),
     ]);
     // 已被新 mount 顶掉(session 已被 cleanup)——不要再用本 session 的 host
     if (session.isAborted()) return;
     // CSS 先于组件 DOM 同帧落地(spec §8 时序保证):
     //   injectCss 同步在 ShadowRoot 头部追加 <style data-sl-css>,在
-    //   adapter.mount 把 DOM 写进来时样式已可命中。cssReady 始终是
-    //   resolved Promise(同步注入下没有等待任务),但保留 await 入口。
-    session.host.injectCss(cssTexts);
+    //   adapter.mount 把 DOM 写进来时样式已可命中。cssTexts 为 null 表示 CSS 取不到
+    //   (loaderUrl 远程组件 / collect 失败),跳过注入,cssReady 已被 failCss reject。
+    if (cssTexts) session.host.injectCss(cssTexts);
     const adapter = selectAdapter(createAdapters(), entry.framework);
     const mounted = await adapter.mount(mod, {
       container: session.host.portalTarget,
@@ -125,7 +128,9 @@ async function mount(componentId: string) {
       props: {},
       theme: { colorScheme: 'light', tokens: defaultTokens, namespace: 'sl' },
       signal: session.abort.signal,
-      cssReady: session.host.ready,
+      // 远程组件(loaderUrl)宿主不注入 CSS → 不传 cssReady,adapter 走 adoptStylesInto
+      // 兜底(spec §9);本地组件传 cssReady,等 injectCss / failCss settle。
+      cssReady: entry.loaderUrl ? undefined : session.host.cssReady,
     });
     if (session.isAborted()) {
       // 本 session 被顶掉但 mount() 还成功——清掉刚挂上的实例

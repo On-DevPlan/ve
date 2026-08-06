@@ -42,8 +42,6 @@ export interface ShadowRootHost {
   injectCss(texts: string[]): void;
   failCss(err: unknown): void;
   readonly cssReady: Promise<void>;
-  /** @deprecated 改名 cssReady;Task 4 迁移 DetailPage 后移除。 */
-  ready: Promise<void>;
   destroy(): void;
 }
 
@@ -100,7 +98,6 @@ export function createShadowRootHost(opts: ShadowRootHostOptions): ShadowRootHos
     injectCss,
     failCss,
     cssReady,
-    ready: cssReady,
     destroy,
   };
 }

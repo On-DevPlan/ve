@@ -1,22 +1,23 @@
-// registry/css-maps.ts —— 构建期真实 CSS 文本 map(dev/prod 同构)。
-//   - React:`?inline` eager glob,同步返回 CSS 文本(Vite 文档确认)
-//   - Vue:import virtual:vue-styles(由 vue-style-collector 插件提供,Task 3)
+// registry/css-maps.ts —— 构建期懒加载 CSS map(dev/prod 同构)。
+//   - React:不带 eager 的 glob → 每个 CSS 独立 chunk,按需拉取(评审 #6)
+//   - Vue:import virtual:vue-styles,后者导出懒加载 loader map
 //
-// 为什么顶层 import.meta.glob 能同步:?inline 把 CSS 文本变成 JS 字符串,
-// eager:true 在构建时内联进 chunk,运行时零异步、零网络。
+// 不带 eager 的意义:卡片层和单组件详情页都不会被其他组件的 CSS 拖累。
+// loader 内部是字面量 import(),vite 静态分析可分包。
 
 import vueStylesMap from 'virtual:vue-styles';
 import type { CssMaps } from './css-collector';
 
-const reactCss = import.meta.glob(
-  '../../../../packages/react-components/src/*/index.css?inline',
-  { eager: true, import: 'default' },
-) as Record<string, string>;
+// 不带 eager → 每个 CSS 独立 chunk,按需拉取(评审 #6)。
+const reactCssLoaders = import.meta.glob(
+  '../../../../packages/react-components/src/*/index.css',
+  { query: '?inline', import: 'default' },
+) as Record<string, () => Promise<string>>;
 
-const react: Record<string, string> = {};
-for (const [path, text] of Object.entries(reactCss)) {
+const react: Record<string, () => Promise<string[]>> = {};
+for (const [path, loader] of Object.entries(reactCssLoaders)) {
   const id = path.match(/\/src\/([^/]+)\/index\.css/)?.[1];
-  if (id) react[id] = text;
+  if (id) react[id] = () => loader().then((css) => [css]);
 }
 
 export const cssMaps: CssMaps = { react, vue: vueStylesMap };
