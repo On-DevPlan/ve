@@ -72,4 +72,26 @@ describe('createShadowRootHost', () => {
     // 容器已经从 document.body 上摘掉
     expect(container.parentNode).toBeNull();
   });
+
+  it('injectCss appends a <style> with the given css text into shadowRoot', () => {
+    const host = createShadowRootHost({ container });
+    host.injectCss(['.inject-test { color: seagreen; }']);
+    const texts = Array.from(host.shadowRoot.querySelectorAll('style'))
+      .map((s) => s.textContent ?? '')
+      .join('\n');
+    expect(texts).toContain('.inject-test { color: seagreen; }');
+  });
+
+  it('injectCss is idempotent for identical css text', () => {
+    const host = createShadowRootHost({ container });
+    host.injectCss(['.dedup { color: red; }']);
+    host.injectCss(['.dedup { color: red; }']);
+    expect(host.shadowRoot.querySelectorAll('style[data-sl-css]')).toHaveLength(1);
+  });
+
+  it('exposes a ready promise that resolves after injectCss', async () => {
+    const host = createShadowRootHost({ container });
+    host.injectCss(['.ready-test { color: blue; }']);
+    await expect(host.ready).resolves.toBeUndefined();
+  });
 });

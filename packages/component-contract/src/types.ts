@@ -290,6 +290,11 @@ export interface MountContext {
   props: Record<string, unknown>; // 组件 props
   theme: ThemeRuntime; // 主题运行时
   signal: AbortSignal; // 路由切换时的取消信号
+  /**
+   * 组件 CSS 已注入 ShadowRoot 的完成信号。adapter 必须在 render / app.mount 前 await。
+   * 缺省(如远程 loaderUrl 组件)时,adapter 回退 adoptStylesInto 扫 document.head。
+   */
+  cssReady?: Promise<void>;
 }
 
 // 已挂载组件句柄:adapter 返回给 Host(spec §4.4)

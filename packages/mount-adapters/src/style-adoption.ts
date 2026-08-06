@@ -11,8 +11,9 @@
 // 都共用同一份"已 clone 指纹"集合,避免 Vue/React 各自维护独立状态导致
 // 重复克隆。
 
-// djb2 哈希取前 8 个十六进制位 + 文本长度,作为 CSS 属性选择器安全的指纹值
-function styleFingerprint(text: string): string {
+// djb2 哈希取前 8 个十六进制位 + 文本长度,作为 CSS 属性选择器安全的指纹值。
+// 导出供 ShadowRootHost.injectCss 复用同一份指纹算法。
+export function styleFingerprint(text: string): string {
   let hash = 5381;
   for (let i = 0; i < text.length; i++) {
     hash = (hash * 33) ^ text.charCodeAt(i);
