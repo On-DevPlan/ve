@@ -49,7 +49,7 @@ describe('createShortcutStore (delegates to user-space getShortcuts/setShortcuts
     await expect(createShortcutStore().save([])).rejects.toThrow('not logged in');
   });
 
-  it('loads the entire shortcuts blob from the default group KV', async () => {
+  it('loads the entire shortcuts blob without groupId (backend resolves default)', async () => {
     loggedIn(42);
     const groups = [
       { id: 'g1', name: 'VSCode', shortcuts: [
@@ -61,12 +61,12 @@ describe('createShortcutStore (delegates to user-space getShortcuts/setShortcuts
     );
     const result = await createShortcutStore().load();
     expect(result).toEqual(groups);
-    // load = GET /api/v1/kv/shortcut-library?groupId=42
+    // load = GET /api/v1/kv/shortcut-library (不传 groupId,后端走 default)
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining('/api/v1/kv/shortcut-library'),
       expect.anything(),
     );
-    expect(fetchMock.mock.calls[0]?.[0]).toContain('groupId=42');
+    expect(fetchMock.mock.calls[0]?.[0]).not.toContain('groupId=');
   });
 
   it('returns an empty list when the shortcuts KV is missing (code 50)', async () => {
@@ -75,12 +75,13 @@ describe('createShortcutStore (delegates to user-space getShortcuts/setShortcuts
     await expect(createShortcutStore().load()).resolves.toEqual([]);
   });
 
-  it('saves the entire shortcuts blob to the default group KV', async () => {
+  it('saves the entire shortcuts blob without groupId (backend resolves default)', async () => {
     loggedIn(42);
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(ok(null));
     const groups = [{ id: 'g1', name: 'VSCode', shortcuts: [], createdAt: 0, updatedAt: 0 }];
     await createShortcutStore().save(groups);
-    // save = POST /api/v1/kv with key='shortcut-library', tags=['shortcut-library'], groupId=42
+    // save = POST /api/v1/kv with key='shortcut-library', tags=['shortcut-library'],
+    // 不传 groupId(后端用 caller 的 default_group_id)
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/v1/kv',
       expect.objectContaining({
@@ -91,7 +92,7 @@ describe('createShortcutStore (delegates to user-space getShortcuts/setShortcuts
     const body = JSON.parse(String(callArgs?.body));
     expect(body.key).toBe('shortcut-library');
     expect(body.tags).toEqual(['shortcut-library']);
-    expect(body.groupId).toBe(42);
+    expect(body.groupId).toBeUndefined();
     expect(JSON.parse(body.value)).toEqual(groups);
   });
 });

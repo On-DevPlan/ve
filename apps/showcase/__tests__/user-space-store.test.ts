@@ -127,9 +127,9 @@ describe('user-space store KV CRUD', () => {
       const g1 = { id: 'gx1', name: 'VSCode', order: 1, createdAt: 1000, updatedAt: 1500 };
       const s1 = { id: 'sx1', groupId: 'gx1', order: 1, combo: [{ code: 'KeyR', label: 'R', isModifier: false }], description: 'd1', createdAt: 1100, updatedAt: 1200 };
       const fetchMock = vi.spyOn(globalThis, 'fetch')
-        // 1) GET /kv/shortcut-library?groupId=23 -> 404 (code 50)
+        // 1) GET /kv/shortcut-library (不传 groupId,后端走 default) -> 404 (code 50)
         .mockResolvedValueOnce(new Response(JSON.stringify({ code: 50, data: null }), { status: 200 }))
-        // 2) GET /kv?tags=shortcut-library&groupId=23&limit=200 -> legacy rows
+        // 2) GET /kv?tags=shortcut-library (不传 groupId) -> legacy rows
         .mockResolvedValueOnce(new Response(JSON.stringify({
           code: 0,
           data: {
@@ -149,11 +149,11 @@ describe('user-space store KV CRUD', () => {
         id: 'gx1', name: 'VSCode', createdAt: 1000, updatedAt: 1500,
         shortcuts: [{ id: 'sx1', combo: s1.combo, description: 'd1', condition: undefined, createdAt: 1100 }],
       }]);
-      // 1) GET 'shortcut-library' (not found)
-      expect(fetchMock.mock.calls[0][0]).toBe('/api/v1/kv/shortcut-library?groupId=23');
-      // 2) listByTag
+      // 1) GET 'shortcut-library' (not found, no groupId)
+      expect(fetchMock.mock.calls[0][0]).toBe('/api/v1/kv/shortcut-library');
+      // 2) listByTag (no groupId)
       expect(String(fetchMock.mock.calls[1][0])).toContain('tags=shortcut-library');
-      expect(String(fetchMock.mock.calls[1][0])).toContain('groupId=23');
+      expect(String(fetchMock.mock.calls[1][0])).not.toContain('groupId=');
     });
 
     it('returns [] when shortcuts blob is missing and tag list is empty (fresh user)', async () => {
@@ -175,52 +175,35 @@ describe('user-space store KV CRUD', () => {
       await expect(store.getShortcuts()).resolves.toEqual(groups);
     });
 
-    it('falls back to GET /user/default-group when /user/info does not return defaultGroupId', async () => {
-      // 模拟后端 DTO 历史上不返 defaultGroupId(遗留:UserInfo.defaultGroupId 是可选)。
-      // 没有 fallback 时,getShortcuts 会因为 defaultGroupId===null 静默返回 [],
-      // 完全不发请求,UI 看到空白。fallback 后:GET /user/default-group → 拿到 blob。
-      loggedIn(0);
+    it('omits groupId from KV calls (backend resolves default)', async () => {
+      // 新契约:getShortcuts / setShortcuts 不传 groupId,后端 KV 端点自己用
+      // caller 的 default_group_id(见 dev_ctr_hello user-kv-invitecode 技能
+      // [[client-api]] §6:「groupId 0 或不传 → 回退到 default_group_id」)。
+      // 前端不用解析 / 缓存 groupId —— 切默认组后所有组件自动命中。
+      loggedIn(23);
       const groups = [{ id: 'g1', name: 'Browser', shortcuts: [], createdAt: 0, updatedAt: 0 }];
-      const fetchMock = vi.spyOn(globalThis, 'fetch')
-        // 1) GET /user/default-group -> 返回 groupId=23
-        .mockResolvedValueOnce(new Response(JSON.stringify({ code: 0, data: { groupId: 23 } }), { status: 200 }))
-        // 2) GET /kv/shortcut-library?groupId=23 -> 返回 blob
-        .mockResolvedValueOnce(new Response(JSON.stringify({ code: 0, data: { key: 'shortcut-library', value: JSON.stringify(groups), groupId: 23, groupName: 'g', myRole: 'owner', expires_at: '', tags: ['shortcut-library'] } }), { status: 200 }));
-
-      const store = createUserSpaceStore();
-      await expect(store.getShortcuts()).resolves.toEqual(groups);
-      // 1) GET /user/default-group
-      expect(fetchMock.mock.calls[0][0]).toBe('/api/v1/user/default-group');
-      // 2) GET shortcut-library?groupId=23
-      expect(fetchMock.mock.calls[1][0]).toBe('/api/v1/kv/shortcut-library?groupId=23');
-    });
-
-    it('falls back to listGroups when /user/default-group returns 0 (caller never set a default)', async () => {
-      loggedIn(0);
-      const groups = [{ id: 'g1', name: 'Browser', shortcuts: [], createdAt: 0, updatedAt: 0 }];
-      const fetchMock = vi.spyOn(globalThis, 'fetch')
-        // 1) GET /user/default-group -> {groupId: 0} 表示没设
-        .mockResolvedValueOnce(new Response(JSON.stringify({ code: 0, data: { groupId: 0 } }), { status: 200 }))
-        // 2) GET /groups -> 列表
-        .mockResolvedValueOnce(new Response(JSON.stringify({ code: 0, data: { groups: [
-          { id: 23, name: '个人空间', description: '', ownerId: 8, myRole: 'owner', memberCount: 1, createdAt: '', updatedAt: '' },
-        ] } }), { status: 200 }))
-        // 3) GET /kv/shortcut-library?groupId=23
-        .mockResolvedValueOnce(new Response(JSON.stringify({ code: 0, data: { key: 'shortcut-library', value: JSON.stringify(groups), groupId: 23, groupName: 'g', myRole: 'owner', expires_at: '', tags: ['shortcut-library'] } }), { status: 200 }));
-
-      const store = createUserSpaceStore();
-      await expect(store.getShortcuts()).resolves.toEqual(groups);
-      expect(String(fetchMock.mock.calls[1][0])).toContain('/api/v1/groups');
-    });
-
-    it('returns [] when no default group can be resolved', async () => {
-      loggedIn(0);
-      // list 返回空数组(没有个人空间)
-      vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
-        new Response(JSON.stringify({ code: 0, data: { groups: [] } }), { status: 200 }),
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ code: 0, data: { key: 'shortcut-library', value: JSON.stringify(groups), groupId: 23, groupName: 'g', myRole: 'owner', expires_at: '', tags: ['shortcut-library'] } }), { status: 200 }),
       );
       const store = createUserSpaceStore();
-      await expect(store.getShortcuts()).resolves.toEqual([]);
+      await store.getShortcuts();
+      // 不传 groupId —— URL 应该是 /api/v1/kv/shortcut-library 末尾,没 groupId query
+      expect(fetchMock.mock.calls[0][0]).toBe('/api/v1/kv/shortcut-library');
+      expect(String(fetchMock.mock.calls[0][0])).not.toContain('groupId=');
+    });
+
+    it('saves the blob without groupId (backend resolves default)', async () => {
+      loggedIn(23);
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ code: 0, data: null }), { status: 200 }),
+      );
+      const store = createUserSpaceStore();
+      await store.setShortcuts([{ id: 'g1', name: 'X', shortcuts: [], createdAt: 0, updatedAt: 0 }]);
+      const body = JSON.parse(String((fetchMock.mock.calls[0][1] as RequestInit).body));
+      expect(body.key).toBe('shortcut-library');
+      expect(body.tags).toEqual(['shortcut-library']);
+      // 不传 groupId —— 后端用 default_group_id
+      expect(body.groupId).toBeUndefined();
     });
   });
 });

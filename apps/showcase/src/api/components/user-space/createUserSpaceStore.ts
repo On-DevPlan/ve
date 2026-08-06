@@ -108,9 +108,10 @@ export function createUserSpaceStore(): UserSpaceStore {
     //   2) 否则 GET /user/default-group —— 后端新增的轻量探活,总返回 caller 自己的
     //      真正默认(注册时 0,显式 set 后立刻拿到新值)
     //   3) 兜底:listGroups() 挑第一个(只有全部断网 / 后端没该端点的旧版本才会走到)
-    //      没有这些 fallback 时,getShortcuts / listKvs 都会因为找不到 groupId 静默
-    //      返回空,不报错,UI 看到"没数据"误以为是数据问题(典型:shortcut-library
-    //      页面打开就空白)。
+    // 用处:仅给 user-space 多组管理 UI(decorate / 各种 group CRUD 返回 isDefault)
+    // 用。shortcut-library 的 get/set 不调这里 —— 它直接不传 groupId,让后端
+    // KV 端点自己走 default(见 [[client-api]] §6「groupId 0 或不传 → 回退到
+    // caller 的 default_group_id」),更省事也更准。
     const info = jwtAuth.state.jwtUser;
     if (info?.defaultGroupId && info.defaultGroupId > 0) return info.defaultGroupId;
     try {
@@ -378,8 +379,12 @@ export function createUserSpaceStore(): UserSpaceStore {
     }));
   }
 
-  /** 拉全量 ?tags=shortcut-library(分页),返回旧行集合。 */
-  async function listLegacyShortcutKeys(groupId: number): Promise<{ legacyGroups: LegacyGroupRecord[]; legacyShortcuts: LegacyShortcutRecord[]; legacyKeys: string[] }> {
+  /** 拉全量 ?tags=shortcut-library(分页),返回旧行集合。
+   *  不传 groupId,后端用 caller 的 default_group_id —— 见 [[client-api]] §6:
+   *  「groupId 参数:0 或不传 → 回退到 caller 的 default_group_id」。所以 caller
+   *  设了默认组之后,这里不传 groupId 也只会扫到「自己默认组」里的旧 per-item 行,
+   *  不会误扫到他组。 */
+  async function listLegacyShortcutKeys(): Promise<{ legacyGroups: LegacyGroupRecord[]; legacyShortcuts: LegacyShortcutRecord[]; legacyKeys: string[] }> {
     const legacyGroups: LegacyGroupRecord[] = [];
     const legacyShortcuts: LegacyShortcutRecord[] = [];
     const legacyKeys: string[] = [];
@@ -387,7 +392,7 @@ export function createUserSpaceStore(): UserSpaceStore {
     while (true) {
       let resp: { items?: Array<{ key?: string; value?: string }>; total?: number };
       try {
-        resp = await kvV1Service.list({ limit: LEGACY_LIST_PAGE_SIZE, offset, tags: [...SHORTCUT_TAGS], groupId });
+        resp = await kvV1Service.list({ limit: LEGACY_LIST_PAGE_SIZE, offset, tags: [...SHORTCUT_TAGS] });
       } catch {
         return { legacyGroups, legacyShortcuts, legacyKeys };
       }
@@ -412,17 +417,21 @@ export function createUserSpaceStore(): UserSpaceStore {
 
   async function getShortcuts(): Promise<ShortcutsBlob> {
     requireAuth();
-    const defaultGroupId = await resolveDefaultGroupId();
-    if (defaultGroupId === null) return [];
-    // 1) 主路径:读新格式 'shortcuts' blob
+    // 不传 groupId,后端用 caller 的 default_group_id(见 dev_ctr_hello
+    // user-kv-invitecode 技能 [[client-api]] §6:「groupId 参数:0 或不传
+    // → 回退到 caller 的 default_group_id」)。这样前端不用解析 groupId,
+    // 切默认组后所有组件自动命中。
+    //   - 首次用户 default_group_id=NULL → 后端 code 50「no default group」,
+    //     被 catch 当成"还没有 blob",继续走自愈扫旧行(可能命中 → 合并 → 写回)
+    //   - 已设默认组 → 后端返回 blob 或 404
     try {
-      const item = await kvV1Service.get({ key: SHORTCUTS_KV_KEY, groupId: defaultGroupId });
+      const item = await kvV1Service.get({ key: SHORTCUTS_KV_KEY });
       return safeParseShortcuts(item.value);
     } catch (e) {
-      if (!(e instanceof ApiError) || e.code !== 50) throw e; // 其它业务错误透传
+      if (!(e instanceof ApiError) || e.code !== 50) throw e;
     }
-    // 2) 旧版本兼容:扫描 tag 全量,识别 per-item 旧行 → 合并 → 写回 → 删旧行
-    const { legacyGroups, legacyShortcuts, legacyKeys } = await listLegacyShortcutKeys(defaultGroupId);
+    // 旧版本兼容:扫 tag 全部 key,识别 per-item 旧行 → 合并 → 写回 → 删旧行
+    const { legacyGroups, legacyShortcuts, legacyKeys } = await listLegacyShortcutKeys();
     if (legacyGroups.length === 0 && legacyShortcuts.length === 0) return [];
     const merged = consolidateLegacy(legacyGroups, legacyShortcuts);
     try {
@@ -431,30 +440,24 @@ export function createUserSpaceStore(): UserSpaceStore {
         value: JSON.stringify(merged),
         tags: [...SHORTCUT_TAGS],
         ttl: 0,
-        groupId: defaultGroupId,
       });
     } catch {
       // 写不进去也不阻塞本次读
     }
-    // best-effort 删旧行
     for (const k of legacyKeys) {
-      kvV1Service.delete({ key: k, groupId: defaultGroupId }).catch(() => undefined);
+      kvV1Service.delete({ key: k }).catch(() => undefined);
     }
     return merged;
   }
 
   async function setShortcuts(groups: ShortcutsBlob): Promise<void> {
     requireAuth();
-    const defaultGroupId = await resolveDefaultGroupId();
-    if (defaultGroupId === null) {
-      throw new Error('no default group; call setDefaultGroup first');
-    }
+    // 不传 groupId,后端用 default_group_id(见 getShortcuts 注释)。
     await kvV1Service.set({
       key: SHORTCUTS_KV_KEY,
       value: JSON.stringify(groups),
-      tags: ['shortcut-library'],
+      tags: [...SHORTCUT_TAGS],
       ttl: 0,
-      groupId: defaultGroupId,
     });
   }
 
