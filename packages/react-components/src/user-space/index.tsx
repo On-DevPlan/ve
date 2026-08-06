@@ -88,7 +88,7 @@ export default function UserSpace() {
 
   const selectedGroup: GroupSummary | null = useMemo(() => {
     if (!currentSelected || !groups) return null;
-    return groups.find((g) => g.id === currentSelected) ?? null;
+    return groups?.find((g) => g.id === currentSelected) ?? null;
   }, [currentSelected, groups]);
 
   // 写权限:reader 只读,writer+ 才有写操作
@@ -435,7 +435,7 @@ export default function UserSpace() {
             {view === 'overview' && (
               <Overview
                 group={selectedGroup}
-                defaultGroupName={groups.find((g) => g.id === defaultGroupId)?.name ?? null}
+                defaultGroupName={groups?.find((g) => g.id === defaultGroupId)?.name ?? null}
                 saving={saving}
                 onSave={handleSaveOverview}
                 onSetDefault={() => handleSetDefault(selectedGroup.id)}
@@ -515,7 +515,7 @@ export default function UserSpace() {
         onClose={() => setSettingsOpen(false)}
         kvPageSize={kvPageSize}
         onChangeKvPageSize={changeKvPageSize}
-        defaultGroupName={groups.find((g) => g.id === defaultGroupId)?.name ?? null}
+        defaultGroupName={groups?.find((g) => g.id === defaultGroupId)?.name ?? null}
       />
     </div>
   );
