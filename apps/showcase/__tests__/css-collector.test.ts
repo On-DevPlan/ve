@@ -37,4 +37,8 @@ describe('collectCss', () => {
   it('returns [] when the loaderKey is missing from maps', () => {
     expect(collectCss(entry({ loaderKey: 'unknown' }), maps)).toEqual([]);
   });
+
+  it('returns [] when a vue loaderKey is missing from maps', () => {
+    expect(collectCss(entry({ framework: 'vue', loaderKey: 'unknown' }), maps)).toEqual([]);
+  });
 });
