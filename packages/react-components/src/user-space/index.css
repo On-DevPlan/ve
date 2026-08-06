@@ -32,8 +32,11 @@
 .sl-us-root {
   display: grid;
   grid-template-columns: 240px 1fr;
-  height: 100%;
-  min-height: 0;
+  /* 100vh 而非 100%: 组件渲染在 Shadow DOM 里,父链(host 容器 + portalTarget
+     div)通常没设固定 height → height: 100% 会塌缩成内容高。100vh 锁视口,
+     100dvh 在移动端浏览器地址栏收起时更准。 */
+  height: 100vh;
+  height: 100dvh;
   font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont,
     "Inter", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
   font-size: 13px;
@@ -42,6 +45,7 @@
   background: var(--bg);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow: hidden;
 }
 .sl-us-root * { box-sizing: border-box; }
 .sl-us-root button { font: inherit; cursor: pointer; background: none; border: none; padding: 0; color: inherit; }
