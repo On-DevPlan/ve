@@ -1,7 +1,13 @@
 /* user-space index.css — 顶部必须的 side-effect import,被 Vite 注入 document.head */
 
 /* ── tokens ─────────────────────────────────────── */
-.sl-us-root {
+/* 注意:必须同时挂在 .sl-us-root 和 .sl-us-modal-backdrop 上。
+   原因:编辑弹窗用 createPortal 渲染到 [data-sl-portal],这个节点在
+   .sl-us-root 之外(通常是 shadowRoot 顶层),不在 root scope 内的元素
+   读不到 var(--*) 会全部失效(透明 / 无色)。两个 scope 都挂 token,
+   弹窗才能拿到同样的颜色 + 间距。 */
+.sl-us-root,
+.sl-us-modal-backdrop {
   --bg:         #fafafa;
   --panel:      #ffffff;
   --hover:      #f4f4f5;
@@ -27,6 +33,13 @@
   --radius:     6px;
   --radius-sm:  4px;
 }
+
+/* 弹窗(portal 出 root 之外)也需要同样的 reset,否则按钮 / input
+   会带浏览器默认 chrome(灰底 + 凸起边框),和 root 内样式不一致。 */
+.sl-us-modal-backdrop * { box-sizing: border-box; }
+.sl-us-modal-backdrop button { font: inherit; cursor: pointer; background: none; border: none; padding: 0; color: inherit; }
+.sl-us-modal-backdrop input, .sl-us-modal-backdrop select, .sl-us-modal-backdrop textarea { font: inherit; }
+.sl-us-modal-backdrop h1, .sl-us-modal-backdrop h2, .sl-us-modal-backdrop h3, .sl-us-modal-backdrop h4, .sl-us-modal-backdrop p { margin: 0; }
 
 /* ── shell ──────────────────────────────────────── */
 .sl-us-root {
@@ -133,7 +146,6 @@
 }
 
 .sl-us-side__user {
-  margin-top: auto;
   padding: 10px 12px;
   border-top: 1px solid var(--border);
   display: flex; align-items: center; gap: 8px;
@@ -158,6 +170,43 @@
   color: var(--fg-3);
 }
 .sl-us-side__user-action:hover { background: var(--hover); color: var(--fg); }
+
+/* 账户菜单(⚙ 弹出) */
+.sl-us-side__user-wrap { position: relative; margin-top: auto; }
+.sl-us-side__menu {
+  position: absolute;
+  left: 12px; right: 12px;
+  bottom: calc(100% + 6px);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);
+  padding: 4px;
+  z-index: 50;
+}
+.sl-us-side__menu-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 8px 6px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+.sl-us-side__menu-email {
+  flex: 1; min-width: 0;
+  font-size: 12px; color: var(--fg);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.sl-us-side__menu-item {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  font-size: 12.5px;
+  color: var(--fg-2);
+  border-radius: var(--radius-sm);
+  text-align: left;
+}
+.sl-us-side__menu-item:hover { background: var(--hover); color: var(--fg); }
+.sl-us-side__menu-item--danger { color: var(--danger); }
+.sl-us-side__menu-item--danger:hover { background: var(--danger-soft); color: var(--danger); }
 
 /* ── main ──────────────────────────────────────── */
 .sl-us-main {
