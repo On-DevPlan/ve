@@ -2,23 +2,23 @@
 // 布局:
 //   - 品牌区(产品 logo + 名字)
 //   - "工作空间" label + 列表(默认组用 ★ 标识)
-//   - 底部用户卡(头像 + 邮箱 + 设置齿轮)
+//   - 底部用户卡(头像 + 邮箱,只读上下文 —— 不放登录/退出入口:
+//     那是整个应用全局的事,组件不接管)
 //
 // 设默认入口:每个非默认组行内 hover 显示"★ 默认"按钮,click → onSetDefault
 
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import type { GroupSummary } from '@api/components/user-space';
 
 interface Props {
   groups: GroupSummary[];
   selectedGroupId: number | null;
   defaultGroupId: number | null;
-  /** 当前登录用户邮箱(用户卡 + 账户菜单显示);未登录传 null */
+  /** 当前登录用户邮箱(用户卡展示当前身份);未登录传 null */
   userEmail: string | null;
   onSelect: (id: number) => void;
   onCreate: (name: string, description: string) => Promise<void> | void;
   onSetDefault: (id: number) => Promise<void> | void;
-  onLogout: () => void;
   disabled?: boolean;
 }
 
@@ -30,7 +30,6 @@ export default function Sidebar({
   onSelect,
   onCreate,
   onSetDefault,
-  onLogout,
   disabled,
 }: Props) {
   const [filter, setFilter] = useState('');
@@ -38,20 +37,6 @@ export default function Sidebar({
   const [newDesc, setNewDesc] = useState('');
   const [creating, setCreating] = useState(false);
   const [expanded, setExpanded] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement | null>(null);
-
-  // 点账户菜单外部 → 关闭
-  useEffect(() => {
-    if (!menuOpen) return;
-    function onDown(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
-    }
-    window.addEventListener('mousedown', onDown);
-    return () => window.removeEventListener('mousedown', onDown);
-  }, [menuOpen]);
 
   const filtered = groups.filter((g) =>
     g.name.toLowerCase().includes(filter.toLowerCase()),
@@ -70,11 +55,6 @@ export default function Sidebar({
     } finally {
       setCreating(false);
     }
-  }
-
-  function handleLogout() {
-    setMenuOpen(false);
-    if (window.confirm('确认退出登录?')) onLogout();
   }
 
   const avatarLetter = userEmail ? userEmail.slice(0, 1).toUpperCase() : '?';
@@ -215,38 +195,10 @@ export default function Sidebar({
         </form>
       )}
 
-      {/* 用户卡(底部) */}
-      <div className="sl-us-side__user-wrap" ref={menuRef}>
-        {menuOpen && (
-          <div className="sl-us-side__menu" role="menu">
-            <div className="sl-us-side__menu-head">
-              <div className="sl-us-side__user-avatar">{avatarLetter}</div>
-              <div className="sl-us-side__menu-email" title={userEmail ?? undefined}>
-                {userEmail ?? '未登录'}
-              </div>
-            </div>
-            <button
-              className="sl-us-side__menu-item sl-us-side__menu-item--danger"
-              onClick={handleLogout}
-              role="menuitem"
-            >
-              退出登录
-            </button>
-          </div>
-        )}
-        <div className="sl-us-side__user">
-          <div className="sl-us-side__user-avatar">{avatarLetter}</div>
-          <div className="sl-us-side__user-name">{userEmail ?? '未登录'}</div>
-          <button
-            className="sl-us-side__user-action"
-            title="账户"
-            aria-label="账户菜单"
-            aria-expanded={menuOpen}
-            onClick={() => setMenuOpen((v) => !v)}
-          >
-            ⚙
-          </button>
-        </div>
+      {/* 用户卡(底部)—— 只读展示当前身份,不放登录/退出入口 */}
+      <div className="sl-us-side__user" title={userEmail ?? undefined}>
+        <div className="sl-us-side__user-avatar">{avatarLetter}</div>
+        <div className="sl-us-side__user-name">{userEmail ?? '未登录'}</div>
       </div>
     </aside>
   );

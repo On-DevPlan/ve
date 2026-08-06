@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import './index.css';
 import { useUserSpaceStore } from './src/hooks/useUserSpaceStore';
-import { useJwtAuth, jwtAuth } from './src/hooks/useAuth';
+import { useJwtAuth } from './src/hooks/useAuth';
 import { useLoginModal } from './src/hooks/useLoginModal';
 import Sidebar from './src/pages/Sidebar';
 import Overview from './src/pages/Overview';
@@ -369,7 +369,6 @@ export default function UserSpace() {
         onSelect={(id) => setSelectedId(id)}
         onCreate={(name, description) => handleCreate(name, description)}
         onSetDefault={(id) => handleSetDefault(id)}
-        onLogout={() => jwtAuth.logout()}
         disabled={saving}
       />
 
