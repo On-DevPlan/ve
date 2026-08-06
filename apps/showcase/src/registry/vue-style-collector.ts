@@ -83,7 +83,10 @@ export function generateVueStylesCode(blocks: StyleBlockEntry[]): string {
   const imports: string[] = [];
   const byId = new Map<string, string[]>();
   blocks.forEach((b, i) => {
-    const query = `${b.file}?vue&type=style&index=${b.index}&lang.${b.lang}&inline`;
+    // win32 下 path.join 产生反斜杠绝对路径;导入说明符归一化为正斜杠,
+    // 避免原始反斜杠进入 virtual module 源码(vite:resolve 能兜底但不保证)。
+    const file = b.file.replaceAll('\\', '/');
+    const query = `${file}?vue&type=style&index=${b.index}&lang.${b.lang}&inline`;
     imports.push(`import s${i} from ${JSON.stringify(query)};`);
     const arr = byId.get(b.componentId) ?? [];
     arr.push(`s${i}`);
