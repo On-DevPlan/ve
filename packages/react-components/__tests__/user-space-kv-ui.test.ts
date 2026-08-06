@@ -28,11 +28,33 @@ describe('user-space KV management UI', () => {
     expect(modal).toContain('portal');
   });
 
+  it('KvEditorModal shows version history selector in edit mode (restore to version)', () => {
+    expect(modal).toContain('版本历史');
+    expect(modal).toContain('恢复该版本');
+    expect(modal).toContain('onRestoreVersion');
+    expect(modal).toContain('versionsLoading');
+    expect(modal).toContain('mode === \'edit\'');
+  });
+
   it('index.tsx passes listKvs/createKv/updateKv/deleteKv down to Inventory', () => {
     expect(indexTsx).toContain('listKvs');
     expect(indexTsx).toContain('createKv');
     expect(indexTsx).toContain('updateKv');
     expect(indexTsx).toContain('deleteKv');
+  });
+
+  it('index.tsx wires version history: listKvVersions load + restoreKv handler', () => {
+    expect(indexTsx).toContain('listKvVersions');
+    expect(indexTsx).toContain('restoreKv');
+    expect(indexTsx).toContain('kvVersions');
+    expect(indexTsx).toContain('onRestoreVersion');
+  });
+
+  it('store exposes listKvVersions + restoreKv for the version selector', () => {
+    expect(store).toContain('listKvVersions');
+    expect(store).toContain('restoreKv');
+    expect(store).toContain('kvV1Service.versions');
+    expect(store).toContain('kvV1Service.restore');
   });
 
   it('store no longer exposes legacy inventory()', () => {

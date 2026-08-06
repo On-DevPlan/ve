@@ -85,6 +85,35 @@ describe('user-space store KV CRUD', () => {
     expect(result.items[1].valuePreview).toBe('short');
   });
 
+  it('listKvVersions GETs versions endpoint and maps snake_case → camelCase', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      okBody({
+        versions: [
+          { version_no: 2, value_len: 42, replaced_at: '2026-08-01T12:00:00+08:00' },
+          { version_no: 1, value_len: 7, replaced_at: '2026-07-30T09:00:00+08:00' },
+        ],
+      }),
+    );
+    const store = createUserSpaceStore();
+    const vers = await store.listKvVersions(42, 'api_url');
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/kv/api_url/versions?groupId=42', expect.objectContaining({ method: 'GET' }));
+    expect(vers).toEqual([
+      { versionNo: 2, valueLen: 42, replacedAt: '2026-08-01T12:00:00+08:00' },
+      { versionNo: 1, valueLen: 7, replacedAt: '2026-07-30T09:00:00+08:00' },
+    ]);
+  });
+
+  it('restoreKv POSTs restore with version + groupId', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(okBody(null));
+    const store = createUserSpaceStore();
+    await store.restoreKv(42, 'api_url', 2);
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/kv/api_url/restore', expect.objectContaining({
+      method: 'POST',
+      body: expect.stringContaining('"version":2'),
+    }));
+    expect(String((fetchMock.mock.calls[0][1] as RequestInit).body)).toContain('"groupId":42');
+  });
+
   it('throws not logged in when token missing', async () => {
     const store = createUserSpaceStore();
     // 覆盖 loggedIn mock,切回 logged-out

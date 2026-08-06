@@ -19,6 +19,7 @@ import type {
   KvGetArgs,
   KvDeleteArgs,
   KvTagCount,
+  KvVersionInfo,
 } from './types';
 
 export { ApiError } from '../base';
@@ -30,6 +31,7 @@ export type {
   KvGetArgs,
   KvDeleteArgs,
   KvTagCount,
+  KvVersionInfo,
 } from './types';
 
 export class KvV1Service extends HttpService {
@@ -72,6 +74,20 @@ export class KvV1Service extends HttpService {
   /** GET /kv/tags —— 当前用户非过期 KV 的 {tag, count} facet(按 count desc / tag asc)。 */
   async tags(): Promise<KvTagCount[]> {
     return this.reqGet<KvTagCount[]>('/tags');
+  }
+
+  /** GET /kv/:key/versions —— 历史版本摘要(version_no / value_len / replaced_at,不回 value 全文)。read+。 */
+  async versions(args: { key: string; groupId?: number }): Promise<KvVersionInfo[]> {
+    const qs = args.groupId && args.groupId > 0 ? `?groupId=${args.groupId}` : '';
+    const res = await this.reqGet<{ versions: KvVersionInfo[] }>(`/${encodeURIComponent(args.key)}/versions${qs}`);
+    return res.versions;
+  }
+
+  /** POST /kv/:key/restore —— 回滚到指定版本(write+)。本质是 Set:快照当前值 + set/restore 双审计。 */
+  async restore(args: { key: string; version: number; groupId?: number }): Promise<void> {
+    const body: { version: number; groupId?: number } = { version: args.version };
+    if (args.groupId !== undefined && args.groupId > 0) body.groupId = args.groupId;
+    await this.reqPost(`/${encodeURIComponent(args.key)}/restore`, body);
   }
 }
 

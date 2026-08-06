@@ -32,11 +32,18 @@ import type {
   GroupInvitationView,
   KvListResult,
   KvView,
+  KvVersionView,
   KvEditorPayload,
   UserSpaceStore,
+  ShortcutsBlob,
 } from './types';
+import { ApiError } from '../../services/base';
 
 const VALUE_PREVIEW_MAX = 80;
+
+/** shortcut-library 业务封装用的固定 KV key(user-space 不暴露给其他用途)。
+ * 走默认 group(0 = caller.default_group_id),由前端组装整库 JSON 写入。 */
+const SHORTCUTS_KV_KEY = 'shortcuts';
 
 function normalizeDescription(desc: string | undefined | null): string {
   return (desc ?? '').trim();
@@ -77,6 +84,10 @@ function toKvView(kv: { key: string; value: string; expires_at: string; groupId:
     myRole: kv.myRole,
     expiresAt: kv.expires_at,
   };
+}
+
+function toKvVersionView(v: { version_no: number; value_len: number; replaced_at: string }): KvVersionView {
+  return { versionNo: v.version_no, valueLen: v.value_len, replacedAt: v.replaced_at };
 }
 
 export function createUserSpaceStore(): UserSpaceStore {
@@ -277,6 +288,60 @@ export function createUserSpaceStore(): UserSpaceStore {
     return { items: items.map(toKvView), total, page: opts.page, pageSize: opts.pageSize };
   }
 
+  async function listKvVersions(groupId: number, key: string): Promise<KvVersionView[]> {
+    requireAuth();
+    const vers = await kvV1Service.versions({ key, groupId });
+    return vers.map(toKvVersionView);
+  }
+
+  async function restoreKv(groupId: number, key: string, version: number): Promise<void> {
+    requireAuth();
+    await kvV1Service.restore({ key, version, groupId });
+  }
+
+  // ─── 组件业务封装(per-component contract)────────────────────────
+  // shortcut-library 的整个库作为单个 KV 整体存取,内部固定 key='shortcuts'。
+  // shortcut-library 不知道 KV 协议,也不直接接触 kvV1Service。
+  // KV 后端 "键不存在"(code 50)当作首次使用 → 返回空数组(不是故障)。
+
+  function safeParseShortcuts(raw: string): ShortcutsBlob {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed as ShortcutsBlob;
+      return [];
+    } catch {
+      return [];
+    }
+  }
+
+  async function getShortcuts(): Promise<ShortcutsBlob> {
+    requireAuth();
+    const defaultGroupId = await resolveDefaultGroupId();
+    if (defaultGroupId === null) return [];
+    try {
+      const item = await kvV1Service.get({ key: SHORTCUTS_KV_KEY, groupId: defaultGroupId });
+      return safeParseShortcuts(item.value);
+    } catch (e) {
+      if (e instanceof ApiError && e.code === 50) return []; // key 不存在 = 首次使用
+      throw e;
+    }
+  }
+
+  async function setShortcuts(groups: ShortcutsBlob): Promise<void> {
+    requireAuth();
+    const defaultGroupId = await resolveDefaultGroupId();
+    if (defaultGroupId === null) {
+      throw new Error('no default group; call setDefaultGroup first');
+    }
+    await kvV1Service.set({
+      key: SHORTCUTS_KV_KEY,
+      value: JSON.stringify(groups),
+      tags: ['shortcut-library'],
+      ttl: 0,
+      groupId: defaultGroupId,
+    });
+  }
+
   return {
     listGroups,
     getGroupDetail,
@@ -298,5 +363,9 @@ export function createUserSpaceStore(): UserSpaceStore {
     deleteKv,
     getKvDetail,
     listKvs,
+    listKvVersions,
+    restoreKv,
+    getShortcuts,
+    setShortcuts,
   };
 }

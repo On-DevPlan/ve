@@ -139,6 +139,44 @@ describe('kvV1 service (throw model)', () => {
     expect(mockFetch.mock.calls[0][0]).toBe('/api/v1/kv/tags');
   });
 
+  it('versions GETs /kv/:key/versions with groupId and unwraps versions array', async () => {
+    const mockFetch = vi.fn().mockResolvedValue(
+      mockJSON(200, {
+        code: 0,
+        data: { versions: [{ version_no: 2, value_len: 42, replaced_at: '2026-08-01T12:00:00+08:00' }] },
+      }),
+    );
+    global.fetch = mockFetch;
+
+    const out = await kvV1Service.versions({ key: 'api_url', groupId: 42 });
+
+    expect(mockFetch.mock.calls[0][0]).toBe('/api/v1/kv/api_url/versions?groupId=42');
+    expect((mockFetch.mock.calls[0][1] as RequestInit).method).toBe('GET');
+    expect(out).toEqual([{ version_no: 2, value_len: 42, replaced_at: '2026-08-01T12:00:00+08:00' }]);
+  });
+
+  it('versions without groupId omits query string', async () => {
+    const mockFetch = vi.fn().mockResolvedValue(mockJSON(200, { code: 0, data: { versions: [] } }));
+    global.fetch = mockFetch;
+
+    await kvV1Service.versions({ key: 'k' });
+
+    expect(mockFetch.mock.calls[0][0]).toBe('/api/v1/kv/k/versions');
+  });
+
+  it('restore POSTs /kv/:key/restore with version + groupId', async () => {
+    const mockFetch = vi.fn().mockResolvedValue(mockJSON(200, { code: 0, data: { message: 'kv restored successfully' } }));
+    global.fetch = mockFetch;
+
+    await kvV1Service.restore({ key: 'api_url', version: 2, groupId: 42 });
+
+    expect(mockFetch.mock.calls[0][0]).toBe('/api/v1/kv/api_url/restore');
+    const init = mockFetch.mock.calls[0][1] as RequestInit;
+    expect(init.method).toBe('POST');
+    const body = JSON.parse(init.body as string) as Record<string, unknown>;
+    expect(body).toMatchObject({ version: 2, groupId: 42 });
+  });
+
   it('throws ApiError on business code 50 (key not found)', async () => {
     const mockFetch = vi.fn().mockResolvedValue(
       mockJSON(200, { code: 50, data: null, message: 'key not found' }),

@@ -548,3 +548,14 @@
 .sl-us-modal__title { margin: 0; font-size: 16px; font-weight: 600; }
 .sl-us-modal__body { display: flex; flex-direction: column; }
 .sl-us-modal__foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+
+/* 版本历史(编辑弹窗内) */
+.sl-us-versions__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sl-us-versions__row .sl-us-input--compact {
+  min-width: 180px;
+  flex: 1 1 auto;
+}

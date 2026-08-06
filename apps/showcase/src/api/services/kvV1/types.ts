@@ -47,3 +47,10 @@ export interface KvTagCount {
   tag: string;
   count: number;
 }
+
+/** GET /kv/:key/versions 返回的历史版本摘要。刻意不含 value 全文,只回长度,避免大 value 撑爆响应。 */
+export interface KvVersionInfo {
+  version_no: number;
+  value_len: number;
+  replaced_at: string;
+}

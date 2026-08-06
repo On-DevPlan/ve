@@ -20,6 +20,7 @@ import type {
   GroupMemberView,
   GroupSummary,
   KvListResult,
+  KvVersionView,
   KvView,
   ViewMode,
 } from './src/types';
@@ -58,6 +59,8 @@ export default function UserSpace() {
   const [kvEditorOpen, setKvEditorOpen] = useState(false);
   const [kvEditorMode, setKvEditorMode] = useState<'create' | 'edit'>('create');
   const [kvEditorInit, setKvEditorInit] = useState<KvView | null>(null);
+  const [kvVersions, setKvVersions] = useState<KvVersionView[]>([]);
+  const [kvVersionsLoading, setKvVersionsLoading] = useState(false);
   const KV_PAGE_SIZE = 10;
 
   // 选中态:默认进第一个组 / 用户手动选过的优先
@@ -84,6 +87,7 @@ export default function UserSpace() {
     setKvPage(1);
     setKvTag(null);
     setKvEditorOpen(false);
+    setKvVersions([]);
     setMembersError(null);
     setInvitationsError(null);
     setKvError(null);
@@ -137,6 +141,22 @@ export default function UserSpace() {
     if (view === 'invitations') void loadInvitations();
     if (view === 'inventory') void loadKv(kvPage, kvTag);
   }, [view, loadMembers, loadInvitations, loadKv, kvPage, kvTag]);
+
+  // 打开编辑弹窗时拉一次版本历史;创建模式不拉。恢复成功后父级会 setKvEditorInit
+  // 换新引用,本 effect 随之重跑,自动刷新版本列表(restore 会新拍一份快照)。
+  useEffect(() => {
+    if (!kvEditorOpen || kvEditorMode !== 'edit' || !currentSelected || !kvEditorInit) {
+      setKvVersions([]);
+      return;
+    }
+    let cancelled = false;
+    setKvVersionsLoading(true);
+    store.listKvVersions(currentSelected, kvEditorInit.key)
+      .then((vers) => { if (!cancelled) setKvVersions(vers); })
+      .catch(() => { if (!cancelled) setKvVersions([]); })
+      .finally(() => { if (!cancelled) setKvVersionsLoading(false); });
+    return () => { cancelled = true; };
+  }, [kvEditorOpen, kvEditorMode, currentSelected, kvEditorInit, store]);
 
   // ── 动作封装(展示态) ──────────────────────────────
   async function withError(fn: () => Promise<void>): Promise<void> {
@@ -274,6 +294,19 @@ export default function UserSpace() {
         setKvPage(nextPage);
       }
       await loadKv(nextPage, kvTag);
+    });
+  }
+
+  async function handleRestoreKv(version: number): Promise<void> {
+    if (!currentSelected || !kvEditorInit) return;
+    if (!window.confirm(`确认将 KV「${kvEditorInit.key}」回滚到版本 v${version}?\n当前值会被覆盖(仍可从版本历史回退)。`)) return;
+    await withError(async () => {
+      await store.restoreKv(currentSelected, kvEditorInit.key, version);
+      // 回滚本质是 set:重新拉详情刷新编辑框 value(initial 换新引用,弹窗 effect 重跑)
+      // + 刷新列表预览;版本列表由上面的 effect 随 kvEditorInit 变化自动重拉。
+      const detail = await store.getKvDetail(currentSelected, kvEditorInit.key);
+      setKvEditorInit(detail);
+      await loadKv(kvPage, kvTag);
     });
   }
 
@@ -426,6 +459,9 @@ export default function UserSpace() {
                   initial={kvEditorInit}
                   saving={saving}
                   canWrite={canWrite}
+                  versions={kvVersions}
+                  versionsLoading={kvVersionsLoading}
+                  onRestoreVersion={(v) => void handleRestoreKv(v)}
                   onSave={kvEditorMode === 'create' ? handleCreateKv : handleUpdateKv}
                   onClose={() => setKvEditorOpen(false)}
                 />

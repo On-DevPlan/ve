@@ -64,6 +64,13 @@ export interface KvListResult {
   pageSize: number;
 }
 
+/** 历史版本摘要(组件侧语义,由 kvV1 的 version_no/value_len/replaced_at 映射)。 */
+export interface KvVersionView {
+  versionNo: number;
+  valueLen: number;
+  replacedAt: string;
+}
+
 export interface KvEditorPayload {
   key: string;
   value: string;
@@ -110,4 +117,41 @@ export interface UserSpaceStore {
   deleteKv(groupId: number, key: string): Promise<void>;
   getKvDetail(groupId: number, key: string): Promise<KvView>;
   listKvs(groupId: number, opts: { page: number; pageSize: number; tags?: string[] }): Promise<KvListResult>;
+  /** 历史版本摘要列表(不回 value 全文),用于编辑框里的版本选择器。read+。 */
+  listKvVersions(groupId: number, key: string): Promise<KvVersionView[]>;
+  /** 回滚到指定版本。write+;恢复后需重新拉详情刷新当前值。 */
+  restoreKv(groupId: number, key: string, version: number): Promise<void>;
+
+  // ── 组件业务封装(per-component contract)──────────────────────
+  // shortcut-library 的整个库作为单个 KV 整体存取,内部固定 key='shortcuts'。
+  // shortcut-library 不知道 KV 协议,也不直接接触 kvV1Service。
+  getShortcuts(): Promise<ShortcutsBlob>;
+  setShortcuts(groups: ShortcutsBlob): Promise<void>;
 }
+
+// ─── shortcut-library 业务类型(per-component contract)────────────────────
+//
+// getShortcuts / setShortcuts 读写的"整库"形态:一个 Group[] 数组。
+// 这里定义成 user-space 的域类型(供 shortcut-library 组件 import 使用),
+// 但 getShortcuts 内部把这个数组 JSON.stringify 存进一个 KV key='shortcuts'。
+// Shortcut / Group 字段与 shortcut-library 的组件语义完全一致(同一份类型)
+// —— 是为了避免 component 侧再 import 一份。
+
+export interface Shortcut {
+  id: string;
+  combo: Array<{ code: string; label: string; isModifier: boolean }>;
+  description: string;
+  condition?: string;
+  createdAt: number;
+}
+
+export interface ShortcutGroup {
+  id: string;
+  name: string;
+  shortcuts: Shortcut[];
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** shortcut-library 整体库的形态 —— 一个 Group[] 数组,直接 JSON 序列化进 KV。 */
+export type ShortcutsBlob = ShortcutGroup[];
