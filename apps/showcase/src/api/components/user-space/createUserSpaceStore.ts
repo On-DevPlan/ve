@@ -43,7 +43,10 @@ const VALUE_PREVIEW_MAX = 80;
 
 /** shortcut-library 业务封装用的固定 KV key(user-space 不暴露给其他用途)。
  * 走默认 group(0 = caller.default_group_id),由前端组装整库 JSON 写入。 */
-const SHORTCUTS_KV_KEY = 'shortcuts';
+// key 与 tag 同名('shortcut-library'),与 user-kv-invitecode 技能的「tag 区分
+// 不同组件数据」模式一致;让 listByTag 扫出来时一眼能对到本组件,也让 API 路径
+// /api/v1/kv/shortcut-library 自解释,不需要看文档就知道归属。
+const SHORTCUTS_KV_KEY = 'shortcut-library';
 
 function normalizeDescription(desc: string | undefined | null): string {
   return (desc ?? '').trim();

@@ -57,13 +57,13 @@ describe('createShortcutStore (delegates to user-space getShortcuts/setShortcuts
       ], createdAt: 0, updatedAt: 0 },
     ];
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      ok({ key: 'shortcuts', value: JSON.stringify(groups), groupId: 42, groupName: 'personal', myRole: 'owner', expires_at: '' }),
+      ok({ key: 'shortcut-library', value: JSON.stringify(groups), groupId: 42, groupName: 'personal', myRole: 'owner', expires_at: '' }),
     );
     const result = await createShortcutStore().load();
     expect(result).toEqual(groups);
-    // load = GET /api/v1/kv/shortcuts?groupId=42
+    // load = GET /api/v1/kv/shortcut-library?groupId=42
     expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining('/api/v1/kv/shortcuts'),
+      expect.stringContaining('/api/v1/kv/shortcut-library'),
       expect.anything(),
     );
     expect(fetchMock.mock.calls[0]?.[0]).toContain('groupId=42');
@@ -80,7 +80,7 @@ describe('createShortcutStore (delegates to user-space getShortcuts/setShortcuts
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(ok(null));
     const groups = [{ id: 'g1', name: 'VSCode', shortcuts: [], createdAt: 0, updatedAt: 0 }];
     await createShortcutStore().save(groups);
-    // save = POST /api/v1/kv with key='shortcuts', tags=['shortcut-library'], groupId=42
+    // save = POST /api/v1/kv with key='shortcut-library', tags=['shortcut-library'], groupId=42
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/v1/kv',
       expect.objectContaining({
@@ -89,7 +89,7 @@ describe('createShortcutStore (delegates to user-space getShortcuts/setShortcuts
     );
     const callArgs = fetchMock.mock.calls[0]?.[1] as RequestInit | undefined;
     const body = JSON.parse(String(callArgs?.body));
-    expect(body.key).toBe('shortcuts');
+    expect(body.key).toBe('shortcut-library');
     expect(body.tags).toEqual(['shortcut-library']);
     expect(body.groupId).toBe(42);
     expect(JSON.parse(body.value)).toEqual(groups);
