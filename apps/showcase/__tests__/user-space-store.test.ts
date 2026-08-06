@@ -4,14 +4,14 @@ import { createUserSpaceStore } from '../src/api/components/user-space';
 
 const originalState = jwtAuth.state;
 
-function loggedIn(): void {
+function loggedIn(defaultGroupId = 0): void {
   Object.defineProperty(jwtAuth, 'state', {
     configurable: true,
     get: () => ({
       ...originalState,
       token: 'jwt-abc',
       jwtAuthState: 'logged-in',
-      jwtUser: { id: 8, email: 'a@b.com', username: '', nickname: 'alice', invitationCode: 'X' },
+      jwtUser: { id: 8, email: 'a@b.com', username: '', nickname: 'alice', invitationCode: 'X', defaultGroupId },
     }),
   });
 }
@@ -119,5 +119,60 @@ describe('user-space store KV CRUD', () => {
     // 覆盖 loggedIn mock,切回 logged-out
     Object.defineProperty(jwtAuth, 'state', { configurable: true, get: () => originalState });
     await expect(store.createKv(1, { key: 'k', value: 'v', tags: [], ttl: 0 })).rejects.toThrow('not logged in');
+  });
+
+  describe('getShortcuts lazy migration', () => {
+    it('consolidates legacy sl-group-* / sl-shortcut-* rows into the new blob on first read', async () => {
+      loggedIn(23);
+      const g1 = { id: 'gx1', name: 'VSCode', order: 1, createdAt: 1000, updatedAt: 1500 };
+      const s1 = { id: 'sx1', groupId: 'gx1', order: 1, combo: [{ code: 'KeyR', label: 'R', isModifier: false }], description: 'd1', createdAt: 1100, updatedAt: 1200 };
+      const fetchMock = vi.spyOn(globalThis, 'fetch')
+        // 1) GET /kv/shortcuts?groupId=23 -> 404 (code 50)
+        .mockResolvedValueOnce(new Response(JSON.stringify({ code: 50, data: null }), { status: 200 }))
+        // 2) GET /kv?tags=shortcut-library&groupId=23&limit=200 -> legacy rows
+        .mockResolvedValueOnce(new Response(JSON.stringify({
+          code: 0,
+          data: {
+            items: [
+              { key: 'sl-group-gx1', value: JSON.stringify(g1), groupId: 23, groupName: 'g', myRole: 'owner', expires_at: '', tags: ['shortcut-library'] },
+              { key: 'sl-shortcut-sx1', value: JSON.stringify(s1), groupId: 23, groupName: 'g', myRole: 'owner', expires_at: '', tags: ['shortcut-library'] },
+            ],
+            total: 2,
+          },
+        }), { status: 200 }));
+      // 3) POST /kv (set 'shortcuts' blob) + 4) DELETE for each legacy key
+      fetchMock.mockResolvedValue(new Response(JSON.stringify({ code: 0, data: null }), { status: 200 }));
+
+      const store = createUserSpaceStore();
+      const result = await store.getShortcuts();
+      expect(result).toEqual([{
+        id: 'gx1', name: 'VSCode', createdAt: 1000, updatedAt: 1500,
+        shortcuts: [{ id: 'sx1', combo: s1.combo, description: 'd1', condition: undefined, createdAt: 1100 }],
+      }]);
+      // 1) GET 'shortcuts' (not found)
+      expect(fetchMock.mock.calls[0][0]).toBe('/api/v1/kv/shortcuts?groupId=23');
+      // 2) listByTag
+      expect(String(fetchMock.mock.calls[1][0])).toContain('tags=shortcut-library');
+      expect(String(fetchMock.mock.calls[1][0])).toContain('groupId=23');
+    });
+
+    it('returns [] when shortcuts blob is missing and tag list is empty (fresh user)', async () => {
+      loggedIn(23);
+      vi.spyOn(globalThis, 'fetch')
+        .mockResolvedValueOnce(new Response(JSON.stringify({ code: 50, data: null }), { status: 200 }))
+        .mockResolvedValueOnce(new Response(JSON.stringify({ code: 0, data: { items: [], total: 0 } }), { status: 200 }));
+      const store = createUserSpaceStore();
+      await expect(store.getShortcuts()).resolves.toEqual([]);
+    });
+
+    it('parses a present shortcuts blob directly (no migration)', async () => {
+      loggedIn(23);
+      const groups = [{ id: 'g1', name: 'Browser', shortcuts: [], createdAt: 0, updatedAt: 0 }];
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ code: 0, data: { key: 'shortcuts', value: JSON.stringify(groups), groupId: 23, groupName: 'g', myRole: 'owner', expires_at: '', tags: ['shortcut-library'] } }), { status: 200 }),
+      );
+      const store = createUserSpaceStore();
+      await expect(store.getShortcuts()).resolves.toEqual(groups);
+    });
   });
 });

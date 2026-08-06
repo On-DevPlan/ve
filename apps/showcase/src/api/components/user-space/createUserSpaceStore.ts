@@ -303,6 +303,17 @@ export function createUserSpaceStore(): UserSpaceStore {
   // shortcut-library 的整个库作为单个 KV 整体存取,内部固定 key='shortcuts'。
   // shortcut-library 不知道 KV 协议,也不直接接触 kvV1Service。
   // KV 后端 "键不存在"(code 50)当作首次使用 → 返回空数组(不是故障)。
+  //
+  // 自愈读(getShortcuts):'shortcuts' blob 不存在时,扫一次 tag=shortcut-library
+  // 的全量列表,识别旧 per-item 行(sl-group-* / sl-shortcut-*)→ 合并成新格式 →
+  // 写回 'shortcuts' blob → best-effort 删旧行。这样切换 schema 不需要后端迁移
+  // 脚本,部署后第一次读用户时自动完成。失败也不阻塞 —— 旧行只会遗留为不可见
+  // (组件后续只读写单 blob)。
+
+  const SHORTCUT_TAGS = ['shortcut-library'] as const;
+  const LEGACY_GROUP_PREFIX = 'sl-group-';
+  const LEGACY_SHORTCUT_PREFIX = 'sl-shortcut-';
+  const LEGACY_LIST_PAGE_SIZE = 200;
 
   function safeParseShortcuts(raw: string): ShortcutsBlob {
     try {
@@ -314,17 +325,99 @@ export function createUserSpaceStore(): UserSpaceStore {
     }
   }
 
+  interface LegacyGroupRecord { id: string; name: string; order: number; createdAt: number; updatedAt: number; }
+  interface LegacyShortcutRecord { id: string; groupId: string; order: number; combo: { code: string; label: string; isModifier: boolean }[]; description: string; condition?: string; createdAt: number; updatedAt: number; }
+  function isLegacyGroupRecord(x: unknown): x is LegacyGroupRecord {
+    return !!x && typeof x === 'object' && typeof (x as LegacyGroupRecord).id === 'string' && typeof (x as LegacyGroupRecord).name === 'string';
+  }
+  function isLegacyShortcutRecord(x: unknown): x is LegacyShortcutRecord {
+    return !!x && typeof x === 'object' && typeof (x as LegacyShortcutRecord).id === 'string' && typeof (x as LegacyShortcutRecord).groupId === 'string';
+  }
+
+  /** 把 per-item 旧行合并成新格式 Group[]。 */
+  function consolidateLegacy(groups: LegacyGroupRecord[], shortcuts: LegacyShortcutRecord[]): ShortcutsBlob {
+    const sorted = [...groups].sort((a, b) => a.order - b.order);
+    return sorted.map((g) => ({
+      id: g.id,
+      name: g.name,
+      shortcuts: shortcuts
+        .filter((s) => s.groupId === g.id)
+        .sort((a, b) => a.order - b.order)
+        .map((s) => ({
+          id: s.id,
+          combo: s.combo,
+          description: s.description,
+          condition: s.condition,
+          createdAt: s.createdAt,
+        })),
+      createdAt: g.createdAt,
+      updatedAt: g.updatedAt,
+    }));
+  }
+
+  /** 拉全量 ?tags=shortcut-library(分页),返回旧行集合。 */
+  async function listLegacyShortcutKeys(groupId: number): Promise<{ legacyGroups: LegacyGroupRecord[]; legacyShortcuts: LegacyShortcutRecord[]; legacyKeys: string[] }> {
+    const legacyGroups: LegacyGroupRecord[] = [];
+    const legacyShortcuts: LegacyShortcutRecord[] = [];
+    const legacyKeys: string[] = [];
+    let offset = 0;
+    while (true) {
+      let resp: { items?: Array<{ key?: string; value?: string }>; total?: number };
+      try {
+        resp = await kvV1Service.list({ limit: LEGACY_LIST_PAGE_SIZE, offset, tags: [...SHORTCUT_TAGS], groupId });
+      } catch {
+        return { legacyGroups, legacyShortcuts, legacyKeys };
+      }
+      if (!resp || !Array.isArray(resp.items)) return { legacyGroups, legacyShortcuts, legacyKeys };
+      if (resp.items.length === 0) break;
+      for (const item of resp.items) {
+        if (!item || typeof item.key !== 'string') continue;
+        if (item.key === SHORTCUTS_KV_KEY) continue; // 新格式 blob,忽略
+        if (item.key.startsWith(LEGACY_GROUP_PREFIX)) {
+          legacyKeys.push(item.key);
+          try { const parsed = JSON.parse(String(item.value ?? '')); if (isLegacyGroupRecord(parsed)) legacyGroups.push(parsed); } catch { /* skip */ }
+        } else if (item.key.startsWith(LEGACY_SHORTCUT_PREFIX)) {
+          legacyKeys.push(item.key);
+          try { const parsed = JSON.parse(String(item.value ?? '')); if (isLegacyShortcutRecord(parsed)) legacyShortcuts.push(parsed); } catch { /* skip */ }
+        }
+      }
+      offset += resp.items.length;
+      if (typeof resp.total !== 'number' || offset >= resp.total) break;
+    }
+    return { legacyGroups, legacyShortcuts, legacyKeys };
+  }
+
   async function getShortcuts(): Promise<ShortcutsBlob> {
     requireAuth();
     const defaultGroupId = await resolveDefaultGroupId();
     if (defaultGroupId === null) return [];
+    // 1) 主路径:读新格式 'shortcuts' blob
     try {
       const item = await kvV1Service.get({ key: SHORTCUTS_KV_KEY, groupId: defaultGroupId });
       return safeParseShortcuts(item.value);
     } catch (e) {
-      if (e instanceof ApiError && e.code === 50) return []; // key 不存在 = 首次使用
-      throw e;
+      if (!(e instanceof ApiError) || e.code !== 50) throw e; // 其它业务错误透传
     }
+    // 2) 旧版本兼容:扫描 tag 全量,识别 per-item 旧行 → 合并 → 写回 → 删旧行
+    const { legacyGroups, legacyShortcuts, legacyKeys } = await listLegacyShortcutKeys(defaultGroupId);
+    if (legacyGroups.length === 0 && legacyShortcuts.length === 0) return [];
+    const merged = consolidateLegacy(legacyGroups, legacyShortcuts);
+    try {
+      await kvV1Service.set({
+        key: SHORTCUTS_KV_KEY,
+        value: JSON.stringify(merged),
+        tags: [...SHORTCUT_TAGS],
+        ttl: 0,
+        groupId: defaultGroupId,
+      });
+    } catch {
+      // 写不进去也不阻塞本次读
+    }
+    // best-effort 删旧行
+    for (const k of legacyKeys) {
+      kvV1Service.delete({ key: k, groupId: defaultGroupId }).catch(() => undefined);
+    }
+    return merged;
   }
 
   async function setShortcuts(groups: ShortcutsBlob): Promise<void> {
