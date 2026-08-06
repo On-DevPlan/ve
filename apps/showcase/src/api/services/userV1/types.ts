@@ -11,8 +11,8 @@ export interface UserInfo {
   invitationCode: string;
   /**
    * 默认工作空间 id。后端 DTO 当前未返回(遗留:doc 注 e2e 用 SQL 适配),
-   * 仍声明可选 —— 后续 DTO 加字段后类型自动对齐;
-   * 若未返回,组件走 `GET /user/default-group` 显式探。
+   * 仍声明可选 —— 后续 DTO 加字段后类型自动对齐;若未返回,前端用
+   * listGroups() 兜底(由 createUserSpaceStore.resolveDefaultGroupId 处理)。
    */
   defaultGroupId?: number;
 }

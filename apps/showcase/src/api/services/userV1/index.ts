@@ -45,11 +45,6 @@ export class UserV1Service extends HttpService {
   setDefaultGroup(groupId: number): Promise<{ groupId: number; message: string }> {
     return this.reqPatch<{ groupId: number; message: string }>('/default-group', { groupId });
   }
-
-  /** 读当前 caller 的默认工作空间 id;0 表示还没设。轻量探活,比 listGroups 准确(总是「我自己的默认」,不是「我最早加的」)。 */
-  getDefaultGroup(): Promise<{ groupId: number }> {
-    return this.reqGet<{ groupId: number }>('/default-group');
-  }
 }
 
 export const userV1Service = new UserV1Service();

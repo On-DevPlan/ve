@@ -105,21 +105,15 @@ export function createUserSpaceStore(): UserSpaceStore {
   async function resolveDefaultGroupId(): Promise<number | null> {
     // 顺序:
     //   1) /user/info 是否回 defaultGroupId(后续 DTO 补字段)
-    //   2) 否则 GET /user/default-group —— 后端新增的轻量探活,总返回 caller 自己的
-    //      真正默认(注册时 0,显式 set 后立刻拿到新值)
-    //   3) 兜底:listGroups() 挑第一个(只有全部断网 / 后端没该端点的旧版本才会走到)
-    // 用处:仅给 user-space 多组管理 UI(decorate / 各种 group CRUD 返回 isDefault)
-    // 用。shortcut-library 的 get/set 不调这里 —— 它直接不传 groupId,让后端
-    // KV 端点自己走 default(见 [[client-api]] §6「groupId 0 或不传 → 回退到
-    // caller 的 default_group_id」),更省事也更准。
+    //   2) 兜底:listGroups() 挑第一个(caller 注册时一定有「个人空间」组,
+    //      所以 pick-first 不会误中其他组;多组用户显式 setDefaultGroup
+    //      后就走路径 1 了)
+    // 用处:仅给 user-space 多组管理 UI(decorate / 各种 group CRUD 返回
+    // isDefault)用。shortcut-library 的 get/set 不调这里 —— 它直接不传
+    // groupId,让后端 KV 端点自己走 default(见 [[client-api]] §6「groupId
+    // 0 或不传 → 回退到 caller 的 default_group_id」),更省事也更准。
     const info = jwtAuth.state.jwtUser;
     if (info?.defaultGroupId && info.defaultGroupId > 0) return info.defaultGroupId;
-    try {
-      const { groupId } = await userV1Service.getDefaultGroup();
-      if (groupId > 0) return groupId;
-    } catch {
-      // 该端点不存在(老后端) → 兜底
-    }
     try {
       const { groups } = await groupV1Service.list();
       if (groups.length > 0) return groups[0].id;
@@ -186,11 +180,10 @@ export function createUserSpaceStore(): UserSpaceStore {
   async function setDefaultGroup(id: number): Promise<void> {
     requireAuth();
     await userV1Service.setDefaultGroup(id);
-    // 刷新 jwtAuth.user,确保后续 resolveDefaultGroupId() 走路径 1(读到
-    // userInfo.defaultGroupId),不再额外打 /user/default-group。
-    // /user/info 历史 DTO 不返 defaultGroupId(legacy),所以 refreshUser
-    // 本身可能拿不到 —— 没关系,resolveDefaultGroupId 还有 GET /user/default-group
-    // 兜底链。
+    // 拉一次 /user/info 同步 jwtUser 快照(email / nickname / 等可能变化)。
+    // 注意:后端 DTO 历史上不返 defaultGroupId(legacy),所以 refreshUser
+    // 不会让 resolveDefaultGroupId 走路径 1 —— 它继续走 listGroups 兜底。
+    // shortcut-library 走 KV 端点的 default 解析,完全不依赖这条路径。
     await jwtAuth.refreshUser();
   }
 
