@@ -1,12 +1,14 @@
 // pages/Inventory.tsx —— KV 管理视图(列表 + 新建/详情/编辑/删除 + 分页/tag 过滤)
-// 权限:myRole ∈ {owner,admin,writer} 显示写操作;reader 只读。删除走行内二次确认。
+//
+// 权限:myRole ∈ {owner,admin,writer} 显示写操作;reader 只读。删除走行内 hover 确认。
+// 行 actions 默认隐藏,hover 整行才显示(避免视觉噪音)。
 
 import { useMemo } from 'react';
-import type { KvListResult, KvView, GroupSummary } from '@api/components/user-space';
+import type { KvListResult, KvView } from '@api/components/user-space';
 import { hasMinRole } from '@api/components/user-space';
 
 export interface InventoryProps {
-  group: GroupSummary;
+  group: import('@api/components/user-space').GroupSummary;
   kv: KvListResult | null;
   loading: boolean;
   error: string | null;
@@ -22,6 +24,14 @@ export interface InventoryProps {
   onReload: () => Promise<void>;
 }
 
+function formatReplacedAt(s: string | null | undefined): string {
+  if (!s) return '—';
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return s;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 export default function Inventory(props: InventoryProps) {
   const { group, kv, loading, error, saving, page, pageSize, selectedTag, onPageChange, onTagChange, onCreate, onEdit, onDelete, onReload } = props;
   const canWrite = hasMinRole(group.myRole, 'writer');
@@ -35,97 +45,116 @@ export default function Inventory(props: InventoryProps) {
   const totalPages = kv ? Math.max(1, Math.ceil(kv.total / pageSize)) : 1;
 
   return (
-    <section className="sl-us-view sl-us-inventory">
-      <div className="sl-us-view__head">
-        <h3 className="sl-us-view__title">KV 管理</h3>
-        <span className="sl-us-view__spacer" />
+    <div>
+      {/* Toolbar: tag 过滤 + 搜索 + 新建 + 刷新 */}
+      <div className="sl-us-toolbar">
         <select
           className="sl-us-input sl-us-input--compact"
           value={selectedTag ?? ''}
           onChange={(e) => onTagChange(e.target.value || null)}
           aria-label="按 tag 过滤"
         >
-          <option value="">全部 tag</option>
+          <option value="">所有 tag</option>
           {tagOptions.map((t) => <option key={t} value={t}>{t}</option>)}
         </select>
+        <span className="sl-us-toolbar__spacer" />
+        <button className="sl-us-btn" onClick={() => void onReload()} disabled={loading || saving}>
+          ↻ 刷新
+        </button>
         {canWrite && (
           <button className="sl-us-btn sl-us-btn--primary" onClick={onCreate} disabled={saving}>
             + 新建 KV
           </button>
         )}
-        <button className="sl-us-btn" onClick={() => void onReload()} disabled={loading}>
-          {loading ? '加载中…' : '刷新'}
-        </button>
       </div>
 
       {error && <div className="sl-us-error">{error}</div>}
 
-      <table className="sl-us-table">
-        <thead>
-          <tr>
-            <th>Key</th>
-            <th>Value</th>
-            <th>Tags</th>
-            <th>过期时间</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          {(!kv || kv.items.length === 0) && !loading && (
-            <tr><td colSpan={5} className="sl-us-table__empty">该组暂无 KV</td></tr>
-          )}
-          {kv?.items.map((item) => (
-            <KvRow
-              key={item.key}
-              item={item}
-              canWrite={canWrite}
-              saving={saving}
-              onEdit={onEdit}
-              onDelete={onDelete}
-            />
-          ))}
-        </tbody>
-      </table>
-
-      <div className="sl-us-pager">
-        <span className="sl-us-pager__info">共 {kv?.total ?? 0} 条</span>
-        <button className="sl-us-btn" disabled={page <= 1 || loading} onClick={() => onPageChange(page - 1)}>上一页</button>
-        <span className="sl-us-pager__page">{page} / {totalPages}</span>
-        <button className="sl-us-btn" disabled={page >= totalPages || loading} onClick={() => onPageChange(page + 1)}>下一页</button>
-      </div>
-    </section>
-  );
-}
-
-function KvRow({ item, canWrite, saving, onEdit, onDelete }: {
-  item: KvView; canWrite: boolean; saving: boolean;
-  onEdit: (item: KvView) => void; onDelete: (item: KvView) => void;
-}) {
-  return (
-    <tr>
-      <td><code className="sl-us-code">{item.key}</code></td>
-      <td className="sl-us-inv-value">{item.valuePreview || '—'}</td>
-      <td>
-        {item.tags.length === 0 ? <span className="sl-us-muted">—</span> : item.tags.map((t) => <span key={t} className="sl-us-badge sl-us-badge--tag">{t}</span>)}
-      </td>
-      <td>{item.expiresAt || '—'}</td>
-      <td>
-        <span className="sl-us-table__actions">
-          <button className="sl-us-btn" onClick={() => onEdit(item)} title="查看/编辑详情">详情</button>
-          {canWrite && (
-            <>
-              <button className="sl-us-btn" disabled={saving} onClick={() => onEdit(item)} title="编辑">编辑</button>
-              <button
-                className="sl-us-btn sl-us-btn--danger-ghost"
-                disabled={saving}
-                onClick={() => { if (window.confirm(`删除 KV「${item.key}」?`)) onDelete(item); }}
-              >
-                删除
+      {(!kv || kv.items.length === 0) && !loading ? (
+        <div className="sl-us-empty">
+          <div className="sl-us-empty__title">还没有 KV</div>
+          <div className="sl-us-empty__desc">
+            {canWrite ? '点击右上角「+ 新建 KV」开始管理该组数据' : '当前组内无 KV'}
+          </div>
+        </div>
+      ) : (
+        <div className="sl-us-table-wrap">
+          <table className="sl-us-table">
+            <thead>
+              <tr>
+                <th style={{ width: '22%' }}>Key</th>
+                <th>Value</th>
+                <th style={{ width: '18%' }}>Tags</th>
+                <th style={{ width: '12%' }}>过期</th>
+                <th style={{ width: 1 }} />
+              </tr>
+            </thead>
+            <tbody>
+              {kv?.items.map((item) => (
+                <tr key={item.key}>
+                  <td>
+                    <span className="sl-us-table__cell-key sl-us-table__cell-mono">{item.key}</span>
+                  </td>
+                  <td>
+                    <span className="sl-us-table__cell-value" title={item.value}>
+                      {item.valuePreview || '—'}
+                    </span>
+                  </td>
+                  <td>
+                    {item.tags.length === 0
+                      ? <span className="sl-us-muted">—</span>
+                      : item.tags.map((t) => (
+                          <span key={t} className="sl-us-chip sl-us-chip--tag">{t}</span>
+                        ))
+                    }
+                  </td>
+                  <td className="sl-us-table__cell-faint sl-us-table__cell-mono">
+                    {item.expiresAt ? formatReplacedAt(item.expiresAt) : '—'}
+                  </td>
+                  <td>
+                    <div className="sl-us-table__row-actions">
+                      <button
+                        className="sl-us-btn sl-us-btn--ghost sl-us-btn--icon-sm"
+                        onClick={() => onEdit(item)}
+                        title="查看 / 编辑"
+                        aria-label="查看"
+                      >
+                        ✎
+                      </button>
+                      {canWrite && (
+                        <button
+                          className="sl-us-btn sl-us-btn--danger-ghost sl-us-btn--icon-sm"
+                          disabled={saving}
+                          onClick={() => {
+                            if (window.confirm(`删除 KV「${item.key}」?`)) onDelete(item);
+                          }}
+                          title="删除"
+                          aria-label="删除"
+                        >
+                          ×
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {kv && kv.total > 0 && (
+            <div className="sl-us-table-foot">
+              <span>共 {kv.total} 条</span>
+              <span className="sl-us-table-foot__spacer" />
+              <button className="sl-us-btn sl-us-btn--sm" disabled={page <= 1 || loading} onClick={() => onPageChange(page - 1)}>
+                ← 上一页
               </button>
-            </>
+              <span className="sl-us-table-foot__pages">{page} / {totalPages}</span>
+              <button className="sl-us-btn sl-us-btn--sm" disabled={page >= totalPages || loading} onClick={() => onPageChange(page + 1)}>
+                下一页 →
+              </button>
+            </div>
           )}
-        </span>
-      </td>
-    </tr>
+        </div>
+      )}
+    </div>
   );
 }

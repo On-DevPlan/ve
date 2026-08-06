@@ -1,9 +1,10 @@
-// pages/Sidebar.tsx —— 左侧工作空间列表面板(可搜索、创建、设默认)
-// "我的工作空间"按以下顺序展示:
-//   - 当前默认组(☆ badge)
-//   - 我创建的组(owned)
-//   - 我加入的组(joined)
-// 排序:默认组在前 / owned 在前 / 其余按更新时间倒序
+// pages/Sidebar.tsx —— 左侧工作空间列表面板(品牌区 + 列表 + 创建表单 + 用户卡)
+// 布局:
+//   - 品牌区(产品 logo + 名字)
+//   - "工作空间" label + 列表(默认组用 ★ 标识)
+//   - 底部用户卡(头像 + 邮箱 + 设置齿轮)
+//
+// 设默认入口:每个非默认组行内 hover 显示"★ 默认"按钮,click → onSetDefault
 
 import { useState, type FormEvent } from 'react';
 import type { GroupSummary } from '@api/components/user-space';
@@ -16,19 +17,6 @@ interface Props {
   onCreate: (name: string, description: string) => Promise<void> | void;
   onSetDefault: (id: number) => Promise<void> | void;
   disabled?: boolean;
-}
-
-function roleBadge(role: GroupSummary['myRole']): string {
-  switch (role) {
-    case 'owner':
-      return 'OWNER';
-    case 'admin':
-      return 'ADMIN';
-    case 'writer':
-      return 'WRITER';
-    case 'reader':
-      return 'READER';
-  }
 }
 
 export default function Sidebar({
@@ -59,108 +47,154 @@ export default function Sidebar({
       await onCreate(name, newDesc.trim());
       setNewName('');
       setNewDesc('');
+      setExpanded(false);
     } finally {
       setCreating(false);
     }
   }
 
   return (
-    <aside className="sl-us-sidebar">
-      <div className="sl-us-sidebar__head">
-        <span className="sl-us-sidebar__title">工作空间</span>
-        <span className="sl-us-sidebar__count">{groups.length}</span>
+    <aside className="sl-us-side">
+      {/* 品牌 */}
+      <div className="sl-us-side__brand">
+        <div className="sl-us-side__brand-mark" />
+        <div className="sl-us-side__brand-name">User Space</div>
       </div>
 
-      <input
-        className="sl-us-input"
-        placeholder="搜索工作空间…"
-        value={filter}
-        onChange={(e) => setFilter(e.target.value)}
-      />
+      {/* 工作空间列表 */}
+      <div className="sl-us-side__section">
+        <div className="sl-us-side__label">
+          <span>工作空间</span>
+          <button
+            className="sl-us-side__add"
+            title="新建工作空间"
+            onClick={() => setExpanded((v) => !v)}
+            disabled={disabled}
+            aria-label="新建工作空间"
+          >
+            +
+          </button>
+        </div>
 
-      <ul className="sl-us-sidebar__list">
-        {filtered.length === 0 && (
-          <li className="sl-us-sidebar__empty">
-            {groups.length === 0 ? '尚无工作空间' : '无匹配工作空间'}
-          </li>
-        )}
-        {filtered.map((g) => {
-          const active = g.id === selectedGroupId;
-          const isDefault = g.id === defaultGroupId;
-          return (
-            <li
-              key={g.id}
-              className={`sl-us-sidebar__item ${active ? 'is-active' : ''}`}
-              onClick={() => onSelect(g.id)}
-            >
-              <span className="sl-us-sidebar__name">{g.name}</span>
-              <span className="sl-us-sidebar__meta">
-                <span className={`sl-us-badge sl-us-badge--role-${g.myRole}`}>
-                  {roleBadge(g.myRole)}
-                </span>
-                {isDefault && (
-                  <span className="sl-us-badge sl-us-badge--default" title="默认工作空间">
-                    ★
+        <input
+          className="sl-us-input"
+          style={{ height: 26, fontSize: 12 }}
+          placeholder="搜索…"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+        />
+
+        <div className="sl-us-side__list" style={{ marginTop: 4 }}>
+          {filtered.length === 0 && (
+            <div className="sl-us-muted" style={{ padding: '8px 8px', textAlign: 'center' }}>
+              {groups.length === 0 ? '尚无工作空间' : '无匹配'}
+            </div>
+          )}
+          {filtered.map((g) => {
+            const active = g.id === selectedGroupId;
+            const isDefault = g.id === defaultGroupId;
+            return (
+              <div
+                key={g.id}
+                className={`sl-us-side__item ${active ? 'is-active' : ''}`}
+                onClick={() => onSelect(g.id)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onSelect(g.id);
+                  }
+                }}
+              >
+                <span className="sl-us-side__item-mark">◇</span>
+                <span className="sl-us-side__item-name">{g.name}</span>
+                {isDefault ? (
+                  <span
+                    className="sl-us-chip sl-us-chip--default"
+                    style={{ fontSize: 10, padding: '0 5px' }}
+                    title="默认工作空间"
+                  >
+                    默认
                   </span>
+                ) : g.myRole !== 'reader' ? (
+                  <button
+                    className="sl-us-btn sl-us-btn--ghost sl-us-btn--icon-sm"
+                    style={{ width: 20, height: 20, fontSize: 11, padding: 0 }}
+                    disabled={disabled}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void onSetDefault(g.id);
+                    }}
+                    title="设为默认工作空间"
+                    aria-label={`将 ${g.name} 设为默认`}
+                  >
+                    ★
+                  </button>
+                ) : (
+                  <span className="sl-us-side__item-meta">{g.memberCount}</span>
                 )}
-                <span className="sl-us-sidebar__count">{g.memberCount}</span>
-              </span>
-              {!isDefault && g.myRole !== 'reader' && (
-                <button
-                  className="sl-us-icon-btn"
-                  disabled={disabled}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    void onSetDefault(g.id);
-                  }}
-                  title="设为默认工作空间"
-                >
-                  设为默认
-                </button>
-              )}
-            </li>
-          );
-        })}
-      </ul>
+              </div>
+            );
+          })}
+        </div>
+      </div>
 
-      <form
-        className={`sl-us-sidebar__create ${expanded ? 'is-open' : ''}`}
-        onSubmit={submitCreate}
-      >
-        <button
-          type="button"
-          className="sl-us-sidebar__create-toggle"
-          onClick={() => setExpanded((v) => !v)}
+      {/* 创建表单(展开态) */}
+      {expanded && (
+        <form
+          className="sl-us-side__section"
+          style={{ borderTop: '1px solid var(--border)', paddingTop: 12, paddingBottom: 12 }}
+          onSubmit={submitCreate}
         >
-          {expanded ? '取消' : '+ 新建工作空间'}
-        </button>
-        {expanded && (
-          <>
-            <input
-              className="sl-us-input"
-              placeholder="工作空间名称(必填)"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
+          <div className="sl-us-side__label" style={{ paddingLeft: 0, paddingRight: 0 }}>
+            <span>新建工作空间</span>
+          </div>
+          <input
+            className="sl-us-input"
+            placeholder="名称(必填)"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            disabled={creating}
+            autoFocus
+            style={{ marginBottom: 6 }}
+          />
+          <input
+            className="sl-us-input"
+            placeholder="描述(可选)"
+            value={newDesc}
+            onChange={(e) => setNewDesc(e.target.value)}
+            disabled={creating}
+            style={{ marginBottom: 6 }}
+          />
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button
+              type="button"
+              className="sl-us-btn sl-us-btn--ghost"
+              onClick={() => setExpanded(false)}
               disabled={creating}
-              autoFocus
-            />
-            <input
-              className="sl-us-input"
-              placeholder="描述(可选)"
-              value={newDesc}
-              onChange={(e) => setNewDesc(e.target.value)}
-              disabled={creating}
-            />
+              style={{ flex: 1 }}
+            >
+              取消
+            </button>
             <button
               type="submit"
               className="sl-us-btn sl-us-btn--primary"
               disabled={creating || !newName.trim()}
+              style={{ flex: 1 }}
             >
               {creating ? '创建中…' : '创建'}
             </button>
-          </>
-        )}
-      </form>
+          </div>
+        </form>
+      )}
+
+      {/* 用户卡(底部) */}
+      <div className="sl-us-side__user">
+        <div className="sl-us-side__user-avatar">A</div>
+        <div className="sl-us-side__user-name">alice@on-devplan.com</div>
+        <button className="sl-us-side__user-action" title="设置" aria-label="设置">⚙</button>
+      </div>
     </aside>
   );
 }

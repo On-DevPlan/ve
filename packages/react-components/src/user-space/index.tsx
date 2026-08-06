@@ -373,39 +373,43 @@ export default function UserSpace() {
 
       <main className="sl-us-main">
         {actionError && (
-          <div className="sl-us-error sl-us-error--banner">{actionError}</div>
+          <div className="sl-us-error">{actionError}</div>
         )}
 
         {selectedGroup ? (
           <>
-            <header className="sl-us-header">
-              <div className="sl-us-header__title">
-                <h2 className="sl-us-header__name">{selectedGroup.name}</h2>
-                <span className={`sl-us-badge sl-us-badge--role-${selectedGroup.myRole}`}>
-                  {selectedGroup.myRole.toUpperCase()}
-                </span>
-                {selectedGroup.isDefault && (
-                  <span className="sl-us-badge sl-us-badge--default">默认</span>
-                )}
-              </div>
-              <nav className="sl-us-tabs">
-                {VIEW_TABS.map((t) => (
-                  <button
-                    key={t.key}
-                    className={`sl-us-tab ${view === t.key ? 'is-active' : ''}`}
-                    onClick={() => setView(t.key)}
-                  >
-                    {t.label}
-                  </button>
-                ))}
-              </nav>
-            </header>
+            <div className="sl-us-topbar">
+              <div className="sl-us-topbar__title">{selectedGroup.name}</div>
+              <span className="sl-us-topbar__crumb-sep">/</span>
+              <div className="sl-us-topbar__crumb">{VIEW_TABS.find((t) => t.key === view)?.label}</div>
+              <span className="sl-us-topbar__spacer" />
+              <span className={`sl-us-chip sl-us-chip--${selectedGroup.myRole}`}>
+                {selectedGroup.myRole.toUpperCase()}
+              </span>
+              {selectedGroup.isDefault && (
+                <span className="sl-us-chip sl-us-chip--default">默认</span>
+              )}
+            </div>
+
+            <nav className="sl-us-tabs">
+              {VIEW_TABS.map((t) => (
+                <button
+                  key={t.key}
+                  className={`sl-us-tab ${view === t.key ? 'is-active' : ''}`}
+                  onClick={() => setView(t.key)}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </nav>
 
             {view === 'overview' && (
               <Overview
                 group={selectedGroup}
+                defaultGroupName={groups.find((g) => g.id === defaultGroupId)?.name ?? null}
                 saving={saving}
                 onSave={handleSaveOverview}
+                onSetDefault={() => handleSetDefault(selectedGroup.id)}
                 onLeave={handleLeave}
                 onDissolve={handleDissolve}
               />
