@@ -22,6 +22,8 @@ import { genNginxOut } from './src/api/gen-nginx';
 import path from 'node:path'; // 用于 resolve 绝对路径
 import { fileURLToPath } from 'node:url'; // URL → 路径
 import { apiGateway } from './src/api/to-vite-proxy';
+import { vueStyleCollector } from './src/registry/vue-style-collector';
+import { scopedIdGuard } from './plugins/scoped-id-guard';
 import type { Plugin } from 'vite';
 // ESM 里没有 __dirname,临时造一个指向当前文件目录
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -43,12 +45,18 @@ function buildGatewayPlugin() {
 }
 
 export default defineConfig(() => ({
-  // 插件栈:Vue SFC → React JSX → api gateway → manifest
+  // 插件栈:Vue SFC → React JSX → api gateway → manifest → vue-style-collector
   plugins: [
     vue(),
     react(),
     buildGatewayPlugin(),
     manifestPlugin({ componentRoots: COMPONENT_ROOTS }),
+    vueStyleCollector({
+      vueComponentsRoot: path.resolve(__dirname, '../../packages/vue-components/src'),
+    }),
+    // scoped-id-guard(transform 阶段 post):扫 SFC 产物里的 __scopeId,与本地
+    // computeScopedId 比对,漂移即 this.error() fail build。plugin-vue 升级时兜底。
+    scopedIdGuard(),
     {
       name: 'gen-nginx-locations',
       apply: 'build',

@@ -79,10 +79,10 @@ export default function Invitations({
   }
 
   return (
-    <section className="sl-us-view sl-us-invitations">
-      <div className="sl-us-view__head">
-        <h3 className="sl-us-view__title">邀请</h3>
-        <span className="sl-us-view__spacer" />
+    <section className="sl-us-section sl-us-invitations">
+      <div className="sl-us-section__head">
+        <h3 className="sl-us-section__title">邀请</h3>
+        <span className="sl-us-toolbar__spacer" />
         <button className="sl-us-btn" onClick={() => void onReload()} disabled={loading}>
           {loading ? '刷新中…' : '刷新'}
         </button>

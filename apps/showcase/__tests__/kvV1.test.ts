@@ -21,15 +21,15 @@ describe('kvV1 service (throw model)', () => {
     });
   }
 
-  it('set POSTs to /api/v1/kv with Bearer header + tags', async () => {
+  it('set POSTs to /api/v1/kv with Bearer header + tags + no visibility', async () => {
     const mockFetch = vi.fn().mockResolvedValue(mockJSON(200, { code: 0, message: 'ok' }));
     global.fetch = mockFetch;
 
     await kvV1Service.set({
       key: 'shortcuts',
       value: '{}',
-      visibility: 'private',
       tags: ['prod', 'cache'],
+      groupId: 42,
     });
 
     const url = mockFetch.mock.calls[0][0] as string;
@@ -37,13 +37,9 @@ describe('kvV1 service (throw model)', () => {
     const init = mockFetch.mock.calls[0][1] as RequestInit;
     expect(init.method).toBe('POST');
     expect(init.headers).toMatchObject({ Authorization: 'Bearer jwt-xyz' });
-    expect(JSON.parse(init.body as string)).toMatchObject({
-      key: 'shortcuts',
-      value: '{}',
-      visibility: 'private',
-      ttl: 0,
-      tags: ['prod', 'cache'],
-    });
+    const body = JSON.parse(init.body as string) as Record<string, unknown>;
+    expect(body).toMatchObject({ key: 'shortcuts', value: '{}', ttl: 0, tags: ['prod', 'cache'], groupId: 42 });
+    expect(body).not.toHaveProperty('visibility');
   });
 
   it('set defaults tags to [] (replace semantics = clear)', async () => {
@@ -71,29 +67,41 @@ describe('kvV1 service (throw model)', () => {
     expect(url).toBe('/api/v1/kv/shortcuts');
   });
 
-  it('get appends ownerId when > 0', async () => {
+  it('get appends groupId query when provided', async () => {
     const mockFetch = vi.fn().mockResolvedValue(
       mockJSON(200, {
         code: 0,
-        data: { key: 'k', value: 'v', visibility: 'public', expires_at: '' },
+        data: { key: 'k', value: 'v', expires_at: '', groupId: 42, groupName: 'g', myRole: 'writer', tags: [] },
       }),
     );
     global.fetch = mockFetch;
 
-    await kvV1Service.get({ key: 'k', ownerId: 99 });
+    await kvV1Service.get({ key: 'k', groupId: 42 });
 
     const url = mockFetch.mock.calls[0][0] as string;
-    expect(url).toBe('/api/v1/kv/k?ownerId=99');
+    expect(url).toBe('/api/v1/kv/k?groupId=42');
   });
 
-  it('delete sends DELETE method', async () => {
+  it('delete sends DELETE with groupId query', async () => {
     const mockFetch = vi.fn().mockResolvedValue(mockJSON(200, { code: 0, message: 'ok' }));
     global.fetch = mockFetch;
 
-    await kvV1Service.delete({ key: 'shortcuts' });
+    await kvV1Service.delete({ key: 'shortcuts', groupId: 42 });
 
-    const init = mockFetch.mock.calls[0][1] as RequestInit;
-    expect(init.method).toBe('DELETE');
+    const url = mockFetch.mock.calls[0][0] as string;
+    expect(url).toBe('/api/v1/kv/shortcuts?groupId=42');
+    expect((mockFetch.mock.calls[0][1] as RequestInit).method).toBe('DELETE');
+  });
+
+  it('delete without groupId omits query string (locks default-group behavior)', async () => {
+    const mockFetch = vi.fn().mockResolvedValue(mockJSON(200, { code: 0, message: 'ok' }));
+    global.fetch = mockFetch;
+
+    await kvV1Service.delete({ key: 'k' });
+
+    const url = mockFetch.mock.calls[0][0] as string;
+    expect(url).toBe('/api/v1/kv/k');
+    expect((mockFetch.mock.calls[0][1] as RequestInit).method).toBe('DELETE');
   });
 
   it('list with pagination appends query string', async () => {
@@ -129,6 +137,44 @@ describe('kvV1 service (throw model)', () => {
     const out = await kvV1Service.tags();
     expect(out).toEqual([{ tag: 'prod', count: 3 }, { tag: 'cache', count: 1 }]);
     expect(mockFetch.mock.calls[0][0]).toBe('/api/v1/kv/tags');
+  });
+
+  it('versions GETs /kv/:key/versions with groupId and unwraps versions array', async () => {
+    const mockFetch = vi.fn().mockResolvedValue(
+      mockJSON(200, {
+        code: 0,
+        data: { versions: [{ version_no: 2, value_len: 42, replaced_at: '2026-08-01T12:00:00+08:00' }] },
+      }),
+    );
+    global.fetch = mockFetch;
+
+    const out = await kvV1Service.versions({ key: 'api_url', groupId: 42 });
+
+    expect(mockFetch.mock.calls[0][0]).toBe('/api/v1/kv/api_url/versions?groupId=42');
+    expect((mockFetch.mock.calls[0][1] as RequestInit).method).toBe('GET');
+    expect(out).toEqual([{ version_no: 2, value_len: 42, replaced_at: '2026-08-01T12:00:00+08:00' }]);
+  });
+
+  it('versions without groupId omits query string', async () => {
+    const mockFetch = vi.fn().mockResolvedValue(mockJSON(200, { code: 0, data: { versions: [] } }));
+    global.fetch = mockFetch;
+
+    await kvV1Service.versions({ key: 'k' });
+
+    expect(mockFetch.mock.calls[0][0]).toBe('/api/v1/kv/k/versions');
+  });
+
+  it('restore POSTs /kv/:key/restore with version + groupId', async () => {
+    const mockFetch = vi.fn().mockResolvedValue(mockJSON(200, { code: 0, data: { message: 'kv restored successfully' } }));
+    global.fetch = mockFetch;
+
+    await kvV1Service.restore({ key: 'api_url', version: 2, groupId: 42 });
+
+    expect(mockFetch.mock.calls[0][0]).toBe('/api/v1/kv/api_url/restore');
+    const init = mockFetch.mock.calls[0][1] as RequestInit;
+    expect(init.method).toBe('POST');
+    const body = JSON.parse(init.body as string) as Record<string, unknown>;
+    expect(body).toMatchObject({ version: 2, groupId: 42 });
   });
 
   it('throws ApiError on business code 50 (key not found)', async () => {

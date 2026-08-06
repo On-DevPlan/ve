@@ -26,7 +26,7 @@ import type {
   MountContext, // 挂载上下文
   MountedComponent, // 已挂载句柄
 } from '@style-library/component-contract';
-import { adoptStylesInto } from './style-adoption.ts'; // 共享样式 adoption
+import { ensureCss } from './ensure-css.ts'; // 共享 CSS 前置(等就绪 / 降级)
 
 // 识别已知工程噪声(ShadowRoot + Vue patch 触发)
 function isKnownShadowRootPatchError(err: unknown): boolean {
@@ -59,6 +59,10 @@ export function createVueMountAdapter(): MountAdapter {
         throw new Error('VueMountAdapter: module.default is missing');
       }
 
+      // CSS 前置:有 cssReady(本地组件)等就绪,reject 时降级无样式渲染;
+      // 无 cssReady(远程组件)走 adoptStylesInto 等 document.head 的 link 加载完。
+      await ensureCss(context);
+
       // 1) 创建 portal div 并挂到 ShadowRoot
       const portal = document.createElement('div');
       context.shadowRoot.appendChild(portal);
@@ -85,9 +89,6 @@ export function createVueMountAdapter(): MountAdapter {
           throw err;
         }
       }
-
-      // 4) 注入 SFC 样式(克隆 document.head 的 <style> 进 shadowRoot)
-      adoptStylesInto(context.shadowRoot);
 
       // 5) 路由切换时自动卸载
       context.signal.addEventListener('abort', () => app.unmount());

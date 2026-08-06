@@ -1,98 +1,160 @@
-// pages/Inventory.tsx —— 组内 KV 库存只读快照
+// pages/Inventory.tsx —— KV 管理视图(列表 + 新建/详情/编辑/删除 + 分页/tag 过滤)
 //
-// 不在本组件做 KV 编辑 —— 那是 shortcut-library 之类组件的职责。
-// 这里只展示:总量 / 前 N 个 key / 截断的 value / tag;点击跳转(可选)。
-//
-// 数据来源:store.inventory(groupId) → list({groupId, limit}) + 各 key 单独 get
-// 单 key 失败(best-effort)会在 UI 上显示 "(无权限)"。
+// 权限:myRole ∈ {owner,admin,writer} 显示写操作;reader 只读。删除走行内 hover 确认。
+// 行 actions 默认隐藏,hover 整行才显示(避免视觉噪音)。
 
-import { useEffect, useState } from 'react';
-import type { GroupKvInventory, GroupSummary } from '@api/components/user-space';
+import { useMemo } from 'react';
+import type { KvListResult, KvView } from '@api/components/user-space';
+import { hasMinRole } from '@api/components/user-space';
 
-interface Props {
-  group: GroupSummary;
-  inventory: GroupKvInventory | null;
+export interface InventoryProps {
+  group: import('@api/components/user-space').GroupSummary;
+  kv: KvListResult | null;
   loading: boolean;
   error: string | null;
+  saving: boolean;
+  page: number;
+  pageSize: number;
+  selectedTag: string | null;
+  onPageChange: (page: number) => void;
+  onTagChange: (tag: string | null) => void;
+  onCreate: () => void;
+  onEdit: (item: KvView) => void;
+  onDelete: (item: KvView) => void;
   onReload: () => Promise<void>;
 }
 
-export default function Inventory({ group, inventory, loading, error, onReload }: Props) {
-  const [reloadKey, setReloadKey] = useState(0);
+function formatReplacedAt(s: string | null | undefined): string {
+  if (!s) return '—';
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return s;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 
-  useEffect(() => {
-    setReloadKey((k) => k + 1);
-  }, [group.id]);
+export default function Inventory(props: InventoryProps) {
+  const { group, kv, loading, error, saving, page, pageSize, selectedTag, onPageChange, onTagChange, onCreate, onEdit, onDelete, onReload } = props;
+  const canWrite = hasMinRole(group.myRole, 'writer');
+
+  const tagOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const item of kv?.items ?? []) for (const t of item.tags ?? []) set.add(t);
+    return Array.from(set).sort();
+  }, [kv]);
+
+  const totalPages = kv ? Math.max(1, Math.ceil(kv.total / pageSize)) : 1;
 
   return (
-    <section className="sl-us-view sl-us-inventory">
-      <div className="sl-us-view__head">
-        <h3 className="sl-us-view__title">KV 库存</h3>
-        <button
-          className="sl-us-btn"
-          onClick={() => {
-            void onReload();
-            setReloadKey((k) => k + 1);
-          }}
-          disabled={loading}
+    <div>
+      {/* Toolbar: tag 过滤 + 搜索 + 新建 + 刷新 */}
+      <div className="sl-us-toolbar">
+        <select
+          className="sl-us-input sl-us-input--compact"
+          value={selectedTag ?? ''}
+          onChange={(e) => onTagChange(e.target.value || null)}
+          aria-label="按 tag 过滤"
         >
-          {loading ? '刷新中…' : '刷新'}
+          <option value="">所有 tag</option>
+          {tagOptions.map((t) => <option key={t} value={t}>{t}</option>)}
+        </select>
+        <span className="sl-us-toolbar__spacer" />
+        <button className="sl-us-btn" onClick={() => void onReload()} disabled={loading || saving}>
+          ↻ 刷新
         </button>
+        {canWrite && (
+          <button className="sl-us-btn sl-us-btn--primary" onClick={onCreate} disabled={saving}>
+            + 新建 KV
+          </button>
+        )}
       </div>
 
       {error && <div className="sl-us-error">{error}</div>}
 
-      <div className="sl-us-card">
-        <div className="sl-us-card__row">
-          <label className="sl-us-label">组内 KV 总数</label>
-          <span className="sl-us-value">{inventory ? inventory.total : '—'}</span>
+      {(!kv || kv.items.length === 0) && !loading ? (
+        <div className="sl-us-empty">
+          <div className="sl-us-empty__title">还没有 KV</div>
+          <div className="sl-us-empty__desc">
+            {canWrite ? '点击右上角「+ 新建 KV」开始管理该组数据' : '当前组内无 KV'}
+          </div>
         </div>
-        <div className="sl-us-card__row">
-          <label className="sl-us-label">本次展示</label>
-          <span className="sl-us-value">
-            {inventory ? inventory.keys.length : '—'} 条
-          </span>
-        </div>
-      </div>
-
-      <table className="sl-us-table">
-        <thead>
-          <tr>
-            <th>Key</th>
-            <th>Value 预览</th>
-            <th>长度</th>
-            <th>Tags</th>
-          </tr>
-        </thead>
-        <tbody>
-          {inventory && inventory.keys.length === 0 && (
-            <tr>
-              <td colSpan={4} className="sl-us-table__empty">
-                该组暂无 KV
-              </td>
-            </tr>
+      ) : (
+        <div className="sl-us-table-wrap">
+          <table className="sl-us-table">
+            <thead>
+              <tr>
+                <th style={{ width: '22%' }}>Key</th>
+                <th>Value</th>
+                <th style={{ width: '18%' }}>Tags</th>
+                <th style={{ width: '12%' }}>过期</th>
+                <th style={{ width: 1 }} />
+              </tr>
+            </thead>
+            <tbody>
+              {kv?.items.map((item) => (
+                <tr key={item.key}>
+                  <td>
+                    <span className="sl-us-table__cell-key sl-us-table__cell-mono">{item.key}</span>
+                  </td>
+                  <td>
+                    <span className="sl-us-table__cell-value" title={item.value}>
+                      {item.valuePreview || '—'}
+                    </span>
+                  </td>
+                  <td>
+                    {item.tags.length === 0
+                      ? <span className="sl-us-muted">—</span>
+                      : item.tags.map((t) => (
+                          <span key={t} className="sl-us-chip sl-us-chip--tag">{t}</span>
+                        ))
+                    }
+                  </td>
+                  <td className="sl-us-table__cell-faint sl-us-table__cell-mono">
+                    {item.expiresAt ? formatReplacedAt(item.expiresAt) : '—'}
+                  </td>
+                  <td>
+                    <div className="sl-us-table__row-actions">
+                      <button
+                        className="sl-us-btn sl-us-btn--ghost sl-us-btn--icon-sm"
+                        onClick={() => onEdit(item)}
+                        title="查看 / 编辑"
+                        aria-label="查看"
+                      >
+                        ✎
+                      </button>
+                      {canWrite && (
+                        <button
+                          className="sl-us-btn sl-us-btn--danger-ghost sl-us-btn--icon-sm"
+                          disabled={saving}
+                          onClick={() => {
+                            if (window.confirm(`删除 KV「${item.key}」?`)) onDelete(item);
+                          }}
+                          title="删除"
+                          aria-label="删除"
+                        >
+                          ×
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {kv && kv.total > 0 && (
+            <div className="sl-us-table-foot">
+              <span>共 {kv.total} 条</span>
+              <span className="sl-us-table-foot__spacer" />
+              <button className="sl-us-btn sl-us-btn--sm" disabled={page <= 1 || loading} onClick={() => onPageChange(page - 1)}>
+                ← 上一页
+              </button>
+              <span className="sl-us-table-foot__pages">{page} / {totalPages}</span>
+              <button className="sl-us-btn sl-us-btn--sm" disabled={page >= totalPages || loading} onClick={() => onPageChange(page + 1)}>
+                下一页 →
+              </button>
+            </div>
           )}
-          {inventory?.keys.map((k) => (
-            <tr key={k.key}>
-              <td><code className="sl-us-code">{k.key}</code></td>
-              <td className="sl-us-inv-value">{k.valuePreview || '—'}</td>
-              <td>{k.valueLength}</td>
-              <td>
-                {k.tags.length === 0 ? (
-                  <span className="sl-us-muted">—</span>
-                ) : (
-                  k.tags.map((t) => (
-                    <span key={t} className="sl-us-badge sl-us-badge--tag">{t}</span>
-                  ))
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <div className="sl-us-view__hint" aria-hidden="true">
-        reload #{reloadKey}
-      </div>
-    </section>
+        </div>
+      )}
+    </div>
   );
 }

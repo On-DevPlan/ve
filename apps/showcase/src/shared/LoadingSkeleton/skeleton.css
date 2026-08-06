@@ -1,0 +1,53 @@
+/* skeleton.css —— 0.6s ease transition + spinner + 文字 + 占位元素样式。
+   主题色用现有 CSS 变量(--sl-color-*),与 defaultTokens 对齐。 */
+
+.sl-skel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  min-height: 120px;
+}
+.sl-skel__spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--sl-color-border, #d1d5db);
+  border-top-color: var(--sl-color-primary, #2563eb);
+  border-radius: 50%;
+  animation: sl-skel-spin 0.9s linear infinite;
+}
+.sl-skel__text {
+  font-size: 12px;
+  color: var(--sl-color-text-muted, #6b7280);
+  letter-spacing: 0.05em;
+}
+.sl-skel__bars {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  margin-top: 4px;
+}
+.sl-skel__bar {
+  height: 14px;
+  border-radius: var(--sl-radius-md, 6px);
+  background: var(--sl-color-border, #d1d5db);
+  opacity: 0.6;
+  width: 100%;
+}
+.sl-skel__bar--title {
+  height: 22px;
+  width: 40%;
+  margin-bottom: 6px;
+  opacity: 0.8;
+}
+
+@keyframes sl-skel-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}

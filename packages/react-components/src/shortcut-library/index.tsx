@@ -17,7 +17,6 @@ import type { ImportStats } from './src/hooks/useShortcuts';
 import type { Shortcut } from './src/types';
 import { useJwtAuth } from './src/hooks/useAuth';
 import { useLoginModal } from './src/hooks/useLoginModal';
-import { logoutWithConfirm } from './src/hooks/logoutWithConfirm';
 import SettingsPanel from './src/pages/SettingsPanel';
 import Sidebar from './src/pages/Sidebar';
 import ShortcutTable from './src/pages/ShortcutTable';
@@ -539,11 +538,9 @@ export default function ShortcutLibrary() {
             filter={store.query}
             footer={
               <div className="sl-sl-sidebar-foot">
-                {auth.jwtAuthState === 'logged-in' && auth.token ? (
-                  <span className="sl-sl-sync-pill">
-                    已登录 {auth.jwtUser?.email ?? ''}
-                  </span>
-                ) : (
+                {/* 认证态(已登录 xxx / 退出)只在全局 host UI 显示。库内仅保留
+                    未登录时的登录入口;已登录后这里只剩设置齿轮。 */}
+                {auth.jwtAuthState !== 'logged-in' && (
                   <button className="sl-sl-btn sl-sl-btn--ghost" onClick={loginModal.open}>
                     登录
                   </button>
@@ -557,22 +554,6 @@ export default function ShortcutLibrary() {
                   >
                     ⚙
                   </button>
-                  {auth.jwtAuthState === 'logged-in' && (
-                    <button
-                      className="sl-sl-btn sl-sl-btn--ghost"
-                      onClick={() =>
-                        void logoutWithConfirm({
-                          saveMode: store.saveMode,
-                          dirty: store.dirty,
-                          warnOnDirtyExit: store.warnOnDirtyExit,
-                          // 返回 promise,让 logoutWithConfirm 在失败时弹「保存失败」alert
-                          flushDirty: () => store.flushDirty(),
-                        })
-                      }
-                    >
-                      退出
-                    </button>
-                  )}
                 </div>
               </div>
             }

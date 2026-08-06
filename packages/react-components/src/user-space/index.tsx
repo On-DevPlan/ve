@@ -13,10 +13,16 @@ import Overview from './src/pages/Overview';
 import Members from './src/pages/Members';
 import Invitations from './src/pages/Invitations';
 import Inventory from './src/pages/Inventory';
+import KvEditorModal from './src/pages/KvEditorModal';
+import SettingsPanel from './src/pages/SettingsPanel';
+import { hasMinRole } from '@api/components/user-space';
 import type {
   GroupInvitationView,
   GroupMemberView,
   GroupSummary,
+  KvListResult,
+  KvVersionView,
+  KvView,
   ViewMode,
 } from './src/types';
 
@@ -46,13 +52,31 @@ export default function UserSpace() {
   const [invitationsLoading, setInvitationsLoading] = useState(false);
   const [invitationsError, setInvitationsError] = useState<string | null>(null);
 
-  const [inventory, setInventory] = useState<{
-    groupId: number;
-    total: number;
-    keys: { key: string; valuePreview: string; valueLength: number; tags: string[] }[];
-  } | null>(null);
-  const [inventoryLoading, setInventoryLoading] = useState(false);
-  const [inventoryError, setInventoryError] = useState<string | null>(null);
+  const [kv, setKv] = useState<KvListResult | null>(null);
+  const [kvLoading, setKvLoading] = useState(false);
+  const [kvError, setKvError] = useState<string | null>(null);
+  const [kvPage, setKvPage] = useState(1);
+  const [kvTag, setKvTag] = useState<string | null>(null);
+  const [kvEditorOpen, setKvEditorOpen] = useState(false);
+  const [kvEditorMode, setKvEditorMode] = useState<'create' | 'edit'>('create');
+  const [kvEditorInit, setKvEditorInit] = useState<KvView | null>(null);
+  const [kvVersions, setKvVersions] = useState<KvVersionView[]>([]);
+  const [kvVersionsLoading, setKvVersionsLoading] = useState(false);
+  // KV 每页条数 —— 可设置(设置面板),持久化到 LS
+  const [kvPageSize, setKvPageSize] = useState<number>(() => {
+    try {
+      const v = Number(localStorage.getItem('sl-us:v1:kvPageSize'));
+      return [10, 20, 50].includes(v) ? v : 10;
+    } catch { return 10; }
+  });
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  // 改每页条数 → 回到第 1 页
+  function changeKvPageSize(n: number): void {
+    setKvPageSize(n);
+    try { localStorage.setItem('sl-us:v1:kvPageSize', String(n)); } catch { /* ignore */ }
+    setKvPage(1);
+  }
 
   // 选中态:默认进第一个组 / 用户手动选过的优先
   const currentSelected = useMemo(() => {
@@ -64,17 +88,24 @@ export default function UserSpace() {
 
   const selectedGroup: GroupSummary | null = useMemo(() => {
     if (!currentSelected || !groups) return null;
-    return groups.find((g) => g.id === currentSelected) ?? null;
+    return groups?.find((g) => g.id === currentSelected) ?? null;
   }, [currentSelected, groups]);
+
+  // 写权限:reader 只读,writer+ 才有写操作
+  const canWrite = selectedGroup ? hasMinRole(selectedGroup.myRole, 'writer') : false;
 
   // 切换组时清空子视图缓存,避免脏数据
   useEffect(() => {
     setMembers([]);
     setInvitations([]);
-    setInventory(null);
+    setKv(null);
+    setKvPage(1);
+    setKvTag(null);
+    setKvEditorOpen(false);
+    setKvVersions([]);
     setMembersError(null);
     setInvitationsError(null);
-    setInventoryError(null);
+    setKvError(null);
   }, [currentSelected]);
 
   // ── 各视图 lazy load ───────────────────────────────
@@ -106,25 +137,41 @@ export default function UserSpace() {
     }
   }, [currentSelected, store]);
 
-  const loadInventory = useCallback(async () => {
+  const loadKv = useCallback(async (page: number, tag: string | null) => {
     if (!currentSelected) return;
-    setInventoryLoading(true);
-    setInventoryError(null);
+    setKvLoading(true);
+    setKvError(null);
     try {
-      const inv = await store.inventory(currentSelected, 10);
-      setInventory(inv);
+      const result = await store.listKvs(currentSelected, { page, pageSize: kvPageSize, tags: tag ? [tag] : undefined });
+      setKv(result);
     } catch (e) {
-      setInventoryError(e instanceof Error ? e.message : 'load inventory failed');
+      setKvError(e instanceof Error ? e.message : 'load kv failed');
     } finally {
-      setInventoryLoading(false);
+      setKvLoading(false);
     }
-  }, [currentSelected, store]);
+  }, [currentSelected, store, kvPageSize]);
 
   useEffect(() => {
     if (view === 'members') void loadMembers();
     if (view === 'invitations') void loadInvitations();
-    if (view === 'inventory') void loadInventory();
-  }, [view, loadMembers, loadInvitations, loadInventory]);
+    if (view === 'inventory') void loadKv(kvPage, kvTag);
+  }, [view, loadMembers, loadInvitations, loadKv, kvPage, kvTag]);
+
+  // 打开编辑弹窗时拉一次版本历史;创建模式不拉。恢复成功后父级会 setKvEditorInit
+  // 换新引用,本 effect 随之重跑,自动刷新版本列表(restore 会新拍一份快照)。
+  useEffect(() => {
+    if (!kvEditorOpen || kvEditorMode !== 'edit' || !currentSelected || !kvEditorInit) {
+      setKvVersions([]);
+      return;
+    }
+    let cancelled = false;
+    setKvVersionsLoading(true);
+    store.listKvVersions(currentSelected, kvEditorInit.key)
+      .then((vers) => { if (!cancelled) setKvVersions(vers); })
+      .catch(() => { if (!cancelled) setKvVersions([]); })
+      .finally(() => { if (!cancelled) setKvVersionsLoading(false); });
+    return () => { cancelled = true; };
+  }, [kvEditorOpen, kvEditorMode, currentSelected, kvEditorInit, store]);
 
   // ── 动作封装(展示态) ──────────────────────────────
   async function withError(fn: () => Promise<void>): Promise<void> {
@@ -231,6 +278,53 @@ export default function UserSpace() {
     return joined;
   }
 
+  // ── KV CRUD handlers ─────────────────────────────
+  async function handleCreateKv(payload: { key: string; value: string; tags: string[]; ttl: number }): Promise<void> {
+    if (!currentSelected) return;
+    await withError(async () => {
+      await store.createKv(currentSelected, payload);
+      setKvEditorOpen(false);
+      setKvPage(1); // 新建后回到第一页,新 key 在前
+      await loadKv(1, kvTag);
+    });
+  }
+
+  async function handleUpdateKv(payload: { key: string; value: string; tags: string[]; ttl: number }): Promise<void> {
+    if (!currentSelected) return;
+    await withError(async () => {
+      await store.updateKv(currentSelected, payload);
+      setKvEditorOpen(false);
+      await loadKv(kvPage, kvTag);
+    });
+  }
+
+  async function handleDeleteKv(item: KvView): Promise<void> {
+    if (!currentSelected) return;
+    await withError(async () => {
+      await store.deleteKv(currentSelected, item.key);
+      // 末页删空则回退一页
+      let nextPage = kvPage;
+      if (kv && kv.items.length === 1 && kvPage > 1) {
+        nextPage = kvPage - 1;
+        setKvPage(nextPage);
+      }
+      await loadKv(nextPage, kvTag);
+    });
+  }
+
+  async function handleRestoreKv(version: number): Promise<void> {
+    if (!currentSelected || !kvEditorInit) return;
+    if (!window.confirm(`确认将 KV「${kvEditorInit.key}」回滚到版本 v${version}?\n当前值会被覆盖(仍可从版本历史回退)。`)) return;
+    await withError(async () => {
+      await store.restoreKv(currentSelected, kvEditorInit.key, version);
+      // 回滚本质是 set:重新拉详情刷新编辑框 value(initial 换新引用,弹窗 effect 重跑)
+      // + 刷新列表预览;版本列表由上面的 effect 随 kvEditorInit 变化自动重拉。
+      const detail = await store.getKvDetail(currentSelected, kvEditorInit.key);
+      setKvEditorInit(detail);
+      await loadKv(kvPage, kvTag);
+    });
+  }
+
   // ── 渲染 ─────────────────────────────────────────
   if (auth.jwtAuthState !== 'logged-in' || !auth.token) {
     return (
@@ -286,47 +380,65 @@ export default function UserSpace() {
         groups={safeGroups}
         selectedGroupId={currentSelected}
         defaultGroupId={defaultGroupId}
+        userEmail={auth.jwtUser?.email ?? null}
         onSelect={(id) => setSelectedId(id)}
         onCreate={(name, description) => handleCreate(name, description)}
         onSetDefault={(id) => handleSetDefault(id)}
+        onOpenSettings={() => setSettingsOpen(true)}
         disabled={saving}
       />
 
       <main className="sl-us-main">
         {actionError && (
-          <div className="sl-us-error sl-us-error--banner">{actionError}</div>
+          <div className="sl-us-error">{actionError}</div>
         )}
 
         {selectedGroup ? (
           <>
-            <header className="sl-us-header">
-              <div className="sl-us-header__title">
-                <h2 className="sl-us-header__name">{selectedGroup.name}</h2>
-                <span className={`sl-us-badge sl-us-badge--role-${selectedGroup.myRole}`}>
-                  {selectedGroup.myRole.toUpperCase()}
-                </span>
-                {selectedGroup.isDefault && (
-                  <span className="sl-us-badge sl-us-badge--default">默认</span>
-                )}
-              </div>
-              <nav className="sl-us-tabs">
-                {VIEW_TABS.map((t) => (
+            <div className="sl-us-topbar">
+              <div className="sl-us-topbar__title">{selectedGroup.name}</div>
+              <span className="sl-us-topbar__crumb-sep">/</span>
+              <div className="sl-us-topbar__crumb">{VIEW_TABS.find((t) => t.key === view)?.label}</div>
+              <span className="sl-us-topbar__spacer" />
+              <span className={`sl-us-chip sl-us-chip--${selectedGroup.myRole}`}>
+                {selectedGroup.myRole.toUpperCase()}
+              </span>
+              {selectedGroup.isDefault && (
+                <span className="sl-us-chip sl-us-chip--default">默认</span>
+              )}
+            </div>
+
+            <nav className="sl-us-tabs">
+              {(() => {
+                // tab 上的 count:让用户一眼看到每个视图有多少条(懒加载中时显示 ?)
+                const counts: Record<ViewMode, number | null> = {
+                  overview: null,
+                  members: members.length || selectedGroup.memberCount,
+                  invitations: invitations.length,
+                  inventory: kv?.total ?? null,
+                };
+                return VIEW_TABS.map((t) => (
                   <button
                     key={t.key}
                     className={`sl-us-tab ${view === t.key ? 'is-active' : ''}`}
                     onClick={() => setView(t.key)}
                   >
                     {t.label}
+                    {counts[t.key] !== null && (
+                      <span className="sl-us-tab__count">{counts[t.key]}</span>
+                    )}
                   </button>
-                ))}
-              </nav>
-            </header>
+                ));
+              })()}
+            </nav>
 
             {view === 'overview' && (
               <Overview
                 group={selectedGroup}
+                defaultGroupName={groups?.find((g) => g.id === defaultGroupId)?.name ?? null}
                 saving={saving}
                 onSave={handleSaveOverview}
+                onSetDefault={() => handleSetDefault(selectedGroup.id)}
                 onLeave={handleLeave}
                 onDissolve={handleDissolve}
               />
@@ -357,13 +469,36 @@ export default function UserSpace() {
               />
             )}
             {view === 'inventory' && (
-              <Inventory
-                group={selectedGroup}
-                inventory={inventory}
-                loading={inventoryLoading}
-                error={inventoryError}
-                onReload={loadInventory}
-              />
+              <>
+                <Inventory
+                  group={selectedGroup}
+                  kv={kv}
+                  loading={kvLoading}
+                  error={kvError}
+                  saving={saving}
+                  page={kvPage}
+                  pageSize={kvPageSize}
+                  selectedTag={kvTag}
+                  onPageChange={(p) => setKvPage(p)}
+                  onTagChange={(t) => { setKvTag(t); setKvPage(1); }}
+                  onCreate={() => { setKvEditorMode('create'); setKvEditorInit(null); setKvEditorOpen(true); }}
+                  onEdit={(item) => { setKvEditorMode('edit'); setKvEditorInit(item); setKvEditorOpen(true); }}
+                  onDelete={handleDeleteKv}
+                  onReload={() => loadKv(kvPage, kvTag)}
+                />
+                <KvEditorModal
+                  open={kvEditorOpen}
+                  mode={kvEditorMode}
+                  initial={kvEditorInit}
+                  saving={saving}
+                  canWrite={canWrite}
+                  versions={kvVersions}
+                  versionsLoading={kvVersionsLoading}
+                  onRestoreVersion={(v) => void handleRestoreKv(v)}
+                  onSave={kvEditorMode === 'create' ? handleCreateKv : handleUpdateKv}
+                  onClose={() => setKvEditorOpen(false)}
+                />
+              </>
             )}
           </>
         ) : (
@@ -373,6 +508,15 @@ export default function UserSpace() {
           </div>
         )}
       </main>
+
+      {/* 设置面板 —— 组件自己的偏好,不接管登录/退出 */}
+      <SettingsPanel
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        kvPageSize={kvPageSize}
+        onChangeKvPageSize={changeKvPageSize}
+        defaultGroupName={groups?.find((g) => g.id === defaultGroupId)?.name ?? null}
+      />
     </div>
   );
 }

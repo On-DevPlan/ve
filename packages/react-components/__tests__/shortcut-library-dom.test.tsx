@@ -202,10 +202,10 @@ describe('shortcut-library: rendered DOM contracts', () => {
     ).toBe(true);
   });
 
-  it('logged-out SettingsPanel shows login trigger and no password form', async () => {
-    // Default jwtAuth state is logged-out (no token). SettingsPanel must
-    // render a login trigger that opens the host LoginModal — and must NOT
-    // render an inline password form (that UI moved to the host modal).
+  it('SettingsPanel renders no account/auth section (auth lives in host UI only)', async () => {
+    // Auth UI (登录/已登录/退出) moved out of the library entirely — the host
+    // shows it globally. SettingsPanel must render no account section and no
+    // inline password form.
     await act(async () => {
       root.render(
         <SettingsPanel
@@ -224,11 +224,80 @@ describe('shortcut-library: rendered DOM contracts', () => {
 
     // SettingsPanel renders through a portal to document.body (index.tsx
     // mounts the same way), so query the body, not the render container.
-    const auth = document.body.querySelector('.sl-sl-settings__auth');
-    expect(auth, 'auth section missing').not.toBeNull();
-    const button = auth!.querySelector('button');
-    expect(button, 'login trigger missing').not.toBeNull();
-    expect(button!.textContent).toBe('登录');
+    expect(document.body.querySelector('.sl-sl-settings__auth')).toBeNull();
     expect(document.body.querySelector('input[type="password"]')).toBeNull();
+    // 登录 trigger 也已移出设置面板(注意:面板里帮助文案仍可能出现"退出登录"字样,
+    // 所以按 button 判,而不是按全文)
+    const loginButton = Array.from(
+      document.body.querySelectorAll('.sl-sl-settings-panel button'),
+    ).find((b) => b.textContent === '登录');
+    expect(loginButton).toBeUndefined();
+  });
+
+  it('sidebar footer shows login entry + settings only, no logged-in pill or logout', async () => {
+    seedLocalStorage(makeGroups());
+    await act(async () => {
+      root.render(<ShortcutLibrary />);
+    });
+
+    const foot = container.querySelector('.sl-sl-sidebar-foot');
+    expect(foot, 'sidebar footer missing').not.toBeNull();
+    // 默认未登录 → 显示登录入口 + 设置齿轮
+    expect(foot!.textContent).toContain('登录');
+    expect(foot!.textContent).toContain('⚙');
+    // 已登录态与退出只在全局 host UI 显示,库内不出现
+    expect(foot!.textContent).not.toContain('已登录');
+    expect(foot!.textContent).not.toContain('退出');
+    expect(container.querySelector('.sl-sl-sync-pill')).toBeNull();
+  });
+
+  it('filters table rows by condition through the header select', async () => {
+    seedLocalStorage([
+      {
+        id: 'g0',
+        name: 'VSCode',
+        shortcuts: [
+          { id: 's0', combo: [{ code: 'KeyA', label: 'A', isModifier: false }], description: 'a', condition: '编辑中', createdAt: 0 },
+          { id: 's1', combo: [{ code: 'KeyB', label: 'B', isModifier: false }], description: 'b', condition: '选中文本时', createdAt: 0 },
+          { id: 's2', combo: [{ code: 'KeyC', label: 'C', isModifier: false }], description: 'c', condition: '编辑中', createdAt: 0 },
+          { id: 's3', combo: [{ code: 'KeyD', label: 'D', isModifier: false }], description: 'd', createdAt: 0 },
+        ],
+        createdAt: 0,
+        updatedAt: 0,
+      },
+    ]);
+    await act(async () => {
+      root.render(<ShortcutLibrary />);
+    });
+
+    const select = container.querySelector(
+      '.sl-sl-filter',
+    ) as HTMLSelectElement | null;
+    expect(select, 'condition filter select missing').not.toBeNull();
+    // 去重后的 condition 进选项
+    expect(select!.textContent).toContain('编辑中');
+    expect(select!.textContent).toContain('选中文本时');
+
+    const rowCount = () => container.querySelectorAll('.sl-sl-row').length;
+    expect(rowCount()).toBe(4);
+
+    // 用原型 setter 绕过 React 的受控 value tracker,再派发 change 事件
+    const setSelectValue = Object.getOwnPropertyDescriptor(
+      window.HTMLSelectElement.prototype,
+      'value',
+    )!.set!;
+    await act(async () => {
+      setSelectValue.call(select, '编辑中');
+      select!.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(rowCount()).toBe(2);
+    expect(select!.value).toBe('编辑中');
+
+    // 切回「全部条件」→ 恢复全部行
+    await act(async () => {
+      setSelectValue.call(select, '');
+      select!.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(rowCount()).toBe(4);
   });
 });
