@@ -296,6 +296,17 @@
 }
 .sl-us-input--compact { width: auto; min-width: 140px; }
 .sl-us-input--num { font-variant-numeric: tabular-nums; }
+/* textarea 变体:覆盖 .sl-us-input 的固定高度,改成内容驱动 + monospace
+   (value 通常是 JSON / 配置,等宽对齐更好读) */
+.sl-us-input.sl-us-input--textarea {
+  height: auto;
+  min-height: 140px;
+  padding: 8px 10px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  resize: vertical;
+}
 
 /* ── chip / badge ─────────────────────────────── */
 .sl-us-chip {
@@ -557,6 +568,12 @@
 .sl-us-field__label { font-size: 11px; font-weight: 500; color: var(--fg-2); }
 .sl-us-field__hint { font-size: 11px; color: var(--fg-3); }
 .sl-us-field__row { display: flex; gap: 6px; }
+
+/* 版本历史行(编辑弹窗内) */
+.sl-us-versions__row {
+  display: flex; gap: 6px; align-items: center;
+}
+.sl-us-versions__row .sl-us-input--compact { flex: 1 1 auto; min-width: 180px; }
 
 /* ── danger (Overview) ─────────────────────────── */
 .sl-us-danger {

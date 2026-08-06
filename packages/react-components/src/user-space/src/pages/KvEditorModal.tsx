@@ -76,11 +76,17 @@ export default function KvEditorModal({ open, mode, initial, saving, canWrite = 
       <div className="sl-us-modal" role="dialog" aria-label={mode === 'create' ? '新建 KV' : '编辑 KV'}>
         <header className="sl-us-modal__head">
           <h3 className="sl-us-modal__title">{mode === 'create' ? '新建 KV' : '编辑 KV'}</h3>
-          <button className="sl-us-icon-btn" aria-label="关闭" onClick={onClose}>×</button>
+          <button
+            className="sl-us-btn sl-us-btn--ghost sl-us-btn--icon-sm"
+            aria-label="关闭"
+            onClick={onClose}
+          >
+            ×
+          </button>
         </header>
         <div className="sl-us-modal__body">
-          <label className="sl-us-field">
-            <span className="sl-us-label">Key</span>
+          <div className="sl-us-field">
+            <span className="sl-us-field__label">Key</span>
             <input
               className="sl-us-input"
               value={key}
@@ -89,19 +95,20 @@ export default function KvEditorModal({ open, mode, initial, saving, canWrite = 
               placeholder="如 api_url"
               autoFocus
             />
-          </label>
-          <label className="sl-us-field">
-            <span className="sl-us-label">Value</span>
+            {mode === 'edit' && <span className="sl-us-field__hint">key 创建后不可修改</span>}
+          </div>
+          <div className="sl-us-field">
+            <span className="sl-us-field__label">Value</span>
             <textarea
               className="sl-us-input sl-us-input--textarea"
               value={value}
               onChange={(e) => setValue(e.target.value)}
               disabled={saving || !canWrite}
-              rows={6}
+              rows={8}
             />
-          </label>
-          <label className="sl-us-field">
-            <span className="sl-us-label">Tags(逗号分隔)</span>
+          </div>
+          <div className="sl-us-field">
+            <span className="sl-us-field__label">Tags(逗号分隔)</span>
             <input
               className="sl-us-input"
               value={tagsText}
@@ -109,21 +116,21 @@ export default function KvEditorModal({ open, mode, initial, saving, canWrite = 
               disabled={saving || !canWrite}
               placeholder="prod, cache"
             />
-          </label>
-          <label className="sl-us-field">
-            <span className="sl-us-label">TTL(天,0=永久)</span>
+          </div>
+          <div className="sl-us-field">
+            <span className="sl-us-field__label">TTL(天,0 = 永久)</span>
             <input
-              className="sl-us-input"
+              className="sl-us-input sl-us-input--num"
               type="number"
               min={0}
               value={ttlDays}
               onChange={(e) => setTtlDays(Number(e.target.value))}
               disabled={saving || !canWrite}
             />
-          </label>
+          </div>
           {mode === 'edit' && (
-            <div className="sl-us-field sl-us-versions">
-              <span className="sl-us-label">版本历史</span>
+            <div className="sl-us-field">
+              <span className="sl-us-field__label">版本历史</span>
               {versionsLoading ? (
                 <span className="sl-us-muted">加载中…</span>
               ) : versions.length === 0 ? (
@@ -154,6 +161,7 @@ export default function KvEditorModal({ open, mode, initial, saving, canWrite = 
                   </button>
                 </div>
               )}
+              {selectedVersion && <span className="sl-us-field__hint">恢复会覆盖当前 value(可再次回退)</span>}
             </div>
           )}
         </div>
