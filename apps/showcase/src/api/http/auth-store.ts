@@ -136,6 +136,21 @@ export const jwtAuth = {
     }
   },
 
+  /**
+   * 拉一次 /user/info 并把 jwtUserRef 同步过去。供 setDefaultGroup 这类"改了
+   * 服务端状态但响应不带新字段"的操作在完成后调一次 —— 这样所有 useJwtAuth
+   * 订阅者立刻拿到一致快照,不会等到下次 init() / 重新登录。
+   */
+  async refreshUser(): Promise<void> {
+    if (!tokenRef.value) return;
+    try {
+      jwtUserRef.value = await userV1Service.info();
+      notifyJwt();
+    } catch {
+      // 401 之类让 handleUnauthorized 走,这里不重置 creds
+    }
+  },
+
   async login(email: string, password: string): Promise<void> {
     jwtAuthStateRef.value = 'syncing';
     lastErrorRef.value = null;

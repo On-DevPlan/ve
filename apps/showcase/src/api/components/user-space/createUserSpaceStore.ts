@@ -105,20 +105,25 @@ export function createUserSpaceStore(): UserSpaceStore {
   async function resolveDefaultGroupId(): Promise<number | null> {
     // 顺序:
     //   1) /user/info 是否回 defaultGroupId(后续 DTO 补字段)
-    //   2) 否则 listGroups() 取全量,挑第一个(caller 注册时一定有一个
-    //      「个人空间」组,所以 pick-first 不会误中其他组;多组用户后续
-    //      显式调 setDefaultGroup 后就走路径 1 了)。
-    //      fallback 是必要的:后端 DTO 历史上不返 defaultGroupId
-    //      (见 services/userV1/types.ts),没有这步 getShortcuts / listKvs
-    //      都会因为找不到 groupId 静默返回空,不报错,UI 看到"没数据"
-    //      误以为是数据问题(典型:shortcut-library 页面打开就空白)。
+    //   2) 否则 GET /user/default-group —— 后端新增的轻量探活,总返回 caller 自己的
+    //      真正默认(注册时 0,显式 set 后立刻拿到新值)
+    //   3) 兜底:listGroups() 挑第一个(只有全部断网 / 后端没该端点的旧版本才会走到)
+    //      没有这些 fallback 时,getShortcuts / listKvs 都会因为找不到 groupId 静默
+    //      返回空,不报错,UI 看到"没数据"误以为是数据问题(典型:shortcut-library
+    //      页面打开就空白)。
     const info = jwtAuth.state.jwtUser;
     if (info?.defaultGroupId && info.defaultGroupId > 0) return info.defaultGroupId;
+    try {
+      const { groupId } = await userV1Service.getDefaultGroup();
+      if (groupId > 0) return groupId;
+    } catch {
+      // 该端点不存在(老后端) → 兜底
+    }
     try {
       const { groups } = await groupV1Service.list();
       if (groups.length > 0) return groups[0].id;
     } catch {
-      // list 失败 → 返回 null,UI 该提示什么就提示什么
+      // 全部失败
     }
     return null;
   }
@@ -180,10 +185,12 @@ export function createUserSpaceStore(): UserSpaceStore {
   async function setDefaultGroup(id: number): Promise<void> {
     requireAuth();
     await userV1Service.setDefaultGroup(id);
-    // 后端 DTO 当前不回 defaultGroupId(遗留:e2e 用 SQL 适配)。组件层
-    // setDefaultGroup 之后应主动 refreshUser() 让 jwtAuth.user.defaultGroupId
-    // 对齐;若不刷新,下一次 listGroups 的 resolveDefaultGroupId 会拿到旧值
-    // —— 这是已知 trade-off,见 store 顶部 resolveDefaultGroupId 注释。
+    // 刷新 jwtAuth.user,确保后续 resolveDefaultGroupId() 走路径 1(读到
+    // userInfo.defaultGroupId),不再额外打 /user/default-group。
+    // /user/info 历史 DTO 不返 defaultGroupId(legacy),所以 refreshUser
+    // 本身可能拿不到 —— 没关系,resolveDefaultGroupId 还有 GET /user/default-group
+    // 兜底链。
+    await jwtAuth.refreshUser();
   }
 
   // ── 成员管理 ─────────────────────────────────────
