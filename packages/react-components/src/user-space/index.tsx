@@ -14,6 +14,7 @@ import Members from './src/pages/Members';
 import Invitations from './src/pages/Invitations';
 import Inventory from './src/pages/Inventory';
 import KvEditorModal from './src/pages/KvEditorModal';
+import SettingsPanel from './src/pages/SettingsPanel';
 import { hasMinRole } from '@api/components/user-space';
 import type {
   GroupInvitationView,
@@ -61,7 +62,21 @@ export default function UserSpace() {
   const [kvEditorInit, setKvEditorInit] = useState<KvView | null>(null);
   const [kvVersions, setKvVersions] = useState<KvVersionView[]>([]);
   const [kvVersionsLoading, setKvVersionsLoading] = useState(false);
-  const KV_PAGE_SIZE = 10;
+  // KV 每页条数 —— 可设置(设置面板),持久化到 LS
+  const [kvPageSize, setKvPageSize] = useState<number>(() => {
+    try {
+      const v = Number(localStorage.getItem('sl-us:v1:kvPageSize'));
+      return [10, 20, 50].includes(v) ? v : 10;
+    } catch { return 10; }
+  });
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  // 改每页条数 → 回到第 1 页
+  function changeKvPageSize(n: number): void {
+    setKvPageSize(n);
+    try { localStorage.setItem('sl-us:v1:kvPageSize', String(n)); } catch { /* ignore */ }
+    setKvPage(1);
+  }
 
   // 选中态:默认进第一个组 / 用户手动选过的优先
   const currentSelected = useMemo(() => {
@@ -127,14 +142,14 @@ export default function UserSpace() {
     setKvLoading(true);
     setKvError(null);
     try {
-      const result = await store.listKvs(currentSelected, { page, pageSize: KV_PAGE_SIZE, tags: tag ? [tag] : undefined });
+      const result = await store.listKvs(currentSelected, { page, pageSize: kvPageSize, tags: tag ? [tag] : undefined });
       setKv(result);
     } catch (e) {
       setKvError(e instanceof Error ? e.message : 'load kv failed');
     } finally {
       setKvLoading(false);
     }
-  }, [currentSelected, store]);
+  }, [currentSelected, store, kvPageSize]);
 
   useEffect(() => {
     if (view === 'members') void loadMembers();
@@ -369,6 +384,7 @@ export default function UserSpace() {
         onSelect={(id) => setSelectedId(id)}
         onCreate={(name, description) => handleCreate(name, description)}
         onSetDefault={(id) => handleSetDefault(id)}
+        onOpenSettings={() => setSettingsOpen(true)}
         disabled={saving}
       />
 
@@ -461,7 +477,7 @@ export default function UserSpace() {
                   error={kvError}
                   saving={saving}
                   page={kvPage}
-                  pageSize={KV_PAGE_SIZE}
+                  pageSize={kvPageSize}
                   selectedTag={kvTag}
                   onPageChange={(p) => setKvPage(p)}
                   onTagChange={(t) => { setKvTag(t); setKvPage(1); }}
@@ -492,6 +508,15 @@ export default function UserSpace() {
           </div>
         )}
       </main>
+
+      {/* 设置面板 —— 组件自己的偏好,不接管登录/退出 */}
+      <SettingsPanel
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        kvPageSize={kvPageSize}
+        onChangeKvPageSize={changeKvPageSize}
+        defaultGroupName={groups.find((g) => g.id === defaultGroupId)?.name ?? null}
+      />
     </div>
   );
 }

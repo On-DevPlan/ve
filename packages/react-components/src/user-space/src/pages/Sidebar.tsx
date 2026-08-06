@@ -19,6 +19,8 @@ interface Props {
   onSelect: (id: number) => void;
   onCreate: (name: string, description: string) => Promise<void> | void;
   onSetDefault: (id: number) => Promise<void> | void;
+  /** 打开设置面板(⚙) */
+  onOpenSettings: () => void;
   disabled?: boolean;
 }
 
@@ -30,6 +32,7 @@ export default function Sidebar({
   onSelect,
   onCreate,
   onSetDefault,
+  onOpenSettings,
   disabled,
 }: Props) {
   const [filter, setFilter] = useState('');
@@ -195,10 +198,18 @@ export default function Sidebar({
         </form>
       )}
 
-      {/* 用户卡(底部)—— 只读展示当前身份,不放登录/退出入口 */}
+      {/* 用户卡(底部)—— 只读展示当前身份 + ⚙ 打开设置(不接管登录/退出) */}
       <div className="sl-us-side__user" title={userEmail ?? undefined}>
         <div className="sl-us-side__user-avatar">{avatarLetter}</div>
         <div className="sl-us-side__user-name">{userEmail ?? '未登录'}</div>
+        <button
+          className="sl-us-side__user-action"
+          title="设置"
+          aria-label="设置"
+          onClick={onOpenSettings}
+        >
+          ⚙
+        </button>
       </div>
     </aside>
   );

@@ -164,6 +164,14 @@
   flex: 1; min-width: 0;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+.sl-us-side__user-action {
+  width: 22px; height: 22px;
+  display: grid; place-items: center;
+  border-radius: 3px;
+  color: var(--fg-3);
+  flex-shrink: 0;
+}
+.sl-us-side__user-action:hover { background: var(--hover); color: var(--fg); }
 
 /* ── main ──────────────────────────────────────── */
 .sl-us-main {
@@ -574,6 +582,28 @@
 .sl-us-field__label { font-size: 11px; font-weight: 500; color: var(--fg-2); }
 .sl-us-field__hint { font-size: 11px; color: var(--fg-3); }
 .sl-us-field__row { display: flex; gap: 6px; }
+
+/* 设置面板:chip 式选项组(如每页条数 10/20/50) */
+.sl-us-settings-options {
+  display: inline-flex; gap: 4px;
+}
+.sl-us-settings-option {
+  min-width: 44px;
+  height: 26px; padding: 0 10px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 12.5px; font-weight: 500;
+  color: var(--fg-2);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  transition: background 0.08s, border-color 0.08s, color 0.08s;
+}
+.sl-us-settings-option:hover { background: var(--hover); color: var(--fg); }
+.sl-us-settings-option.is-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg);
+}
 
 /* 版本历史行(编辑弹窗内) */
 .sl-us-versions__row {
