@@ -1,21 +1,38 @@
-// registry/vue-style-collector.ts —— 为 showcase 提供 virtual:vue-styles 的 Vite 插件。
+// registry/vue-style-collector.ts —— 为 showcase 提供 virtual:vue-styles 的 Vite 插件(v2)。
 //
-// 职责(严格限定):扫描 vue 组件目录下所有 .vue,对每个 <style> block:
-//   1) 用 `@vue/compiler-sfc` 的 compileStyle 自带 postcss 编译,
-//      并注入 id `data-v-<scopedId>`(scoped 选择器)
-//   2) 把编译结果打包进虚拟模块的 export const sN = "<css>"
-//   3) 模块末尾 export default Record<componentId, string[]>(给 css-maps.ts 消费)
+// v1 的做法与它的缺陷:
+//   v1 用 @vue/compiler-sfc 的 compileStyle 把每个 <style> block 编译成 raw scoped CSS,
+//   再直接拼成 `export const sN = "<css>"` 塞进虚拟模块。CSS 文本从头到尾没经过
+//   vite 的 CSS 插件 —— 于是 postcss(autoprefixer 等)、`url()` 资源重写、
+//   `@import` 内联、preprocessor、minify **全部被跳过**。
+//   仓库当前 0 个组件用到 url()/@import/scss,所以 build 没暴露问题;
+//   一旦有人在 SFC 里写 `background: url(./bg.png)`,产物里就是一条指向不存在路径的
+//   死链 —— silent failure,build 不报错。
 //
-// 为什么不走 `import '*.vue?vue&type=style&...&inline'` query 形态:
-//   vite CSS 插件的 isCSSRequest 正则只匹配 \.(css|less|sass|...)(?:$|\?),
-//   `xxx.vue?vue&type=style&index=0&lang.css&inline` 扩展名是 .vue,
-//   无任何插件把 raw CSS 包成 JS,rollup 拿到 raw CSS 直接当 JS 解析,
-//   在 @import url(...) 处报 `Expected ident` 失败(Task 5 复现)。
+// v2 的做法(本文件):
+//   对每个 style block 生成一个**与 .vue 同目录、以真 `.css` 结尾**的伪文件路径:
+//       <dir>/__vscoped__<basename>.<index>.css
+//   vite CSS 插件的 isCSSRequest 用
+//       CSS_LANGS_RE = /\.(css|less|sass|scss|styl|stylus|pcss|postcss|sss)(?:$|\?)/
+//   来判定(vite@5.4.21,dist/node/chunks/dep-*.js),`.css` 结尾 → 命中 → 接管。
+//   我们只负责 resolveId(把不存在于磁盘的伪路径认领下来)+ load(吐出 compileStyle
+//   编译后的 raw scoped CSS,带 data-v-xxx),**不做 postcss** —— 后续 postcss /
+//   url 重写 / @import 内联全部交给 vite CSS 插件。
+//   import 时带 `?inline` query,vite CSS 插件返回 `export default "<处理后的 CSS>"`,
+//   于是虚拟模块拿到的是**经过完整 CSS 管线**的字符串。
 //
-//   自写 scoped 编译可绕开 isCSSRequest 边界,且 scopedId 算法必须与
-//   @vitejs/plugin-vue@5.2.4 的 descriptor.id 完全一致,
-//   否则组件运行时的 `__scopeId = 'data-v-<id>'` 与编译期注入的选择器不对齐,
-//   scoped 失效。
+// 为什么不能直接用 `import 'xxx.vue?vue&type=style&index=0&lang.css&inline'`:
+//   那个 id 的扩展名是 `.vue`,isCSSRequest 不命中,没有任何插件把 raw CSS 包成 JS,
+//   rollup 直接拿 CSS 当 JS 解析,在 `@import url(...)` 处报 `Expected ident`(v1 Task 5 复现)。
+//
+// enforce: 'pre' 的作用:让我们的 resolveId/load 排在 vite 内置 CSS 插件**之前**,
+//   先把伪路径认领并喂出 raw CSS,vite CSS 插件随后在 transform 阶段接手。
+//
+// ⚠️ scopedId 必须与 @vitejs/plugin-vue@5.2.4 的 descriptor.id 字节级一致,
+//    否则组件运行时的 `__scopeId = 'data-v-<id>'` 与这里注入的选择器不对齐,scoped 失效。
+//    算法集中在 plugins/scoped-id.ts,build 期由 plugins/scoped-id-guard.ts 兜底比对。
+//    注意 root 必须是 vite 的 config.root(apps/showcase),与 plugin-vue 的
+//    createDescriptor(filename, source, { root }) 取值一致。
 
 import { parse, compileStyle } from '@vue/compiler-sfc';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
@@ -24,6 +41,9 @@ import type { Plugin } from 'vite';
 import { computeScopedId } from '../../plugins/scoped-id';
 
 export const VIRTUAL_VUE_STYLES = 'virtual:vue-styles';
+
+/** 伪 CSS 文件名前缀;resolveId/load 靠它识别"这是我们造的路径,磁盘上不存在"。 */
+const PSEUDO_PREFIX = '__vscoped__';
 
 export interface StyleBlockEntry {
   componentId: string;
@@ -35,8 +55,35 @@ export interface StyleBlockEntry {
   source: string; // .vue 全文;production 模式参与 scopedId
 }
 
-// re-export scoped 算法,保持现有 import 路径(同仓库既有调用方 vue-style-collector.test.ts)。
+// re-export scoped 算法,保持现有 import 路径(vue-style-collector.test.ts 等既有调用方)。
 export { computeScopedId };
+
+/** 把 \ 换成 /;module id 在 vite 里一律用 posix 分隔符,避免 win32 下 resolveId/load 对不上。 */
+function toPosix(p: string): string {
+  return p.split('\\').join('/');
+}
+
+/** 去掉 module id 上的 query(`?inline` / `?used` 等),只留路径部分。 */
+function stripQuery(id: string): string {
+  const i = id.indexOf('?');
+  return i === -1 ? id : id.slice(0, i);
+}
+
+/**
+ * 为某个 style block 生成伪 CSS 路径:`<dir>/__vscoped__<basename>.<index>.css`。
+ *
+ * 关键点:
+ *   1) **与 .vue 同目录** —— 这样 CSS 里的相对 `url(./bg.png)` / `@import './x.css'`
+ *      被 vite 解析时,basedir 与原 SFC 一致,相对路径语义不变。
+ *   2) **以 `.css` 结尾** —— 命中 vite 的 CSS_LANGS_RE,CSS 插件才会接管。
+ *   3) 带 `__vscoped__` 前缀 + `.<index>` —— 避免与磁盘真实文件重名,且同一 SFC 的
+ *      多个 style block 各自独立。
+ */
+export function pseudoCssPath(file: string, index: number): string {
+  const dir = path.dirname(file);
+  const base = path.basename(file); // 例:index.vue
+  return toPosix(path.join(dir, `${PSEUDO_PREFIX}${base}.${index}.css`));
+}
 
 /** 数一个 SFC 的 <style> block 个数;解析失败按 0 处理。 */
 export function countStyleBlocks(filePath: string): number {
@@ -52,7 +99,7 @@ export function countStyleBlocks(filePath: string): number {
 /**
  * 目录项排序:组件入口 index.vue 优先,其余按名称升序。
  * 目的:readdirSync 的顺序跨文件系统不稳定(NTFS 按名字、ext4 按创建序),
- * 显式排序保证 virtual module 的 style 文本顺序与组件 id 数组跨平台可复现。
+ * 显式排序保证 virtual module 的 style 顺序与组件 id 数组跨平台可复现。
  */
 function compareVueNames(a: string, b: string): number {
   const rank = (name: string) => (name === 'index.vue' ? 0 : 1);
@@ -101,69 +148,129 @@ export function collectVueStyleBlocks(vueComponentsRoot: string): StyleBlockEntr
 }
 
 /**
- * 生成 virtual module 源码:每个 style block 一行 `export const sN = <scoped css>`,
- * 末尾 `export default Record<componentId, [sN, ...]>`。
- * 编译走 @vue/compiler-sfc 的 compileStyle(自带 postcss 8 + modules),
- * 注入 id=`data-v-<scopedId>` 使 scoped 选择器在编译期生效。
+ * 把一个 style block 编译成 **raw scoped CSS**(带 `data-v-<scopedId>` 选择器)。
  *
- * 注意:`preprocessLang` 仅在仓库实际引入 scss/less/sass/styl/stylus 时生效;
- * 当前仓库 0 个 SFC 用了 preprocessor,所以缺包时走默认 fallback 也不影响 fixture。
+ * 这里只做 compileStyle 的 scoped 改写 —— 不做 postcss 插件、不做 url 重写、
+ * 不做 @import 内联、不 minify。那些**全部**由 vite CSS 插件在 transform 阶段完成。
+ * 本函数的输出是喂给 vite CSS 插件的**输入**。
+ *
+ * `preprocessLang` 仅在 SFC 真的用了 scss/less/sass/styl/stylus 时传;
+ * 当前仓库 0 个 SFC 用 preprocessor。
  */
-export function generateVueStylesCode(
-  blocks: StyleBlockEntry[],
+export function compileRawScopedCss(
+  block: StyleBlockEntry,
   opts: { root: string; isProduction: boolean },
 ): string {
+  const scopedId = computeScopedId(opts.root, block.file, block.source, opts.isProduction);
+  const result = compileStyle({
+    filename: block.file,
+    source: block.content,
+    id: `data-v-${scopedId}`,
+    scoped: block.scoped,
+    isProd: opts.isProduction,
+    preprocessLang:
+      block.lang === 'scss' ||
+      block.lang === 'less' ||
+      block.lang === 'sass' ||
+      block.lang === 'styl' ||
+      block.lang === 'stylus'
+        ? block.lang
+        : undefined,
+  });
+  if (result.errors.length) {
+    throw new Error(
+      `compileStyle failed for ${block.file} block #${block.index}: ${result.errors
+        .map((e) => e.message)
+        .join('; ')}`,
+    );
+  }
+  return result.code;
+}
+
+/**
+ * 生成 virtual:vue-styles 的模块源码。
+ *
+ * v1 形态(已废弃):`export const sN = "<raw css>"` —— CSS 文本硬编码在模块里,绕过 vite。
+ * v2 形态:`import cN from "<伪 .css 路径>?inline"` —— CSS 文本由 vite CSS 插件产出。
+ *
+ * 导出:
+ *   - `cssIds`:伪 CSS 路径数组(调试/工具用,顺序与 blocks 一致)
+ *   - `cssMap`:Record<componentId, string[]> 聚合
+ *   - `default`:同 `cssMap` —— css-maps.ts 顶层 `import vueStylesMap from 'virtual:vue-styles'`
+ *     消费的就是这个默认导出,签名 Record<componentId, string[]> 与 v1 保持一致。
+ */
+export function generateVueStylesCode(blocks: StyleBlockEntry[]): string {
   const byId = new Map<string, string[]>();
-  const decls: string[] = [];
+  const imports: string[] = [];
+  const ids: string[] = [];
+
   blocks.forEach((b, i) => {
-    const scopedId = computeScopedId(opts.root, b.file, b.source, opts.isProduction);
-    const result = compileStyle({
-      filename: b.file,
-      source: b.content,
-      id: `data-v-${scopedId}`,
-      scoped: b.scoped,
-      isProd: opts.isProduction,
-      preprocessLang:
-        b.lang === 'scss' ||
-        b.lang === 'less' ||
-        b.lang === 'sass' ||
-        b.lang === 'styl' ||
-        b.lang === 'stylus'
-          ? b.lang
-          : undefined,
-    });
-    if (result.errors.length) {
-      throw new Error(
-        `compileStyle failed for ${b.file} block #${b.index}: ${result.errors.map((e) => e.message).join('; ')}`,
-      );
-    }
-    decls.push(`export const s${i} = ${JSON.stringify(result.code)};`);
+    const id = pseudoCssPath(b.file, b.index);
+    // `?inline` 让 vite CSS 插件返回 `export default "<处理后的 CSS 字符串>"`,
+    // 而不是把 CSS 作为副作用注入 <style> 标签。
+    imports.push(`import c${i} from ${JSON.stringify(`${id}?inline`)};`);
+    ids.push(JSON.stringify(id));
     const arr = byId.get(b.componentId) ?? [];
-    arr.push(`s${i}`);
+    arr.push(`c${i}`);
     byId.set(b.componentId, arr);
   });
-  const entries = [...byId.entries()]
+
+  const mapEntries = [...byId.entries()]
     .map(([id, refs]) => `  ${JSON.stringify(id)}: [${refs.join(', ')}],`)
     .join('\n');
-  return `${decls.join('\n')}\n\nexport default {\n${entries}\n};\n`;
+
+  return [
+    imports.join('\n'),
+    '',
+    `export const cssIds = [${ids.join(', ')}];`,
+    '',
+    `export const cssMap = {\n${mapEntries}\n};`,
+    '',
+    'export default cssMap;',
+    '',
+  ].join('\n');
 }
 
 export function vueStyleCollector(opts: { vueComponentsRoot: string }): Plugin {
   let code: string | null = null;
+  // 伪 CSS 路径(无 query) → style block,供 load() 反查。
+  const pseudoBlocks = new Map<string, StyleBlockEntry>();
+  let root = '';
+  let isProduction = false;
+
   return {
     name: 'vue-style-collector',
+    // 'pre' 让 resolveId/load 排在 vite 内置 CSS 插件之前:
+    // 我们先认领伪路径并吐出 raw CSS,vite CSS 插件随后 transform。
+    enforce: 'pre',
     configResolved(config) {
+      // root 必须取 vite 的 config.root —— plugin-vue 的 createDescriptor 也是用它算
+      // descriptor.id,两边不一致会导致 data-v-<id> 对不上,scoped 静默失效。
+      root = config.root;
+      isProduction = config.command === 'build';
       const blocks = collectVueStyleBlocks(opts.vueComponentsRoot);
-      code = generateVueStylesCode(blocks, {
-        root: config.root,
-        isProduction: config.command === 'build',
-      });
+      pseudoBlocks.clear();
+      for (const b of blocks) {
+        pseudoBlocks.set(pseudoCssPath(b.file, b.index), b);
+      }
+      code = generateVueStylesCode(blocks);
     },
     resolveId(id) {
+      // 拦截 1:虚拟模块本身。
       if (id === VIRTUAL_VUE_STYLES) return VIRTUAL_VUE_STYLES;
+      // 拦截 2:伪 CSS 路径 —— 磁盘上不存在,必须我们认领,否则 vite 解析失败。
+      // 原样返回(保留 `?inline` query),让 vite CSS 插件后续能读到 query。
+      if (pseudoBlocks.has(stripQuery(toPosix(id)))) return id;
+      return undefined;
     },
     load(id) {
+      // 拦截 1:虚拟模块 → 返回模块源码(一堆 import + cssIds/cssMap 导出)。
       if (id === VIRTUAL_VUE_STYLES) return code ?? '';
+      // 拦截 2:伪 CSS 路径 → 返回 raw scoped CSS(带 data-v-xxx)。
+      // 到此为止,postcss / url() 重写 / @import 内联全部交给 vite CSS 插件。
+      const block = pseudoBlocks.get(stripQuery(toPosix(id)));
+      if (block) return compileRawScopedCss(block, { root, isProduction });
+      return undefined;
     },
   };
 }
