@@ -291,8 +291,10 @@ export interface MountContext {
   theme: ThemeRuntime; // 主题运行时
   signal: AbortSignal; // 路由切换时的取消信号
   /**
-   * 组件 CSS 已注入 ShadowRoot 的完成信号。adapter 必须在 render / app.mount 前 await。
-   * 缺省(如远程 loaderUrl 组件)时,adapter 回退 adoptStylesInto 扫 document.head。
+   * 组件 CSS 已注入 ShadowRoot 的完成信号。adapter 必须在首次 render 前 await。
+   * - resolve:CSS 已同步就位(本地组件的常态)
+   * - reject:CSS 获取失败,adapter 必须降级为「无样式渲染」,不得白屏
+   * - undefined:宿主不管理 CSS,adapter 走 adoptStylesInto 兜底(远程组件)
    */
   cssReady?: Promise<void>;
 }

@@ -20,7 +20,7 @@ import type {
   MountContext, // 挂载上下文
   MountedComponent, // 已挂载句柄
 } from '@style-library/component-contract';
-import { adoptStylesInto } from './style-adoption.ts'; // 共享样式 adoption
+import { ensureCss } from './ensure-css.ts'; // 共享 CSS 前置(等就绪 / 降级)
 
 // 工厂入口:返回一个仅处理 'react' 的 adapter
 export function createReactMountAdapter(): MountAdapter {
@@ -38,12 +38,9 @@ export function createReactMountAdapter(): MountAdapter {
         throw new Error('ReactMountAdapter: module.default is missing');
       }
 
-      // CSS 前置:有 cssReady(本地组件,host 已注入)则等就绪;没有(远程组件)回退扫 head。
-      if (context.cssReady) {
-        await context.cssReady;
-      } else {
-        adoptStylesInto(context.shadowRoot);
-      }
+      // CSS 前置:有 cssReady(本地组件)等就绪,reject 时降级无样式渲染;
+      // 无 cssReady(远程组件)走 adoptStylesInto 等 document.head 的 link 加载完。
+      await ensureCss(context);
 
       // 在 ShadowRoot 里建 portal div 作为 React 根节点
       const portal = document.createElement('div');
