@@ -247,7 +247,11 @@ export function vueStyleCollector(opts: { vueComponentsRoot: string }): Plugin {
       // root 必须取 vite 的 config.root —— plugin-vue 的 createDescriptor 也是用它算
       // descriptor.id,两边不一致会导致 data-v-<id> 对不上,scoped 静默失效。
       root = config.root;
-      isProduction = config.command === 'build';
+      // isProduction 必须与 plugin-vue@5.2.4 的 createDescriptor 取值一致
+      // (它用 config.isProduction = NODE_ENV==='production',不是 config.command)。
+      // 默认 vite build 下两者等价,但 `vite build --mode development` 会分歧:
+      // 本插件算 prod id、plugin-vue 算 dev id → scoped 静默失效。
+      isProduction = config.isProduction;
       const blocks = collectVueStyleBlocks(opts.vueComponentsRoot);
       pseudoBlocks.clear();
       for (const b of blocks) {

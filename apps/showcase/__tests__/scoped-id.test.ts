@@ -4,80 +4,86 @@
 //      影响所有 .vue 组件的 scoped data-v-<hex>,组件运行时 __scopeId 与编译期不一致,
 //      scoped CSS 静默失效(v1 final review 之前没拦住这种漂移)。
 //
-// ⚠️ 锁值来自 HEAD 仓根 + v1 算法(createDescriptor in @vitejs/plugin-vue@5.2.4):
+// ⚠️ 锁值来自 apps/showcase root + v1 算法(createDescriptor in @vitejs/plugin-vue@5.2.4):
 //      sha256(normalizePath(relative(root, filename)) + source).substring(0, 8)
-//    任何 .vue 文件改动 + 算法不变 → 锁值也会变;届时必须 PR 同步更新。
+//    root 必须是 vite 的 config.root = apps/showcase(vite.config.ts 未显式设 root,
+//    默认 process.cwd() = apps/showcase;plugin-vue 与 vue-style-collector 都用它算
+//    descriptor.id / scopedId)。任何 .vue 文件改动 + 算法不变 → 锁值也会变;
+//    届时必须 PR 同步更新。
 //
-//    关于 v2 brief task-1-brief.md 引用的"v1 final reviewer 锁值"(aed2660f 等):
-//      那些 hex 无法从当前文件内容复现。最可能的原因:v1 在 commit fd75bf5..HEAD
-//      之间有过 SFC 文案重写,reviewer 当时跑的 file 内容跟现在不一致。
-//      本单测锁的是 v1 算法 + 当前 HEAD 内容 —— 它代表"v1 抽离后算法永不改"的契约;
-//      build 期 scoped-id-guard 会按相同算法比对 plugin-vue 产物,任何漂移当场挂。
+//    这 5 个值(aed2660f / b3e18dfd / 492642e2 / 442c4847 / a89c26d1)就是 Task 2
+//    build 产物 dist/assets/vc-*.css 里真实出现的 scopedId,与运行时 __scopeId 对齐
+//    (Task 2 已铁证:7 个组件 chunk ALL ALIGNED)。
+//    早期用"仓根"当 root 锁出的 42b507f2 等从不匹配任何真实产物 —— 那是错的:
+//    root 用错,path.relative 的相对路径不同 → hash 不同(Fix round 1 修正)。
 
 import { describe, it, expect } from 'vitest';
 import path from 'node:path';
 import fs from 'node:fs';
 import { computeScopedId } from '../plugins/scoped-id';
 
-// 仓根解析:从 apps/showcase/__tests__/ 推到仓根,跨 3 层
-// (apps/showcase/__tests__/ → apps/showcase/ → apps/ → 仓根)
+// root 解析(vite.config.ts 未显式设 root,默认 process.cwd() = apps/showcase):
+//   - showcaseRoot:作为 computeScopedId 的 root 引用点 —— plugin-vue 的
+//     createDescriptor 与本插件的 config.root 都用它算 descriptor.id / scopedId。
+//     注意:root 只是 path.relative(root, filename) 的参照,不是文件解析基准,
+//     文件路径仍按仓库内绝对路径解析。从 __tests__/ 向上 1 层即 apps/showcase。
+//   - repoRoot:仅用于把仓库内相对路径解析成真实文件绝对路径(__tests__/ 向上 3 层)。
+const showcaseRoot = path.resolve(__dirname, '..');
 const repoRoot = path.resolve(__dirname, '../../..');
 
 describe('scoped-id', () => {
   it('locks prod scopedId for 5 real-world SFCs (algorithm + current file contents)', () => {
     // 5 个 fixture:覆盖不同的目录深度与文件名形态(index.vue / *.vue)。
-    // 每个 fixture 用 prod 模式(拼 source)+ 仓根,与 v1 vue-style-collector 调用一致。
+    // 文件用仓库内绝对路径解析;hash 的 root 引用用 apps/showcase(与 vite 一致)。
     const fixtures = [
       {
         rel: 'packages/vue-components/src/china-map/index.vue',
-        expected: '42b507f2',
+        expected: 'aed2660f',
       },
       {
         rel: 'packages/vue-components/src/bottom-nav-capsule-v3/index.vue',
-        expected: '568fc508',
+        expected: 'b3e18dfd',
       },
       {
         rel: 'packages/vue-components/src/mobile-nav-v5/index.vue',
-        expected: '66bfaf13',
+        expected: '492642e2',
       },
       {
         rel: 'packages/vue-components/src/parallax-gallery/ParallaxCard.vue',
-        expected: '5e86a972',
+        expected: '442c4847',
       },
       {
         rel: 'packages/vue-components/src/gis/ControlPanel.vue',
-        expected: 'f2f288d1',
+        expected: 'a89c26d1',
       },
     ];
     for (const fx of fixtures) {
       const abs = path.resolve(repoRoot, fx.rel);
       const source = fs.readFileSync(abs, 'utf-8');
-      const actual = computeScopedId(repoRoot, abs, source, true);
+      const actual = computeScopedId(showcaseRoot, abs, source, true);
       expect(actual, fx.rel).toBe(fx.expected);
     }
   });
 
   it('algorithm sanity: same input → same output (deterministic)', () => {
-    const root = path.resolve(repoRoot, 'packages/vue-components/src/china-map');
-    const file = path.join(root, 'index.vue');
-    const source = fs.readFileSync(file, 'utf-8');
-    const a = computeScopedId(root, file, source, true);
-    const b = computeScopedId(root, file, source, true);
+    const abs = path.resolve(repoRoot, 'packages/vue-components/src/china-map/index.vue');
+    const source = fs.readFileSync(abs, 'utf-8');
+    const a = computeScopedId(showcaseRoot, abs, source, true);
+    const b = computeScopedId(showcaseRoot, abs, source, true);
     expect(a).toBe(b);
     expect(a).toMatch(/^[a-f0-9]{8}$/);
   });
 
   it('isProduction flag changes the output (prod hashes source, dev does not)', () => {
-    const root = path.resolve(repoRoot, 'packages/vue-components/src/china-map');
-    const file = path.join(root, 'index.vue');
-    const source = fs.readFileSync(file, 'utf-8');
-    const devId = computeScopedId(root, file, source, false);
-    const prodId = computeScopedId(root, file, source, true);
+    const abs = path.resolve(repoRoot, 'packages/vue-components/src/china-map/index.vue');
+    const source = fs.readFileSync(abs, 'utf-8');
+    const devId = computeScopedId(showcaseRoot, abs, source, false);
+    const prodId = computeScopedId(showcaseRoot, abs, source, true);
     expect(devId).not.toBe(prodId);
     // prod 把 source 拼进 hash;改 source 必改 prod
     const prodIdOther = computeScopedId(
-      root,
-      file,
+      showcaseRoot,
+      abs,
       source + '\n// touch',
       true,
     );
