@@ -103,10 +103,23 @@ export function createUserSpaceStore(): UserSpaceStore {
   }
 
   async function resolveDefaultGroupId(): Promise<number | null> {
-    // 顺序:先看 /user/info 是否回 defaultGroupId(后续 DTO 补字段);
-    // 否则返回 null,UI 提示用户**第一次**手动选默认组。
+    // 顺序:
+    //   1) /user/info 是否回 defaultGroupId(后续 DTO 补字段)
+    //   2) 否则 listGroups() 取全量,挑第一个(caller 注册时一定有一个
+    //      「个人空间」组,所以 pick-first 不会误中其他组;多组用户后续
+    //      显式调 setDefaultGroup 后就走路径 1 了)。
+    //      fallback 是必要的:后端 DTO 历史上不返 defaultGroupId
+    //      (见 services/userV1/types.ts),没有这步 getShortcuts / listKvs
+    //      都会因为找不到 groupId 静默返回空,不报错,UI 看到"没数据"
+    //      误以为是数据问题(典型:shortcut-library 页面打开就空白)。
     const info = jwtAuth.state.jwtUser;
     if (info?.defaultGroupId && info.defaultGroupId > 0) return info.defaultGroupId;
+    try {
+      const { groups } = await groupV1Service.list();
+      if (groups.length > 0) return groups[0].id;
+    } catch {
+      // list 失败 → 返回 null,UI 该提示什么就提示什么
+    }
     return null;
   }
 

@@ -174,5 +174,37 @@ describe('user-space store KV CRUD', () => {
       const store = createUserSpaceStore();
       await expect(store.getShortcuts()).resolves.toEqual(groups);
     });
+
+    it('falls back to listGroups when /user/info does not return defaultGroupId', async () => {
+      // 模拟后端 DTO 历史上不返 defaultGroupId(遗留:UserInfo.defaultGroupId 是可选)。
+      // 没有 fallback 时,getShortcuts 会因为 defaultGroupId===null 静默返回 [],
+      // 完全不发请求,UI 看到空白。fallback 后:list groups → pick first → 拿到 blob。
+      loggedIn(0);
+      const groups = [{ id: 'g1', name: 'Browser', shortcuts: [], createdAt: 0, updatedAt: 0 }];
+      const fetchMock = vi.spyOn(globalThis, 'fetch')
+        // 1) GET /groups -> 返回组列表(没有 defaultGroupId 的兜底)
+        .mockResolvedValueOnce(new Response(JSON.stringify({ code: 0, data: { groups: [
+          { id: 23, name: '个人空间', description: '', ownerId: 8, myRole: 'owner', memberCount: 1, createdAt: '', updatedAt: '' },
+        ] } }), { status: 200 }))
+        // 2) GET /kv/shortcut-library?groupId=23 -> 返回 blob
+        .mockResolvedValueOnce(new Response(JSON.stringify({ code: 0, data: { key: 'shortcut-library', value: JSON.stringify(groups), groupId: 23, groupName: 'g', myRole: 'owner', expires_at: '', tags: ['shortcut-library'] } }), { status: 200 }));
+
+      const store = createUserSpaceStore();
+      await expect(store.getShortcuts()).resolves.toEqual(groups);
+      // 1) list groups
+      expect(String(fetchMock.mock.calls[0][0])).toContain('/api/v1/groups');
+      // 2) GET shortcut-library?groupId=23
+      expect(fetchMock.mock.calls[1][0]).toBe('/api/v1/kv/shortcut-library?groupId=23');
+    });
+
+    it('returns [] when no default group can be resolved', async () => {
+      loggedIn(0);
+      // list 返回空数组(没有个人空间)
+      vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+        new Response(JSON.stringify({ code: 0, data: { groups: [] } }), { status: 200 }),
+      );
+      const store = createUserSpaceStore();
+      await expect(store.getShortcuts()).resolves.toEqual([]);
+    });
   });
 });
