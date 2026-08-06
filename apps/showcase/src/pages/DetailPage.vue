@@ -24,6 +24,7 @@ import {
   createShadowRootHost, // 隔离容器工厂
   type ShadowRootHost, // 隔离容器返回类型
 } from '@style-library/mount-adapters';
+import { collectCss, cssMaps } from '../registry/css-maps';
 import { defaultTokens } from '../theme/tokens';
 
 const route = useRoute();
@@ -101,9 +102,22 @@ async function mount(componentId: string) {
     if (!loader) {
       throw new Error(`No loader registered for "${entry.loaderKey}"`);
     }
-    const mod = await loader();
+    // 并行拉组件实现 + CSS 文本(spec §5 架构):
+    //   - loader() 负责拉组件 chunk,可能跨包 import,自然异步
+    //   - collectCss() 是纯函数,在 Promise.resolve() 内同步完成,但仍用 await
+    //     把"两个并行任务"的语义留在代码里,便于未来 collect 阶段变异步
+    // Promise.all 保证 loader 与 CSS 同步就位,任意一个 reject → mount 失败
+    const [mod, cssTexts] = await Promise.all([
+      loader(),
+      Promise.resolve(collectCss(entry, cssMaps)),
+    ]);
     // 已被新 mount 顶掉(session 已被 cleanup)——不要再用本 session 的 host
     if (session.isAborted()) return;
+    // CSS 先于组件 DOM 同帧落地(spec §8 时序保证):
+    //   injectCss 同步在 ShadowRoot 头部追加 <style data-sl-css>,在
+    //   adapter.mount 把 DOM 写进来时样式已可命中。cssReady 始终是
+    //   resolved Promise(同步注入下没有等待任务),但保留 await 入口。
+    session.host.injectCss(cssTexts);
     const adapter = selectAdapter(createAdapters(), entry.framework);
     const mounted = await adapter.mount(mod, {
       container: session.host.portalTarget,
@@ -111,6 +125,7 @@ async function mount(componentId: string) {
       props: {},
       theme: { colorScheme: 'light', tokens: defaultTokens, namespace: 'sl' },
       signal: session.abort.signal,
+      cssReady: session.host.ready,
     });
     if (session.isAborted()) {
       // 本 session 被顶掉但 mount() 还成功——清掉刚挂上的实例
