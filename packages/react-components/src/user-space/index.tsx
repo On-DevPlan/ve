@@ -396,7 +396,7 @@ export default function UserSpace() {
                 // tab 上的 count:让用户一眼看到每个视图有多少条(懒加载中时显示 ?)
                 const counts: Record<ViewMode, number | null> = {
                   overview: null,
-                  members: members.length || group.memberCount,
+                  members: members.length || selectedGroup.memberCount,
                   invitations: invitations.length,
                   inventory: kv?.total ?? null,
                 };
