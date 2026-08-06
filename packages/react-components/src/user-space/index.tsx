@@ -392,15 +392,27 @@ export default function UserSpace() {
             </div>
 
             <nav className="sl-us-tabs">
-              {VIEW_TABS.map((t) => (
-                <button
-                  key={t.key}
-                  className={`sl-us-tab ${view === t.key ? 'is-active' : ''}`}
-                  onClick={() => setView(t.key)}
-                >
-                  {t.label}
-                </button>
-              ))}
+              {(() => {
+                // tab 上的 count:让用户一眼看到每个视图有多少条(懒加载中时显示 ?)
+                const counts: Record<ViewMode, number | null> = {
+                  overview: null,
+                  members: members.length || group.memberCount,
+                  invitations: invitations.length,
+                  inventory: kv?.total ?? null,
+                };
+                return VIEW_TABS.map((t) => (
+                  <button
+                    key={t.key}
+                    className={`sl-us-tab ${view === t.key ? 'is-active' : ''}`}
+                    onClick={() => setView(t.key)}
+                  >
+                    {t.label}
+                    {counts[t.key] !== null && (
+                      <span className="sl-us-tab__count">{counts[t.key]}</span>
+                    )}
+                  </button>
+                ));
+              })()}
             </nav>
 
             {view === 'overview' && (
