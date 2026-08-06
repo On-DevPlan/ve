@@ -183,11 +183,17 @@
 
 /* Linear 风格:容器一条 hairline,active tab 用 font-weight 600 + -1px bottom
    + 2px 黑实线跨过横线 + 嵌入式 count badge(active 时反色) */
+/* Linear 风格:容器一条 hairline,active tab 用 font-weight 600 + 2px 黑实线
+   跨过横线 + 嵌入式 count badge(active 时反色)。
+   注意:容器上下都有 padding(呼吸感),所以 active 下划线用
+   bottom: calc(-1 * var(--tabs-pad-y)) 跨过 padding 压到 hairline ——
+   改 --tabs-pad-y 时不用动 ::after。 */
 .sl-us-tabs {
+  --tabs-pad-y: 10px;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 20px 0; /* 上 6 让 tab 和横线之间有呼吸感,下 0 让 active 下划线正好压线 */
+  gap: 10px;
+  padding: var(--tabs-pad-y) 20px;
   border-bottom: 1px solid var(--border);
 }
 .sl-us-tab {
@@ -205,7 +211,10 @@
 .sl-us-tab.is-active::after {
   content: "";
   position: absolute;
-  left: 8px; right: 8px; bottom: -1px;
+  left: 14px; right: 14px;
+  /* 跨过容器 padding + 1px border,让 2px 实线下沿正好覆盖 hairline,
+     避免 active tab 下面出现"黑 + 灰"叠加。bottom = -pad-y - 1px */
+  bottom: calc(-1 * var(--tabs-pad-y, 10px) - 1px);
   height: 2px;
   background: var(--fg);
   border-radius: 1px 1px 0 0;
