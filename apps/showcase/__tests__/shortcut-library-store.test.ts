@@ -4,17 +4,22 @@ import { createShortcutStore } from '../src/api/components/shortcut-library/crea
 
 const originalState = jwtAuth.state;
 
-function loggedIn(): void {
+function loggedIn(defaultGroupId = 42): void {
   Object.defineProperty(jwtAuth, 'state', {
     configurable: true,
-    get: () => ({ ...originalState, token: 'jwt-abc' }),
+    get: () => ({
+      ...originalState,
+      token: 'jwt-abc',
+      jwtAuthState: 'logged-in',
+      jwtUser: { id: 8, email: 'a@b.com', username: '', nickname: 'a', invitationCode: 'X', defaultGroupId },
+    }),
   });
 }
 
 function loggedOut(): void {
   Object.defineProperty(jwtAuth, 'state', {
     configurable: true,
-    get: () => ({ ...originalState, token: null }),
+    get: () => ({ ...originalState, token: null, jwtAuthState: 'logged-out', jwtUser: null }),
   });
 }
 
@@ -33,126 +38,60 @@ function bizErr(code: number): Response {
   return new Response(JSON.stringify({ code, data: null }), { status: 200 });
 }
 
-describe('createShortcutStore (per-item CRUD)', () => {
+describe('createShortcutStore (delegates to user-space getShortcuts/setShortcuts)', () => {
   beforeEach(() => loggedOut());
 
   it('returns an empty list when logged out', async () => {
-    await expect(createShortcutStore().pull()).resolves.toEqual([]);
+    await expect(createShortcutStore().load()).resolves.toEqual([]);
   });
 
-  it('throws when writing while logged out', async () => {
-    const store = createShortcutStore();
-    const g = { id: 'g', name: 'x', shortcuts: [], createdAt: 0, updatedAt: 0 };
-    await expect(store.createGroup(g, 0)).rejects.toThrow('not logged in');
-    await expect(store.updateShortcut('g', { id: 's', combo: [], description: 'x', createdAt: 0 }, 0)).rejects.toThrow('not logged in');
-    await expect(store.deleteShortcut('s')).rejects.toThrow('not logged in');
+  it('throws when saving while logged out', async () => {
+    await expect(createShortcutStore().save([])).rejects.toThrow('not logged in');
   });
 
-  it('reconstructs groups from tagged KV items on pull', async () => {
-    loggedIn();
+  it('loads the entire shortcuts blob from the default group KV', async () => {
+    loggedIn(42);
+    const groups = [
+      { id: 'g1', name: 'VSCode', shortcuts: [
+        { id: 's1', combo: [{ code: 'KeyR', label: 'R', isModifier: false }], description: 'run', createdAt: 1 },
+      ], createdAt: 0, updatedAt: 0 },
+    ];
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      ok({
-        items: [
-          { key: 'sl-group-g1', value: JSON.stringify({ id: 'g1', name: 'VSCode', order: 0, createdAt: 1, updatedAt: 2 }) },
-          { key: 'sl-group-g2', value: JSON.stringify({ id: 'g2', name: 'Chrome', order: 1, createdAt: 3, updatedAt: 4 }) },
-          {
-            key: 'sl-shortcut-s1',
-            value: JSON.stringify({ id: 's1', groupId: 'g1', order: 0, combo: [{ code: 'KeyR', label: 'R', isModifier: false }], description: 'run', createdAt: 5, updatedAt: 6 }),
-          },
-          // 孤儿 shortcut(groupId 无对应 group)→ 应被丢弃
-          {
-            key: 'sl-shortcut-orphan',
-            value: JSON.stringify({ id: 'orphan', groupId: 'nope', order: 0, combo: [], description: 'lost', createdAt: 5, updatedAt: 6 }),
-          },
-        ],
-        total: 4,
-      }),
+      ok({ key: 'shortcuts', value: JSON.stringify(groups), groupId: 42, groupName: 'personal', myRole: 'owner', expires_at: '' }),
     );
-
-    const groups = await createShortcutStore().pull();
-
-    expect(groups).toHaveLength(2);
-    expect(groups[0].name).toBe('VSCode');
-    expect(groups[0].shortcuts).toHaveLength(1);
-    expect(groups[0].shortcuts[0].description).toBe('run');
-    expect(groups[1].name).toBe('Chrome');
-    expect(groups[1].shortcuts).toHaveLength(0);
-    // 拉取 = GET /kv?tags=shortcut-library
+    const result = await createShortcutStore().load();
+    expect(result).toEqual(groups);
+    // load = GET /api/v1/kv/shortcuts?groupId=42
     expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining('tags=shortcut-library'),
+      expect.stringContaining('/api/v1/kv/shortcuts'),
       expect.anything(),
     );
+    expect(fetchMock.mock.calls[0]?.[0]).toContain('groupId=42');
   });
 
-  it('returns an empty list when no keys exist', async () => {
-    loggedIn();
-    // list 空 + 旧 blob 也不存在(not found) → 空库
-    vi.spyOn(globalThis, 'fetch')
-      .mockResolvedValueOnce(ok({ items: [], total: 0 }))
-      .mockResolvedValueOnce(bizErr(50));
-    await expect(createShortcutStore().pull()).resolves.toEqual([]);
+  it('returns an empty list when the shortcuts KV is missing (code 50)', async () => {
+    loggedIn(42);
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(bizErr(50));
+    await expect(createShortcutStore().load()).resolves.toEqual([]);
   });
 
-  it('creates a group key tagged shortcut-library on createGroup', async () => {
-    loggedIn();
+  it('saves the entire shortcuts blob to the default group KV', async () => {
+    loggedIn(42);
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(ok(null));
-    const g = { id: 'g1', name: 'VSCode', shortcuts: [], createdAt: 1, updatedAt: 2 };
-    await createShortcutStore().createGroup(g, 0);
-
+    const groups = [{ id: 'g1', name: 'VSCode', shortcuts: [], createdAt: 0, updatedAt: 0 }];
+    await createShortcutStore().save(groups);
+    // save = POST /api/v1/kv with key='shortcuts', tags=['shortcut-library'], groupId=42
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/v1/kv',
       expect.objectContaining({
         method: 'POST',
-        body: expect.stringContaining('sl-group-g1'),
       }),
     );
-    expect(fetchMock).toHaveBeenCalledWith(
-      '/api/v1/kv',
-      expect.objectContaining({
-        body: expect.stringContaining('"tags":["shortcut-library"]'),
-      }),
-    );
-  });
-
-  it('deletes the shortcut key on deleteShortcut', async () => {
-    loggedIn();
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(ok(null));
-    await createShortcutStore().deleteShortcut('s1');
-    expect(fetchMock).toHaveBeenCalledWith(
-      '/api/v1/kv/sl-shortcut-s1',
-      expect.objectContaining({ method: 'DELETE' }),
-    );
-  });
-
-  it('migrates a legacy shortcuts blob to per-item keys on pull', async () => {
-    loggedIn();
-    const legacyGroups = [
-      {
-        id: 'g1',
-        name: 'VSCode',
-        shortcuts: [
-          { id: 's1', combo: [{ code: 'KeyR', label: 'R', isModifier: false }], description: 'run', createdAt: 5 },
-        ],
-        createdAt: 1,
-        updatedAt: 2,
-      },
-    ];
-    const fetchMock = vi.spyOn(globalThis, 'fetch')
-      .mockResolvedValueOnce(ok({ items: [], total: 0 }))                                  // list → 无新 key
-      .mockResolvedValueOnce(ok({ key: 'shortcuts', value: JSON.stringify(legacyGroups) })) // get 旧 blob
-      .mockResolvedValueOnce(ok(null))                                                      // set sl-group-g1
-      .mockResolvedValueOnce(ok(null))                                                      // set sl-shortcut-s1
-      .mockResolvedValueOnce(ok(null));                                                     // delete 旧 key
-
-    const groups = await createShortcutStore().pull();
-
-    expect(groups).toHaveLength(1);
-    expect(groups[0].name).toBe('VSCode');
-    expect(groups[0].shortcuts[0].description).toBe('run');
-    // 迁移:逐条写新 key + 删旧 key
-    const calls = fetchMock.mock.calls;
-    expect(calls.some((c) => c[0] === '/api/v1/kv' && String((c[1] as RequestInit).body).includes('sl-group-g1'))).toBe(true);
-    expect(calls.some((c) => c[0] === '/api/v1/kv' && String((c[1] as RequestInit).body).includes('sl-shortcut-s1'))).toBe(true);
-    expect(calls.some((c) => c[0] === '/api/v1/kv/shortcuts' && (c[1] as RequestInit).method === 'DELETE')).toBe(true);
+    const callArgs = fetchMock.mock.calls[0]?.[1] as RequestInit | undefined;
+    const body = JSON.parse(String(callArgs?.body));
+    expect(body.key).toBe('shortcuts');
+    expect(body.tags).toEqual(['shortcut-library']);
+    expect(body.groupId).toBe(42);
+    expect(JSON.parse(body.value)).toEqual(groups);
   });
 });

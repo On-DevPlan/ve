@@ -1,23 +1,18 @@
-// store.ts —— shortcut-library 持久化抽象(细粒度增删改查)。
+// store.ts —— shortcut-library 持久化抽象(简单 load/save)。
 //
-// ShortcutCrudStore 是 useShortcuts 读写数据的唯一入口,接口定义在
-// createShortcutStore.ts(api 层),本文件实现本地版 LSStore。
-// 两个实现:
-//   - LSStore(本文件):数据落 localStorage。每个粒度 op = 读整库 → 应用单变更 →
-//     整库写回,用 promise 链串行化,避免并发 op 的 read-modify-write 互相覆盖。
-//     localStorage 是本地、可整体覆盖(不存在"传空清远端"的风险)。
-//   - cloud store(createShortcutStore.ts):逐 key 的 POST /kv / DELETE /kv/:key,
-//     pull() 拉取最新。见该文件。
+// 整个库作为单个 JSON 字符串读写。云端由 createShortcutStore 委托给 user-space
+// 的 getShortcuts/setShortcuts,本地由 LSStore 落 localStorage。组件不感知
+// KV 协议(那是 user-space 的事)。
 //
 // 设计要点:
-//   - pull() 是一次性启动读取;增删改走 create*/update*/delete* 细粒度方法,
-//     没有 save(snapshot) 整体上传 —— 前端某时刻快照为空/异常,也不会清空远端。
+//   - load() 是一次性启动读取;save() 是每次变更后调。是否 debounce / 失败重试
+//     完全关在 store 里,useShortcuts 不感知。
+//   - authState 是可选的——只为 UI 显示登录条;LS 永远 'logged-out'(假装)。
 //   - 不在 store 里管 React state —— 那是 useShortcuts 的职责。
 
-import type { Group, Shortcut } from '../types';
-import type { ShortcutCrudStore } from '@api/components/shortcut-library/createShortcutStore';
+import type { ShortcutsBlob } from '@api/components/user-space/types';
 
-export type { ShortcutCrudStore };
+export type AuthState = 'logged-out' | 'logged-in' | 'syncing' | 'error';
 
 export interface ImportStats {
   groupsAdded: number;
@@ -26,21 +21,34 @@ export interface ImportStats {
   errors: string[];
 }
 
-const LS_KEY = 'sl-shortcut-library:v1';
+/** shortcut-library 整个库一次性读写的极简契约。 */
+export interface ShortcutStore {
+  /** One-shot read at startup. */
+  load(): Promise<ShortcutsBlob>;
+  /** Persist the new state. */
+  save(groups: ShortcutsBlob): Promise<void>;
+  /** Optional — UI 用来显示登录态条;LS 永远 'logged-out'(假装)。 */
+  readonly authState: AuthState;
+}
 
-function loadFromLS(): Group[] {
+// ---- LSStore(本地缓存 + 离线 fallback)-----------------------------
+
+const LS_KEY = 'sl-shortcut-library:v1';
+const DEBOUNCE_MS = 200;
+
+function loadFromLS(): ShortcutsBlob {
   try {
     const raw = localStorage.getItem(LS_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed as Group[];
+    return parsed as ShortcutsBlob;
   } catch {
     return [];
   }
 }
 
-function writeToLS(groups: Group[]): void {
+function writeToLS(groups: ShortcutsBlob): void {
   try {
     localStorage.setItem(LS_KEY, JSON.stringify(groups));
   } catch {
@@ -48,59 +56,21 @@ function writeToLS(groups: Group[]): void {
   }
 }
 
-export class LSStore implements ShortcutCrudStore {
-  /** 串行化读改写:op 排队逐个执行,避免并发互相覆盖。 */
-  private _writeChain: Promise<void> = Promise.resolve();
+export class LSStore implements ShortcutStore {
+  readonly authState: AuthState = 'logged-out';
 
-  private mutateLS(fn: (groups: Group[]) => Group[]): Promise<void> {
-    this._writeChain = this._writeChain
-      .then(() => {
-        writeToLS(fn(loadFromLS()));
-      })
-      .catch((e: unknown) => {
-        // 前一次写失败不阻塞后续 op(loadFromLS/writeToLS 内部已吞错,这里兜底)
-        console.error('[LSStore] write failed:', e);
-      });
-    return this._writeChain;
-  }
-
-  pull(): Promise<Group[]> {
+  load(): Promise<ShortcutsBlob> {
     return Promise.resolve(loadFromLS());
   }
 
-  createGroup(g: Group, _order: number): Promise<void> {
-    return this.mutateLS((groups) => [...groups, g]);
+  async save(groups: ShortcutsBlob): Promise<void> {
+    // Debounce: collapse rapid updates into a single write.
+    if (this._writeTimer !== null) window.clearTimeout(this._writeTimer);
+    this._writeTimer = window.setTimeout(() => {
+      writeToLS(groups);
+      this._writeTimer = null;
+    }, DEBOUNCE_MS);
   }
 
-  updateGroup(g: Group, _order: number): Promise<void> {
-    return this.mutateLS((groups) => groups.map((x) => (x.id === g.id ? g : x)));
-  }
-
-  deleteGroup(id: string): Promise<void> {
-    return this.mutateLS((groups) => groups.filter((g) => g.id !== id));
-  }
-
-  createShortcut(groupId: string, s: Shortcut, _order: number): Promise<void> {
-    return this.mutateLS((groups) =>
-      groups.map((g) =>
-        g.id === groupId ? { ...g, shortcuts: [...g.shortcuts, s], updatedAt: Date.now() } : g,
-      ),
-    );
-  }
-
-  updateShortcut(groupId: string, s: Shortcut, _order: number): Promise<void> {
-    return this.mutateLS((groups) =>
-      groups.map((g) =>
-        g.id === groupId
-          ? { ...g, shortcuts: g.shortcuts.map((sc) => (sc.id === s.id ? s : sc)), updatedAt: Date.now() }
-          : g,
-      ),
-    );
-  }
-
-  deleteShortcut(id: string): Promise<void> {
-    return this.mutateLS((groups) =>
-      groups.map((g) => ({ ...g, shortcuts: g.shortcuts.filter((sc) => sc.id !== id) })),
-    );
-  }
+  private _writeTimer: number | null = null;
 }
