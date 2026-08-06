@@ -47,6 +47,40 @@ const groups = await userSpaceStore.listKvs(0, { ... });
 - **Set/Delete** → caller 在该组必须是 `owner|admin|writer`(`write+`)
 - **Get/List/Versions** → caller 是任意成员(含 `reader`)(`read+`)
 
+## KV 端点用法分流(groupId vs tags)
+
+仓库当前两类组件对 `/api/v1/kv` 的用法**不一样**,前端必须按组件用途选对端点,**不要混用**:
+
+| 组件 | 用法 | 端点形态 | 原因 |
+|---|---|---|---|
+| **`/user-space`** | **按 group 维度管理 KV** —— 用户在「概览/成员/邀请/库存」tab 看到的 KV 列表,按所选 group 过滤 | `GET /api/v1/kv?groupId=<N>&tags=...`(`groupId` 显式传) | 用户在 user-space 内**显式选了一个组**(操作该组的 KV),groupId 是用户意图,不是"个人空间"。`tags` 用于在该组范围内筛选 |
+| 其他组件(`shortcut-library` / 未来的 `theme-*` 等) | 单用户单 blob 同步 | `GET /api/v1/kv/<key>`(`groupId` **不传** → 后端走 default) | 整组件数据只属于"我自己",跨组没意义(同账号多端共享即可);`tags` 等于 key 名用于 facet 扫表 |
+
+### 选错端点的症状
+
+- `user-space` 走不传 groupId → 后端给的是**个人空间**的 KV 列表,看不到用户当前组的 KV
+- 其他组件传 `groupId=<我的工作空间>` → 后端校验该组是否给该组件用,正常情况下直接走个人空间更安全
+
+### 端点选择决策树
+
+```
+组件是否要"按 group 管理多个 KV"?
+  ├─ 是 → user-space 模式:显式传 groupId,tags 可选筛
+  │       例:GET /api/v1/kv?groupId=42&tags=shortcut
+  └─ 否 → single-blob 模式:不传 groupId,key 自解释
+          例:GET /api/v1/kv/shortcut-library
+          tags 等于 key 名
+```
+
+### 写端的对应
+
+- `POST /api/v1/kv` body 里 **`groupId` 是否必填**:
+  - user-space:**显式传**当前用户选中的 `groupId`(用户在 UI 操作的就是这个组的 KV)
+  - 其他组件:**不传** → 后端用 caller's default_group_id(个人空间)
+
+- 不允许 user-space 写"个人空间"以外的 KV(那是 caller 的别的组的 KV,UI 上不该跨组越权)
+- 不允许其他组件写"显式 groupId" —— 它们没有组维度语义
+
 ## 架构速查
 
 ```text
