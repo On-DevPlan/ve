@@ -105,10 +105,31 @@ describe('hitTest', () => {
     bounds: { minLng: 0, maxLng: 0, minLat: 0, maxLat: 0 },
   });
 
+  const baseRect = { left: 0, top: 0, width: 600, height: 450 };
+
+  it('converts viewport coords to canvas-local before hit-testing (subtracts rect offset)', () => {
+    const provinces = [mk('广东'), mk('广西')];
+    const calls: [number, number][] = [];
+    const ctx = {
+      canvas: {
+        width: 1200,
+        height: 900,
+        getBoundingClientRect: () => ({ left: 40, top: 20, width: 600, height: 450 }),
+      },
+      isPointInPath: (_p: Path2D, x: number, y: number) => {
+        calls.push([x, y]);
+        return true;
+      },
+    } as unknown as CanvasRenderingContext2D;
+    expect(hitTest(provinces, ctx, 100, 100)).toBe('广西');
+    // (100-40) * (1200/600) = 120；(100-20) * (900/450) = 160
+    expect(calls[0]).toEqual([120, 160]);
+  });
+
   it('picks the later province when two overlap (reverse-order priority)', () => {
     const provinces = [mk('广东'), mk('广西')];
     const ctx = {
-      canvas: { width: 1200, height: 900, getBoundingClientRect: () => ({ width: 600, height: 450 }) },
+      canvas: { width: 1200, height: 900, getBoundingClientRect: () => baseRect },
       isPointInPath: () => true, // 两个省都命中
     } as unknown as CanvasRenderingContext2D;
     expect(hitTest(provinces, ctx, 100, 100)).toBe('广西');
@@ -117,7 +138,7 @@ describe('hitTest', () => {
   it('returns null when nothing is hit', () => {
     const provinces = [mk('广东')];
     const ctx = {
-      canvas: { width: 1200, height: 900, getBoundingClientRect: () => ({ width: 600, height: 450 }) },
+      canvas: { width: 1200, height: 900, getBoundingClientRect: () => baseRect },
       isPointInPath: () => false,
     } as unknown as CanvasRenderingContext2D;
     expect(hitTest(provinces, ctx, 100, 100)).toBeNull();

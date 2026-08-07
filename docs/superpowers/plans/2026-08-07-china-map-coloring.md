@@ -1221,3 +1221,9 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 - **Order B** (color under text) enforced in Task 3 test.
 - **Decode shape**: verified empirically — `encodeOffsets[p][0]` is the `[x,y]` pair for polygon `p` (per-polygon alignment), all 34 features have `cp`, names already short.
 - **Path2D stub** set at test-module scope (before `it` blocks run); `buildProvinces`/`hitTest`/`render` only touch `Path2D`/ctx at call time, so the stub suffices without jsdom.
+
+## 实测修正（Task 5 e2e 验证时发现）
+
+1. **hitTest 视口偏移**：规范 §4.4 的公式 `x = clientX * (1200/rect.width)` 未减 `rect.left/top`。当画布不在视口原点（本组件在卡片内，有 padding）时命中坐标整体偏移，点击省份不生效。修正为 `x = (clientX - rect.left) * (1200/rect.width)`，并加单测锁定偏移换算。
+2. **开发环境**：`pnpm install` 补齐了缺失的 `http-proxy` 链接（showcase dev server 依赖，旧 install 未链接）；e2e 前先 kill 残留的旧 dev server（端口 5173 被占）。
+3. **e2e 采样注意**：hover 高亮（0.3 蓝色覆盖整省）会把已涂色省份的纯色像素盖成「蓝叠色」，扫描涂色像素时需先移开指针（或对 blue-over-color 混合色设阈值）。

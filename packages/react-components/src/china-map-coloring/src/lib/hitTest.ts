@@ -8,8 +8,9 @@ export function hitTest(
   clientY: number,
 ): string | null {
   const rect = ctx.canvas.getBoundingClientRect();
-  const x = clientX * (ctx.canvas.width / rect.width);
-  const y = clientY * (ctx.canvas.height / rect.height);
+  // clientX/clientY 是视口坐标,先减去画布偏移得到画布内坐标,再按比例换算到逻辑坐标。
+  const x = (clientX - rect.left) * (ctx.canvas.width / rect.width);
+  const y = (clientY - rect.top) * (ctx.canvas.height / rect.height);
   // 倒序遍历：后绘制的省份优先（岛屿、重叠边界）
   for (let i = provinces.length - 1; i >= 0; i--) {
     const p = provinces[i];
