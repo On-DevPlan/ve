@@ -6,6 +6,7 @@ import { project, DEFAULT_MAP_CONFIG } from '../src/china-map-coloring/src/lib/p
 import { buildProvinces, toShortName } from '../src/china-map-coloring/src/lib/geojson';
 import { hitTest } from '../src/china-map-coloring/src/lib/hitTest';
 import type { ProvincePath } from '../src/china-map-coloring/src/types';
+import { renderMap } from '../src/china-map-coloring/src/lib/render';
 
 describe('PALETTE', () => {
   it('matches the spec exactly, 8 colors in order', () => {
@@ -120,5 +121,52 @@ describe('hitTest', () => {
       isPointInPath: () => false,
     } as unknown as CanvasRenderingContext2D;
     expect(hitTest(provinces, ctx, 100, 100)).toBeNull();
+  });
+});
+
+function createRecordingCtx() {
+  const calls: { op: string; fillStyle?: string; strokeStyle?: string }[] = [];
+  const ctx = {
+    canvas: { width: 1200, height: 900 },
+    fillStyle: '',
+    strokeStyle: '',
+    lineWidth: 0,
+    globalAlpha: 1,
+    textAlign: '',
+    textBaseline: '',
+    font: '',
+    clearRect(): void {},
+    fillRect(): void {},
+    save(): void {},
+    restore(): void {},
+    fill(): void { calls.push({ op: 'fill', fillStyle: ctx.fillStyle }); },
+    stroke(): void { calls.push({ op: 'stroke', strokeStyle: ctx.strokeStyle }); },
+    fillText(): void { calls.push({ op: 'fillText' }); },
+    strokeText(): void { calls.push({ op: 'strokeText' }); },
+  };
+  return { ctx: ctx as unknown as CanvasRenderingContext2D, calls };
+}
+
+describe('renderMap', () => {
+  it('fills a colored province under the province text (order B)', () => {
+    const provinces = buildProvinces(chinaJson as never, 1200, 900);
+    const color = '#FF6B6B';
+    const { ctx, calls } = createRecordingCtx();
+    renderMap(ctx, provinces, { 广东: color }, null, false);
+
+    const colorFillIdx = calls.findIndex((c) => c.op === 'fill' && c.fillStyle === color);
+    const textIdx = calls.findIndex((c) => c.op === 'strokeText');
+    expect(colorFillIdx).toBeGreaterThanOrEqual(0);
+    expect(textIdx).toBeGreaterThan(colorFillIdx); // 涂色先于省名文字
+  });
+
+  it('draws white base fill before any stroke (no gap between provinces)', () => {
+    const provinces = buildProvinces(chinaJson as never, 1200, 900);
+    const { ctx, calls } = createRecordingCtx();
+    renderMap(ctx, provinces, {}, null, false);
+    const firstFill = calls.findIndex((c) => c.op === 'fill' && c.fillStyle === '#FFFFFF');
+    const firstStroke = calls.findIndex((c) => c.op === 'stroke');
+    expect(firstFill).toBeGreaterThanOrEqual(0);
+    expect(firstStroke).toBeGreaterThan(firstFill);
   });
 });
