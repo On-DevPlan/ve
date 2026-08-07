@@ -1,0 +1,145 @@
+/* index.css —— china-map-coloring 样式
+   类名 sl-cmc-*；壳 UI 走 var(--sl-*, fallback) token；画布内颜色为固定 hex */
+
+.sl-cmc-root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  background: var(--sl-color-bg, #f8fafc);
+  color: var(--sl-color-text, #1f2328);
+  font-family: var(--sl-font-family, system-ui, "PingFang SC", sans-serif);
+  font-size: 14px;
+}
+
+.sl-cmc-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--sl-color-border, #e2e8f0);
+}
+.sl-cmc-header-icon { color: var(--sl-color-primary, #ec4899); flex: none; }
+.sl-cmc-title { margin: 0; font-size: 22px; font-weight: 700; }
+.sl-cmc-subtitle { margin: 2px 0 0; font-size: 13px; color: var(--sl-color-text-secondary, #64748b); }
+
+.sl-cmc-main {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 20px;
+  padding: 20px;
+  max-width: 1600px;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 auto;
+}
+@media (max-width: 900px) {
+  .sl-cmc-main { grid-template-columns: 1fr; }
+}
+
+.sl-cmc-map-card {
+  background: var(--sl-color-surface, #ffffff);
+  border: 1px solid var(--sl-color-border, #e2e8f0);
+  border-radius: 12px;
+  box-shadow: var(--sl-shadow, 0 1px 3px rgba(0, 0, 0, 0.08));
+  padding: 20px;
+}
+.sl-cmc-map-title { font-weight: 600; margin: 0 0 12px; }
+.sl-cmc-map-body { position: relative; display: flex; justify-content: center; }
+
+.sl-cmc-map { position: relative; width: 100%; }
+.sl-cmc-canvas {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  touch-action: none;
+}
+.sl-cmc-canvas--hidden { visibility: hidden; }
+
+.sl-cmc-skeleton {
+  position: absolute;
+  inset: 0;
+  background: var(--sl-color-surface-alt, #f1f5f9);
+  border-radius: 8px;
+  animation: sl-cmc-pulse 1.6s ease-in-out infinite;
+}
+@keyframes sl-cmc-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+.sl-cmc-bubble {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(4px);
+  border: 1px solid var(--sl-color-border, #e2e8f0);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.sl-cmc-side { display: flex; flex-direction: column; gap: 16px; }
+.sl-cmc-panel {
+  background: var(--sl-color-surface, #ffffff);
+  border: 1px solid var(--sl-color-border, #e2e8f0);
+  border-radius: 12px;
+  padding: 16px;
+}
+.sl-cmc-panel-title { margin: 0 0 12px; font-size: 15px; font-weight: 600; }
+
+.sl-cmc-swatches { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.sl-cmc-swatch {
+  position: relative;
+  aspect-ratio: 1;
+  border: 2px solid var(--sl-color-border, #e2e8f0);
+  border-radius: 10px;
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.sl-cmc-swatch:hover { transform: scale(1.06); }
+.sl-cmc-swatch:focus-visible { outline: 2px solid var(--sl-color-primary, #ec4899); outline-offset: 2px; }
+.sl-cmc-swatch.is-active {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.35);
+}
+.sl-cmc-check {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 18px;
+  font-weight: 700;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+.sl-cmc-selected-text { margin: 12px 0 0; font-size: 13px; color: var(--sl-color-text-secondary, #64748b); }
+
+.sl-cmc-steps { margin: 0; padding-left: 18px; line-height: 1.8; color: var(--sl-color-text-secondary, #64748b); }
+
+.sl-cmc-debug { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.sl-cmc-debug-toggle { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.sl-cmc-reset {
+  padding: 8px 14px;
+  border: 1px solid var(--sl-color-border, #e2e8f0);
+  border-radius: 8px;
+  background: var(--sl-color-surface-alt, #f1f5f9);
+  color: var(--sl-color-text, #1f2328);
+  cursor: pointer;
+  font: inherit;
+}
+.sl-cmc-reset:hover { background: #fee2e2; color: #dc2626; }
+
+.sl-cmc-footer {
+  padding: 12px 20px;
+  font-size: 12px;
+  color: var(--sl-color-text-secondary, #64748b);
+  border-top: 1px solid var(--sl-color-border, #e2e8f0);
+  text-align: center;
+}
