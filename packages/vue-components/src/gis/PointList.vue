@@ -1,9 +1,10 @@
 <script setup>
 import { ref } from 'vue'
 
-// const props = defineProps({  // ve 源里 props 未使用,留作未来扩展点
-//   points: { type: Array, default: () => [] }
-// })
+// ControlPanel 传入 recordPoints(记录点列表),这里声明 points prop 接收
+defineProps({
+  points: { type: Array, default: () => [] }
+})
 
 const emit = defineEmits(['edit', 'delete', 'select', 'preview'])
 
