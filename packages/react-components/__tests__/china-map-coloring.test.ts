@@ -3,6 +3,9 @@ import chinaJson from '../../../apps/showcase/public/map/json/china.json';
 import { PALETTE } from '../src/china-map-coloring/src/lib/constants';
 import { decodeRing, decodeGeometry } from '../src/china-map-coloring/src/lib/decode';
 import { project, DEFAULT_MAP_CONFIG } from '../src/china-map-coloring/src/lib/projection';
+import { buildProvinces, toShortName } from '../src/china-map-coloring/src/lib/geojson';
+import { hitTest } from '../src/china-map-coloring/src/lib/hitTest';
+import type { ProvincePath } from '../src/china-map-coloring/src/types';
 
 describe('PALETTE', () => {
   it('matches the spec exactly, 8 colors in order', () => {
@@ -48,5 +51,74 @@ describe('project', () => {
     const b = DEFAULT_MAP_CONFIG.bounds;
     expect(project(b.minLng, b.maxLat, 1200, 900)).toEqual({ x: 0, y: 0 });
     expect(project(b.maxLng, b.minLat, 1200, 900)).toEqual({ x: 1200, y: 900 });
+  });
+});
+
+// Path2D 在 node 环境不存在；buildProvinces 仅在调用时构造，测试在此处注入桩即可。
+class FakePath2D {
+  moveTo(): void {}
+  lineTo(): void {}
+  closePath(): void {}
+}
+globalThis.Path2D = FakePath2D as unknown as typeof Path2D;
+
+describe('toShortName', () => {
+  it('shortens full administrative names', () => {
+    expect(toShortName('新疆维吾尔自治区')).toBe('新疆');
+    expect(toShortName('内蒙古自治区')).toBe('内蒙古');
+    expect(toShortName('广东省')).toBe('广东');
+    expect(toShortName('香港特别行政区')).toBe('香港');
+    expect(toShortName('北京市')).toBe('北京市');
+  });
+});
+
+describe('buildProvinces', () => {
+  const provinces = buildProvinces(chinaJson as never, 1200, 900);
+
+  it('builds one ProvincePath per feature (34)', () => {
+    expect(provinces.length).toBe(34);
+  });
+
+  it('gives every province a closed Path2D and finite center', () => {
+    for (const p of provinces) {
+      expect(p.paths.length).toBeGreaterThanOrEqual(1);
+      expect(Number.isFinite(p.center.x)).toBe(true);
+      expect(Number.isFinite(p.center.y)).toBe(true);
+      expect(p.paths[0]).toBeInstanceOf(FakePath2D);
+    }
+  });
+
+  it('keeps the existing (already-short) names as displayName', () => {
+    const taiwan = provinces.find((p) => p.name === '台湾');
+    expect(taiwan?.displayName).toBe('台湾');
+  });
+});
+
+describe('hitTest', () => {
+  const mk = (name: string): ProvincePath => ({
+    name,
+    displayName: name,
+    center: { x: 0, y: 0 },
+    centerLngLat: [0, 0],
+    paths: [new FakePath2D() as unknown as Path2D],
+    bounds: { minLng: 0, maxLng: 0, minLat: 0, maxLat: 0 },
+  });
+
+  it('picks the later province when two overlap (reverse-order priority)', () => {
+    const provinces = [mk('广东'), mk('广西')];
+    const ctx = {
+      canvas: { width: 1200, height: 900, getBoundingClientRect: () => ({ width: 600, height: 450 }) },
+      isPointInPath: () => true, // 两个省都命中
+    } as unknown as CanvasRenderingContext2D;
+    expect(hitTest(provinces, ctx, 100, 100)).toBe('广西');
+  });
+
+  it('returns null when nothing is hit', () => {
+    const provinces = [mk('广东')];
+    const ctx = {
+      canvas: { width: 1200, height: 900, getBoundingClientRect: () => ({ width: 600, height: 450 }) },
+      isPointInPath: () => false,
+    } as unknown as CanvasRenderingContext2D;
+    expect(hitTest(provinces, ctx, 100, 100)).toBeNull();
   });
 });
