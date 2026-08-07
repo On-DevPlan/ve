@@ -50,6 +50,10 @@ export abstract class HttpService {
     return api.post<T>(`${this.BASE}${path}`, body, opts);
   }
 
+  protected reqPatch<T>(path: string, body?: unknown, opts?: RequestOptions): Promise<T> {
+    return api.patch<T>(`${this.BASE}${path}`, body, opts);
+  }
+
   protected reqDelete(path: string, opts?: RequestOptions): Promise<void> {
     return api.delete(`${this.BASE}${path}`, opts);
   }

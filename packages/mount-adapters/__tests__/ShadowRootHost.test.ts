@@ -1,15 +1,44 @@
 // 单元测试:createShadowRootHost 详情容器工厂。
-// 验证五条不变量:
-//   1) 默认 mode === 'closed'
+// 验证不变量:
+//   1) 默认 mode === 'open'(Vue 3 patch reconciler 兼容性)
 //   2) 配置 open === true 时 mode === 'open'
 //   3) portal target 必须是 DIV 且挂在 shadowRoot 上
-//   4) tokens 必须被写到 portal target 的 inline style
+//   4) tokens 必须被写到 shadowRoot 的 :host 规则
 //   5) destroy() 必须把容器从父节点上摘掉
+//   6) injectCss 注入组件 CSS(adoptedStyleSheets 优先 / <style data-sl-css> 降级)
+//   7) cssReady 一次性 settle:injectCss resolve,failCss reject
 //
 // 用 jsdom 作为测试环境,在 vitest.config.ts 里配置。
+//
+// jsdom 29.1.1 adoptedStyleSheets 实测:
+//   - CSSStyleSheet 存在,'replaceSync' in CSSStyleSheet.prototype === true
+//   - 但 'adoptedStyleSheets' in Document.prototype === false
+//   → supportsAdopted === false → adoptCssTexts 走 <style data-sl-css> 降级路径。
+//   下面的 shadowCssTexts 按运行时能力适配两条断言路径,避免 jsdom 升级后失效。
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'; // vitest 三件套
 import { createShadowRootHost } from '../src/ShadowRootHost'; // 被测工厂
+
+const envSupportsAdopted =
+  typeof CSSStyleSheet !== 'undefined' &&
+  'replaceSync' in CSSStyleSheet.prototype &&
+  'adoptedStyleSheets' in Document.prototype;
+
+// 从 shadowRoot 里收集"已注入的组件 CSS 文本":
+//   - adoptedStyleSheets 分支:读每个 sheet 的 cssRules
+//   - 降级分支:读 <style data-sl-css> 节点文本(reset/theme 无该属性,天然排除)
+function shadowCssTexts(shadowRoot: ShadowRoot): string[] {
+  if (envSupportsAdopted) {
+    const texts: string[] = [];
+    for (const sheet of shadowRoot.adoptedStyleSheets) {
+      for (const rule of Array.from(sheet.cssRules)) texts.push(rule.cssText);
+    }
+    return texts;
+  }
+  return Array.from(shadowRoot.querySelectorAll('style[data-sl-css]')).map(
+    (el) => el.textContent ?? '',
+  );
+}
 
 describe('createShadowRootHost', () => {
   // 用一个 div 作为详情容器,挂到 document.body 上才能让 attachShadow 正常工作
@@ -71,5 +100,67 @@ describe('createShadowRootHost', () => {
     host.destroy();
     // 容器已经从 document.body 上摘掉
     expect(container.parentNode).toBeNull();
+  });
+
+  it('injectCss injects the given css text into shadowRoot', () => {
+    const host = createShadowRootHost({ container });
+    host.injectCss(['.inject-test { color: seagreen; }']);
+    const texts = shadowCssTexts(host.shadowRoot);
+    expect(texts.some((t) => t.includes('.inject-test'))).toBe(true);
+  });
+
+  it('injectCss is idempotent for identical css text', () => {
+    const host = createShadowRootHost({ container });
+    host.injectCss(['.dedup { color: red; }']);
+    host.injectCss(['.dedup { color: red; }']);
+    // 同一文本两次注入只落一份(adopted:同一 sheet 不重复进数组;降级:同一 style 节点)
+    const texts = shadowCssTexts(host.shadowRoot).filter((t) => t.includes('.dedup'));
+    expect(texts).toHaveLength(1);
+  });
+
+  it('cssReady resolves after injectCss', async () => {
+    const host = createShadowRootHost({ container });
+    host.injectCss(['.ready-test { color: blue; }']);
+    await expect(host.cssReady).resolves.toBeUndefined();
+  });
+
+  it('cssReady rejects when failCss is called', async () => {
+    const host = createShadowRootHost({ container });
+    host.failCss(new Error('css-oom'));
+    await expect(host.cssReady).rejects.toThrow('css-oom');
+  });
+
+  it('cssReady settles only once (first of injectCss / failCss wins)', async () => {
+    const host = createShadowRootHost({ container });
+    host.failCss(new Error('boom'));
+    // settle 后的 injectCss 不再改变结果
+    host.injectCss(['.after-fail { color: red; }']);
+    await expect(host.cssReady).rejects.toThrow('boom');
+  });
+
+  it('no longer exposes a ready alias (DetailPage migrated to cssReady in Task 4)', () => {
+    const host = createShadowRootHost({ container });
+    // Task 4 移除了 `ready: cssReady` deprecated alias:DetailPage 已全部改用 cssReady,
+    // 这里确认 alias 真的没了,防止后续误用。
+    expect((host as Partial<ShadowRootHost>).ready).toBeUndefined();
+  });
+
+  it('injectCss with @import falls back to <style> clone (no replaceSync throw)', () => {
+    // v2 回归:含 @import url(...) 的 raw CSS 走 adoptedStyleSheets.replaceSync 会抛
+    // "@import rules are not allowed here"(W3C construct-stylesheets 限制)。
+    // 兜底:整段降级到 <style data-sl-css> clone,浏览器允许 <style> 内 @import。
+    // jsdom 29.1.1 已走 <style> 降级路径(envSupportsAdopted === false),
+    // 所以这条用例天然覆盖 <style> 分支;真实浏览器里 adoptCssTexts 也会
+    // 主动检测 @import 走降级,不会触发 replaceSync。
+    const host = createShadowRootHost({ container });
+    const cssWithImport =
+      "@import url('https://cdn.jsdelivr.net/.../tabler-icons.min.css');\n.icon { color: red; }";
+    // 不应抛错
+    expect(() => host.injectCss([cssWithImport])).not.toThrow();
+    // 文本必须落进 shadowRoot(降级分支走 <style> clone)
+    const texts = shadowCssTexts(host.shadowRoot);
+    const found = texts.find((t) => t.includes('@import url') && t.includes('tabler-icons'));
+    expect(found).toBeDefined();
+    expect(found).toContain('.icon');
   });
 });

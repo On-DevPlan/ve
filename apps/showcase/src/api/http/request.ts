@@ -49,7 +49,7 @@ function bearerHeader(): Record<string, string> {
 
 // ───── Bearer 401 handler(注入点,解环用) ──────────────────────────
 // 曾经 request 直接 import jwtAuth 调 handleUnauthorized,那会让
-//   api/services/base → shared/request → shared/auth-store → @api → api/services/base
+//   api/http/request → api/http/auth-store → api/services → api/http/base → request
 // 形成循环。改成注入:auth-store 在 init 时注册 handler,request 只调函数。
 type UnauthorizedHandler = () => void;
 let onBearerUnauthorized: UnauthorizedHandler = () => {};

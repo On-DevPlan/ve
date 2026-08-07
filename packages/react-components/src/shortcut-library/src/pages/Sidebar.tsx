@@ -1,7 +1,7 @@
 // Sidebar.tsx —— 左侧分组列表面板
 // 显示全部分组(可搜索过滤),支持新增/重命名/删除;当前选中项高亮
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { Group } from '../types';
 
 interface Props {
@@ -12,6 +12,8 @@ interface Props {
   onRename: (id: string, name: string) => void;
   onDelete: (id: string) => void;
   filter: string;
+  /** 侧边栏底部账户/同步区(登录入口、设置、退出),由宿主注入 */
+  footer?: ReactNode;
 }
 
 export default function Sidebar({
@@ -22,6 +24,7 @@ export default function Sidebar({
   onRename,
   onDelete,
   filter,
+  footer,
 }: Props) {
   const [newName, setNewName] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -150,6 +153,7 @@ export default function Sidebar({
           );
         })}
       </ul>
+      {footer}
     </aside>
   );
 }

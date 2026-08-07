@@ -10,3 +10,4 @@
 //   import type { Group } from '@/api/components/shortcut-library';
 
 export * from './shortcut-library';
+export * from './user-space';

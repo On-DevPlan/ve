@@ -26,6 +26,7 @@ description: Use when working on the ve project (D:\DevProjects\my\github\ve) �
 | 想了解 Manifest ↔ Loader 对账机制的实现细节(loader-inventory / reconcile / 错误信息) | [[manifest-loader-reconciliation]] |
 | lint 报错 / 自动修复 / 提交前清理 | [[fix-lint-loop]] |
 | build 产物 Shadow DOM 样式丢失(常见冷门坑) | [[shadow-dom-build-css-loss]] |
+| 组件首屏白屏感,首次会话看不到骨架过渡 | [[loading-skeleton-first-session]] |
 | 决定新约束用 ajv schema 还是 ESLint 规则 | [[when-eslint-vs-ajv]] |
 | 写自定义 ESLint 规则(AST / filename / 字面量提取样板) | [[eslint-pattern-recipes]] |
 | 写自定义规则的测试(RuleTester + ts parser) | [[eslint-testing-pattern]] |
@@ -44,6 +45,9 @@ description: Use when working on the ve project (D:\DevProjects\my\github\ve) �
 - 生产 nginx 路由生成: `vite build` 内联插件(closeBundle 调 `genNginxOut()` 写 `nginx/api-locations/generated.conf`)
 - nginx 站点配置(手写部分): `default.conf`(生成的 location 由它 include)
 - 运行时挂载适配器(ShadowRoot + 样式 adoption): `packages/mount-adapters/`
+- 组件 CSS 同步注入(`MountContext.cssReady` + `ShadowRootHost.injectCss` + `adoptCssTexts` + `ensureCss`):同帧落 ShadowRoot,消除 FOUC;远程组件 `loaderUrl` 走 `adoptStylesInto` 兜底
+- Vue scoped CSS 接入 Vite CSS 管线(`vue-style-collector` + `scoped-id-guard`):伪 `.css` 路径让 vite CSS 接管 postcss / url / @import;插件扫 SFC `import '*.css'` 自动把 ol.css 等第三方 CSS 也进 ShadowRoot;`scopedId` 算法复刻 plugin-vue,guard 在 build 期拦截漂移
+- 加载过渡(首次会话首屏骨架,0.6s ease):`apps/showcase/src/shared/LoadingSkeleton/`(框架无关核心 `skeleton.ts` + Vue/React 适配;sessionStorage 标记仅首次显)
 - 自定义 ESLint 规则: `eslint/rules/valid-component-config.js`
 
 ## 常用命令

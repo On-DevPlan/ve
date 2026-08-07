@@ -1,7 +1,8 @@
 // useShortcuts.ts —— shortcut-library 数据层 React 适配。
 //
 // 数据落点由 host 的 JWT 态决定:
-//   - 已登录(jwtAuth.state.token 存在)→ 用 createShortcutStore(后端 /api/v1/kv)
+//   - 已登录(jwtAuth.state.token 存在)→ 用 createShortcutStore(内部调 user-space
+//     getShortcuts/setShortcuts,经 user-space 的 KV 句柄存取,整库 JSON)
 //   - 游客(无 token)→ 自动降级用 LSStore(本地缓存),登录后无缝迁回 cloud store
 //   - 所有现有 export(findBindingsByCode / comboKey / comboLabel / ImportStats)
 //     保持稳定,既有调用方零改动
@@ -21,7 +22,7 @@ function freshId(): string {
 
 /**
  * 策略:activeStore 由 host JWT 态决定(useJwtAuth 读 token)。
- *   - token 存在 → cloud store(createShortcutStore,数据存后端 /api/v1/kv)
+ *   - token 存在 → cloud store(createShortcutStore,内部调 user-space)
  *   - token 不存在 → LSStore(游客本地缓存)
  * 登录 / 登出时 token 变化 → effect 自动切换 activeStore 并重 load。
  * 写操作都走 activeStore;游客模式下天然落本地。
@@ -66,11 +67,17 @@ export function useShortcuts() {
   );
 
   // 启动 + token 变化:按 JWT 态选 activeStore 并 load。
-  // host 的 jwtAuth.init() 已在应用启动时跑过(Task 10),这里只读当前 token。
-  // useJwtAuth() 每次渲染返回新快照,但 auth.token 是原始值,作为依赖稳定。
+  // 关键依赖 `auth.jwtAuthState`,不只是 `auth.token`:
+  //   - jwtAuth.init() 是 fire-and-forget(main.ts 里),存在一个「token 落 ref
+  //     已设但 jwtUser 还在拉 /user/info」的中间态。
+  //   - 如果只看 token,init 期间 useShortcuts 会选 cloudStore,然后
+  //     userSpace.getShortcuts() 的 requireAuth() 抛 not logged in,导致
+  //     页面空白 + 不会自动重试(init 完后再变 activeStore 没有触发源)。
+  //   - 把 jwtAuthState 也加入依赖,init 完成态变 → effect 重跑 → 再调一次
+  //     cloudStore.load(),这次 jwtUser 已就位,真正发请求。
   useEffect(() => {
     let cancelled = false;
-    const store = auth.token ? (cloudStore as ShortcutStore) : lsStore;
+    const store = auth.token && auth.jwtAuthState === 'logged-in' ? cloudStore : lsStore;
     setActiveStore(store);
     (async () => {
       try {
@@ -83,13 +90,34 @@ export function useShortcuts() {
       }
     })();
     return () => { cancelled = true; };
-  }, [auth.token, cloudStore, lsStore]);
+  }, [auth.token, auth.jwtAuthState, cloudStore, lsStore]);
 
   // token 变化(登录/登出)→ 保证 activeStore 指向正确的 store 实现
   useEffect(() => {
-    const want = auth.token ? (cloudStore as ShortcutStore) : lsStore;
+    const want = auth.token && auth.jwtAuthState === 'logged-in' ? cloudStore : lsStore;
     setActiveStore((prev) => (prev === want ? prev : want));
-  }, [auth.token, cloudStore, lsStore]);
+  }, [auth.token, auth.jwtAuthState, cloudStore, lsStore]);
+
+  // 登出 → reset saveMode + dirty(但不弹窗 — 退出确认已经在 banner 按钮的
+  // onClick 里处理了,这里只负责清理 + 重新 load)。
+  useEffect(() => {
+    const loggedOut = activeStore === lsStore;
+    if (loggedOut) {
+      setSaveModeState('auto');
+      setDirty(false);
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const g = await activeStore.load();
+        if (!cancelled) setGroups(g);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error('[useShortcuts] reload failed:', msg);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activeStore, lsStore]);
 
   // 自动选中(第一个 / 刚创建的)
   useEffect(() => {
@@ -139,22 +167,19 @@ export function useShortcuts() {
     [activeStore, saveMode],
   );
 
-  const addGroup = useCallback(
-    (name: string) => {
-      const now = Date.now();
-      const g: Group = {
-        id: freshId(),
-        name: name.trim() || '未命名',
-        shortcuts: [],
-        createdAt: now,
-        updatedAt: now,
-      };
-      mutate((prev) => [...prev, g]);
-      setSelectedGroupId(g.id);
-      return g;
-    },
-    [mutate],
-  );
+  const addGroup = useCallback((name: string) => {
+    const now = Date.now();
+    const g: Group = {
+      id: freshId(),
+      name: name.trim() || '未命名',
+      shortcuts: [],
+      createdAt: now,
+      updatedAt: now,
+    };
+    mutate((prev) => [...prev, g]);
+    setSelectedGroupId(g.id);
+    return g;
+  }, [mutate]);
 
   const renameGroup = useCallback(
     (id: string, name: string) => {
@@ -176,7 +201,7 @@ export function useShortcuts() {
 
   const addShortcut = useCallback(
     (groupId: string, combo: KeyStroke[], description: string, condition?: string) => {
-      const s_new: Shortcut = {
+      const s: Shortcut = {
         id: freshId(),
         combo,
         description: description.trim(),
@@ -186,11 +211,11 @@ export function useShortcuts() {
       mutate((prev) =>
         prev.map((g) =>
           g.id === groupId
-            ? { ...g, shortcuts: [...g.shortcuts, s_new], updatedAt: Date.now() }
+            ? { ...g, shortcuts: [...g.shortcuts, s], updatedAt: Date.now() }
             : g,
         ),
       );
-      return s_new;
+      return s;
     },
     [mutate],
   );
@@ -257,35 +282,29 @@ export function useShortcuts() {
         for (const g of data.groups) {
           const existing = next.find((eg) => eg.name.toLowerCase() === g.name.toLowerCase());
           if (existing) {
-            const newShortcuts = g.shortcuts.map((sc) => ({
+            const added = g.shortcuts.map((s) => ({
               id: freshId(),
-              combo: sc.combo,
-              description: sc.description,
-              condition: sc.condition,
+              combo: s.combo,
+              description: s.description,
+              condition: s.condition,
               createdAt: Date.now(),
             }));
-            existing.shortcuts = [...existing.shortcuts, ...newShortcuts];
+            existing.shortcuts = [...existing.shortcuts, ...added];
             existing.updatedAt = Date.now();
             stats.groupsAppended++;
-            stats.shortcutsAdded += newShortcuts.length;
+            stats.shortcutsAdded += added.length;
           } else {
             const now = Date.now();
-            const newGroup: Group = {
+            const shortcuts = g.shortcuts.map((s) => ({
               id: freshId(),
-              name: g.name,
-              shortcuts: g.shortcuts.map((sc) => ({
-                id: freshId(),
-                combo: sc.combo,
-                description: sc.description,
-                condition: sc.condition,
-                createdAt: now,
-              })),
+              combo: s.combo,
+              description: s.description,
+              condition: s.condition,
               createdAt: now,
-              updatedAt: now,
-            };
-            next.push(newGroup);
+            }));
+            next.push({ id: freshId(), name: g.name, shortcuts, createdAt: now, updatedAt: now });
             stats.groupsAdded++;
-            stats.shortcutsAdded += newGroup.shortcuts.length;
+            stats.shortcutsAdded += shortcuts.length;
           }
         }
         return next;
@@ -294,29 +313,6 @@ export function useShortcuts() {
     },
     [mutate],
   );
-
-  // 登录态切换时(登出 → 切回 LS,登录 → 切到 cloud),主动重拉一次,
-  // 保证本地 state 跟新 store 同步。
-  // 登出 → reset saveMode + dirty(但不弹窗 — 退出确认已经在 banner 按钮的
-  // onClick 里处理了,这里只负责清理 + 重新 load)。
-  useEffect(() => {
-    const loggedOut = activeStore === lsStore;
-    if (loggedOut) {
-      setSaveModeState('auto');
-      setDirty(false);
-    }
-    let cancelled = false;
-    (async () => {
-      try {
-        const g = await activeStore.load();
-        if (!cancelled) setGroups(g);
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        console.error('[useShortcuts] reload failed:', msg);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [activeStore, lsStore]);
 
   return {
     groups,

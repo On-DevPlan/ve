@@ -1,226 +1,143 @@
-// Keyboard.tsx —— 简化的扁平键盘预览
-// 接收 highlightedCodes 集合,把对应键渲染为"按下"状态
-// 风格参考 zfrontier:flat,两态(浅色未按,深色按下)
+// Keyboard.tsx —— ANSI 104 键 1:1 物理键盘预览
 //
-// 三种"显示该键快捷键"的入口,视觉态相同,差别只在触发方式(由父组件统一管):
-//   - 悬停 (mouse):           mouseenter → 父组件延迟 HOVER_OPEN_DELAY 弹 popup(非 pin)
-//   - 长按 (mouse / 物理键):   pointerdown → 父组件 KEY_HOLD_MS(400ms) hold timer → 弹 popup(非 pin)
-//   - 双击 (mouse):           dblclick → 父组件直接弹 popup 并 pin 住
-// 父组件持有唯一的 popup state,三种入口都往里写;新触发覆盖旧 popup。
-// 本组件只负责上报事件 + 渲染视觉态。
+// 适用场景:挂在 shortcut-library 的 preview 面板里,展示按键状态。
+// 不适用:host 想用任意键的 getBoundingClientRect(popup 定位)—— 它直接走
+// shadow DOM 内 [data-shortcut-code] 查找,跟本组件无关。
+//
+// 三簇并列布局:main(主键) / nav(编辑+方向) / numpad(小键盘)。
+// 数据与形状分离:键位定义见 src/data/keyboard-layout.ts,渲染只负责按
+// 形状映射 DOM + 把状态(is-on / is-hover / has-binding)打到 className。
+// pointer 状态由父组件完全持有(按下/释放/悬停/双击 4 个回调),渲染层
+// 不维护自己的 ref,避免和父组件的 hold / hover 定时器竞争。
+//
+// 所有键保留 data-shortcut-code(物理键 keydown 走 e.code 直接命中,
+// findKeyRect 也通过它定位 popup 位置)。
+//
+// 视觉态完全由 props 决定:
+//   is-on / is-held  -> 父组件 heldKeys(物理键盘 / 鼠标长按中)
+//   is-hover         -> 父组件 highlightedCodes(录入 3s) + hoveredCodes(表格行 hover)
+//   has-binding      -> 可选 boundCodes,标记哪些键被某个 binding 占用,加细底线
 
-import { type PointerEvent as ReactPointerEvent, type MouseEvent as ReactMouseEvent } from 'react';
+import { type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
+import {
+  MAIN_ROWS, NAV_ROWS, NUMPAD_KEYS, MAC_LABEL_OVERRIDES,
+  type KeyDef, type NumpadKeyDef,
+} from '../data/keyboard-layout';
 
 interface Props {
   highlightedCodes: Set<string>;
   hoveredCodes: Set<string>;
-  heldKeys?: Set<string>;
-  onPress?: (code: string) => void;
-  onRelease?: (code: string) => void;
-  // 悬停(仅鼠标):进入 / 离开一个键。父组件据此延迟弹 / 关 mapping popup。
-  onKeyHoverEnter?: (code: string, rect: DOMRect) => void;
-  onKeyHoverLeave?: (code: string) => void;
-  // 双击:父组件直接弹 popup 并 pin 住。
-  onDoubleClickKey?: (code: string, rect: DOMRect) => void;
-}
-
-// 物理布局——按物理行而非逻辑 row(用户的 Ctrl 是 ControlLeft)
-const ROWS: Array<Array<{ code: string; label: string; w?: number }>> = [
-  [
-    { code: 'Escape', label: 'Esc' },
-    { code: 'F1', label: 'F1' }, { code: 'F2', label: 'F2' }, { code: 'F3', label: 'F3' }, { code: 'F4', label: 'F4' },
-    { code: 'F5', label: 'F5' }, { code: 'F6', label: 'F6' }, { code: 'F7', label: 'F7' }, { code: 'F8', label: 'F8' },
-    { code: 'F9', label: 'F9' }, { code: 'F10', label: 'F10' }, { code: 'F11', label: 'F11' }, { code: 'F12', label: 'F12' },
-  ],
-  [
-    { code: 'Backquote', label: '`' }, { code: 'Digit1', label: '1' }, { code: 'Digit2', label: '2' },
-    { code: 'Digit3', label: '3' }, { code: 'Digit4', label: '4' }, { code: 'Digit5', label: '5' },
-    { code: 'Digit6', label: '6' }, { code: 'Digit7', label: '7' }, { code: 'Digit8', label: '8' },
-    { code: 'Digit9', label: '9' }, { code: 'Digit0', label: '0' },
-    { code: 'Minus', label: '-' }, { code: 'Equal', label: '=' },
-    { code: 'Backspace', label: '⌫', w: 1.5 },
-  ],
-  [
-    { code: 'Tab', label: 'Tab', w: 1.5 },
-    { code: 'KeyQ', label: 'Q' }, { code: 'KeyW', label: 'W' }, { code: 'KeyE', label: 'E' },
-    { code: 'KeyR', label: 'R' }, { code: 'KeyT', label: 'T' }, { code: 'KeyY', label: 'Y' },
-    { code: 'KeyU', label: 'U' }, { code: 'KeyI', label: 'I' }, { code: 'KeyO', label: 'O' }, { code: 'KeyP', label: 'P' },
-    { code: 'BracketLeft', label: '[' }, { code: 'BracketRight', label: ']' },
-    { code: 'Backslash', label: '\\', w: 1.25 },
-  ],
-  [
-    { code: 'CapsLock', label: 'Caps', w: 1.75 },
-    { code: 'KeyA', label: 'A' }, { code: 'KeyS', label: 'S' }, { code: 'KeyD', label: 'D' },
-    { code: 'KeyF', label: 'F' }, { code: 'KeyG', label: 'G' }, { code: 'KeyH', label: 'H' },
-    { code: 'KeyJ', label: 'J' }, { code: 'KeyK', label: 'K' }, { code: 'KeyL', label: 'L' },
-    { code: 'Semicolon', label: ';' }, { code: 'Quote', label: "'" },
-    { code: 'Enter', label: 'Enter', w: 2.25 },
-  ],
-  [
-    { code: 'ShiftLeft', label: 'Shift', w: 2.25 },
-    { code: 'KeyZ', label: 'Z' }, { code: 'KeyX', label: 'X' }, { code: 'KeyC', label: 'C' },
-    { code: 'KeyV', label: 'V' }, { code: 'KeyB', label: 'B' }, { code: 'KeyN', label: 'N' }, { code: 'KeyM', label: 'M' },
-    { code: 'Comma', label: ',' }, { code: 'Period', label: '.' }, { code: 'Slash', label: '/' },
-    { code: 'ShiftRight', label: 'Shift', w: 2.75 },
-  ],
-  [
-    { code: 'ControlLeft', label: 'Ctrl', w: 1.25 },
-    { code: 'MetaLeft', label: '⌘', w: 1.25 },
-    { code: 'AltLeft', label: 'Alt', w: 1.25 },
-    { code: 'Space', label: '', w: 6.25 },
-    { code: 'AltRight', label: 'Alt', w: 1.25 },
-    { code: 'MetaRight', label: '⌘', w: 1.25 },
-    { code: 'ControlRight', label: 'Ctrl', w: 1.25 },
-  ],
-  // 导航簇:Insert/Home/PageUp 上排,Delete/End/PageDown 下排(标准 2×3 布局)
-  [
-    { code: 'Insert', label: 'Ins' },
-    { code: 'Home', label: 'Home' },
-    { code: 'PageUp', label: 'PgUp' },
-  ],
-  [
-    { code: 'Delete', label: 'Del' },
-    { code: 'End', label: 'End' },
-    { code: 'PageDown', label: 'PgDn' },
-  ],
-  [
-    { code: 'ArrowUp', label: '↑' },
-    { code: 'ArrowDown', label: '↓' },
-    { code: 'ArrowLeft', label: '←' },
-    { code: 'ArrowRight', label: '→' },
-  ],
-];
-
-function ModifierAlias({ code }: { code: string }) {
-  // 左侧修饰键高亮时,右侧同名也亮
-  if (code === 'ShiftLeft') return <span className="sl-sl-kb__alias">Shift</span>;
-  if (code === 'ControlLeft') return <span className="sl-sl-kb__alias">Ctrl</span>;
-  if (code === 'AltLeft') return <span className="sl-sl-kb__alias">Alt</span>;
-  if (code === 'MetaLeft') return <span className="sl-sl-kb__alias">⌘</span>;
-  return null;
-}
-
-// 单个键 —— 视觉态完全由 props 决定:
-//   isOn:     来自父组件的 highlightedCodes(录入 3s 高亮)
-//   isHeld:   来自父组件的 heldKeys(物理键盘 / 鼠标长按中,键被按住)
-//   isHover:  来自父组件的 hoveredCodes(表格行 hover 高亮)
-//
-// 鼠标 / 触屏按压交给父组件:pointerdown 调 onPress、pointerup / leave / cancel
-// 调 onRelease。悬停 / 双击同理上报,mouseenter / leave 只认鼠标(触屏不会触发,
-// 避免点触误弹 hover popup)。父组件维护 heldKeys + hold / hover 定时器 + popup。
-interface KeyProps {
-  code: string;
-  label: string;
-  width: number;
-  height: number;
-  isOn: boolean;
-  isHover: boolean;
-  isHeld: boolean;
-  onPress?: (code: string) => void;
-  onRelease?: (code: string) => void;
-  onHoverEnter?: (code: string, rect: DOMRect) => void;
-  onHoverLeave?: (code: string) => void;
-  onDblClick?: (code: string, rect: DOMRect) => void;
-}
-
-function Key({
-  code, label, width, height, isOn, isHover, isHeld,
-  onPress, onRelease, onHoverEnter, onHoverLeave, onDblClick,
-}: KeyProps) {
-  const handlePointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
-    // 鼠标主键(或触屏)才触发;右键/中键忽略
-    if (e.pointerType === 'mouse' && e.button !== 0) return;
-    if (!onPress) return;
-    onPress(code);
-  };
-
-  const handlePointerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
-    // 只在主键释放时通知父组件;右键/中键释放直接忽略
-    if (e.pointerType === 'mouse' && e.button !== 0) return;
-    if (!onRelease) return;
-    onRelease(code);
-  };
-
-  // pointerleave / pointercancel:放弃本次按压
-  // 注:pointerleave 不冒泡,React 17+ 在 document 监听时可能收不到,
-  // 我们改用 onPointerOut(pointerout 是冒泡版本)同时挂两个保险。
-  const handleCancel = () => {
-    if (!onRelease) return;
-    onRelease(code);
-  };
-
-  // 悬停只认鼠标(mouseenter / leave 在触屏上不触发,避免点触连发 hover popup)。
-  // rect 用 currentTarget 当前的布局位置(hover 是瞬时的,进入那一刻的位置足够)。
-  const handleMouseEnter = (e: ReactMouseEvent<HTMLDivElement>) => {
-    onHoverEnter?.(code, e.currentTarget.getBoundingClientRect());
-  };
-  const handleMouseLeave = () => {
-    onHoverLeave?.(code);
-  };
-  // 双击:rect 同样取当前布局位置。可能残留的 hold / hover 定时器由父组件清。
-  const handleDoubleClick = (e: ReactMouseEvent<HTMLDivElement>) => {
-    onDblClick?.(code, e.currentTarget.getBoundingClientRect());
-  };
-
-  return (
-    <div
-      className={`sl-sl-kb__key ${isOn || isHeld ? 'is-on' : ''} ${isHover ? 'is-hover' : ''}`}
-      style={{ width, height }}
-      title={code}
-      data-shortcut-code={code}
-      onPointerDown={handlePointerDown}
-      onPointerUp={handlePointerUp}
-      onPointerLeave={handleCancel}
-      onPointerOut={handleCancel}
-      onPointerCancel={handleCancel}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-      onDoubleClick={handleDoubleClick}
-    >
-      {label && <span className="sl-sl-kb__label">{label}</span>}
-      {(isOn || isHeld) && <ModifierAlias code={code} />}
-    </div>
-  );
+  heldKeys: Set<string>;
+  /** 鼠标 / 触屏按压回调。父组件维护 heldKeys + hold / hover 定时器 */
+  onPress: (code: string) => void;
+  onRelease: (code: string) => void;
+  /** 悬停(仅鼠标):进入 / 离开。父组件据此延迟弹 / 关 mapping popup */
+  onKeyHoverEnter: (code: string, rect: DOMRect) => void;
+  onKeyHoverLeave: (code: string) => void;
+  /** 双击:父组件直接弹 popup 并 pin 住 */
+  onDoubleClickKey: (code: string, rect: DOMRect) => void;
+  /** 有绑定的键:加 has-binding 视觉标记,一眼看出哪些键被占用 */
+  boundCodes?: Set<string>;
+  /** Mac 修饰键改名(可选) */
+  platform?: 'win' | 'mac';
+  /** 是否显示小键盘(可选,默认 true) */
+  showNumpad?: boolean;
 }
 
 export default function Keyboard({
   highlightedCodes, hoveredCodes, heldKeys,
   onPress, onRelease, onKeyHoverEnter, onKeyHoverLeave, onDoubleClickKey,
+  boundCodes, platform = 'win', showNumpad = true,
 }: Props) {
-  // 单元宽 56px,gap 4px
-  const UNIT = 56;
-  const GAP = 4;
-  const heldSet = heldKeys ?? new Set<string>();
+  const labelOf = (k: KeyDef): string =>
+    (platform === 'mac' && MAC_LABEL_OVERRIDES[k.code]) || k.label;
+
+  function renderKey(k: KeyDef, i: number, extraStyle?: CSSProperties) {
+    if (k.spacer) {
+      return (
+        <span
+          key={`sp-${i}`}
+          className="sl-sl-kb__spacer"
+          style={{ ['--sl-kb-w' as string]: String(k.w ?? 1) }}
+          aria-hidden="true"
+        />
+      );
+    }
+    const cls = [
+      'sl-sl-kb__key',
+      heldKeys.has(k.code) ? 'is-on' : '',
+      (hoveredCodes.has(k.code) || highlightedCodes.has(k.code)) ? 'is-hover' : '',
+      boundCodes?.has(k.code) ? 'has-binding' : '',
+    ].filter(Boolean).join(' ');
+
+    return (
+      <div
+        key={k.code}
+        className={cls}
+        data-shortcut-code={k.code}
+        title={k.code}
+        style={{
+          '--sl-kb-w': k.w ?? 1,
+          '--sl-kb-col': (extraStyle as Record<string, string> | undefined)?.['--sl-kb-col'],
+          '--sl-kb-row': (extraStyle as Record<string, string> | undefined)?.['--sl-kb-row'],
+          '--sl-kb-colspan': (extraStyle as Record<string, string> | undefined)?.['--sl-kb-colspan'],
+          '--sl-kb-rowspan': (extraStyle as Record<string, string> | undefined)?.['--sl-kb-rowspan'],
+        } as CSSProperties}
+        onPointerDown={(e: ReactPointerEvent<HTMLDivElement>) => {
+          if (e.pointerType === 'mouse' && e.button !== 0) return;
+          e.preventDefault();
+          onPress(k.code);
+        }}
+        onPointerUp={(e: ReactPointerEvent<HTMLDivElement>) => {
+          if (e.pointerType === 'mouse' && e.button !== 0) return;
+          onRelease(k.code);
+        }}
+        onPointerLeave={() => {
+          onRelease(k.code);
+          onKeyHoverLeave(k.code);
+        }}
+        onPointerOut={() => onRelease(k.code)}
+        onPointerCancel={() => onRelease(k.code)}
+        onMouseEnter={(e: ReactMouseEvent<HTMLDivElement>) =>
+          onKeyHoverEnter(k.code, e.currentTarget.getBoundingClientRect())}
+        onDoubleClick={(e: ReactMouseEvent<HTMLDivElement>) =>
+          onDoubleClickKey(k.code, e.currentTarget.getBoundingClientRect())}
+      >
+        {k.sub && <span className="sl-sl-kb__sub">{k.sub}</span>}
+        <span className="sl-sl-kb__label">{labelOf(k)}</span>
+      </div>
+    );
+  }
 
   return (
-    <div className="sl-sl-kb">
-      {ROWS.map((row, ri) => (
-        <div className="sl-sl-kb__row" key={ri} style={{ gap: GAP }}>
-          {row.map((key) => {
-            const isOn = highlightedCodes.has(key.code);
-            const isHover = hoveredCodes.has(key.code);
-            const isHeld = heldSet.has(key.code);
-            const w = (key.w ?? 1) * UNIT + (key.w ? (key.w - 1) * GAP : 0);
-            return (
-              <Key
-                key={key.code}
-                code={key.code}
-                label={key.label}
-                width={w}
-                height={UNIT}
-                isOn={isOn}
-                isHover={isHover}
-                isHeld={isHeld}
-                onPress={onPress}
-                onRelease={onRelease}
-                onHoverEnter={onKeyHoverEnter}
-                onHoverLeave={onKeyHoverLeave}
-                onDblClick={onDoubleClickKey}
-              />
-            );
-          })}
+    <div className="sl-sl-kb" role="group" aria-label="键盘预览">
+      <div className="sl-sl-kb__cluster sl-sl-kb__cluster--main">
+        {MAIN_ROWS.map((row, r) => (
+          <div className="sl-sl-kb__row" key={`m${r}`}>{row.map(renderKey)}</div>
+        ))}
+      </div>
+
+      <div className="sl-sl-kb__cluster sl-sl-kb__cluster--nav">
+        {NAV_ROWS.map((row, r) => (
+          <div className="sl-sl-kb__row" key={`n${r}`}>
+            {row.length
+              ? row.map(renderKey)
+              : <span className="sl-sl-kb__spacer" style={{ ['--sl-kb-w' as string]: '3' }} />}
+          </div>
+        ))}
+      </div>
+
+      {showNumpad && (
+        <div className="sl-sl-kb__cluster sl-sl-kb__cluster--numpad">
+          {NUMPAD_KEYS.map((k: NumpadKeyDef, i) =>
+            renderKey(k, i, {
+              ['--sl-kb-col' as string]: String(k.col),
+              ['--sl-kb-row' as string]: String(k.row),
+              ['--sl-kb-colspan' as string]: String(k.colSpan ?? 1),
+              ['--sl-kb-rowspan' as string]: String(k.rowSpan ?? 1),
+            } as CSSProperties & Record<string, string>))}
         </div>
-      ))}
+      )}
     </div>
   );
 }

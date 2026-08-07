@@ -1,6 +1,18 @@
 // ShortcutTable.tsx —— 当前选中分组的快捷键表格
-// 内嵌 CapturePopover 用于"录入组合键";同组内 combo 重复时高亮
-// 「条件」列展示 condition 字段(纯备注),仅当存在时显示
+//
+// 适用场景:shortcut-library 主区里、已选中某个 group 时渲染该分组下的快捷键列表;
+// 配套表格顶部右上角 "+ 新增" 按钮触发行内录入,行 hover 触发键盘预览区高亮。
+// 不适用:未选中分组(此时父组件 index.tsx 渲染 sl-sl-empty-state);分组数据来自
+// props.group,本组件不直接拿 store,所有变更通过 onAdd/onUpdate/onDelete 上抛。
+//
+// 显示条件与约定:
+//   - 表格仅在 group.shortcuts 非空 或 adding=true 时展开;空列表显示"还没有快捷键"
+//   - 行内仅当 editingId/adding 命中时,把该行替换为 CapturePopover(整行 colSpan=4)
+//   - combo 冲突(同组内 comboKey 完全相同)在该行 + combo 列显示"冲突"红标 + 行底色
+//   - condition 列:快捷键的 condition 字段纯备注,只在存在时显示文字,否则"—"
+//   - 行 hover:mouseenter 把 combo codes 推到父组件(键盘预览高亮)+ 上报 rect
+//     (供右侧 description tooltip 定位);mouseleave 全部清掉
+//   - 删除二次确认:第一下 × 变 ?,再点同一行的 ? 才真删;切分组/失焦自动取消
 
 import { useEffect, useMemo, useState } from 'react';
 import type { Group, Shortcut, KeyStroke } from '../types';
@@ -34,15 +46,34 @@ export default function ShortcutTable({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftDesc, setDraftDesc] = useState('');
   const [draftCondition, setDraftCondition] = useState('');
-  // 就地二次确认删除:第一次点 × 变 ?,再点一次真删。失焦或切分组自动取消。
+  // 删除二次确认:第一下 × 变 ?,再点同一行的 ? 才真删;切分组/失焦自动取消。
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  // 条件筛选:'' 表示全部;选中某个 condition 值时只显示条件完全相同的行。
+  const [condFilter, setCondFilter] = useState('');
 
-  // 切换分组时清掉待确认态,避免"?"跨分组残留
+  // 触发条件:切换分组(group.id 变化)→ 清掉 confirmDeleteId,避免"?"跨分组残留。
   useEffect(() => {
     setConfirmDeleteId(null);
   }, [group.id]);
 
-  // 计算同组内冲突的 combo
+  // 当前分组内去重后的 condition 值(纯备注,可为空;非空才进选项)。
+  // 排序保证选项稳定,免得切分组时下拉项顺序跳动。
+  const conditionOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of group.shortcuts) if (s.condition) set.add(s.condition);
+    return [...set].sort();
+  }, [group.shortcuts]);
+
+  // 切分组 / 组内数据变化时,若选中的条件已不存在(分组被删/条件被改),
+  // 重置回"全部条件",避免下拉停留在一个悬空值上。
+  useEffect(() => {
+    setCondFilter((prev) => (prev && conditionOptions.includes(prev) ? prev : ''));
+  }, [conditionOptions]);
+
+  // 冲突判定:同一 group 内,combo 完全相同(comboKey 一致)→ 算冲突。
+  // 不区分修饰键大小写、不区分修饰键左右(comboKey 已经规范化),
+  // 也不跨 group 比(每个 group 各自一份快捷键,允许 Ctrl+R 同时存在于
+  // VSCode 和 Chrome 两组里)。
   const conflictMap = useMemo(() => {
     const m = new Map<string, number>();
     for (const s of group.shortcuts) m.set(comboKey(s.combo), (m.get(comboKey(s.combo)) ?? 0) + 1);
@@ -51,9 +82,11 @@ export default function ShortcutTable({
     return conflicts;
   }, [group.shortcuts]);
 
-  // 过滤
+  // 筛选:条件筛选(精确匹配)与搜索词(query)是 AND 关系 —— 先按条件收窄,
+  // 再按 query 在 description / condition / comboLabel 里做大小写不敏感包含匹配。
   const q = query.trim().toLowerCase();
   const filtered = group.shortcuts.filter((s) => {
+    if (condFilter && s.condition !== condFilter) return false;
     if (!q) return true;
     if (s.description.toLowerCase().includes(q)) return true;
     if (s.condition?.toLowerCase().includes(q)) return true;
@@ -89,16 +122,34 @@ export default function ShortcutTable({
           <h2 className="sl-sl-table__title">{group.name}</h2>
           <span className="sl-sl-table__sub">{group.shortcuts.length} 条快捷键</span>
         </div>
-        <button
-          className="sl-sl-btn sl-sl-btn--primary"
-          onClick={startAdd}
-          disabled={adding}
-        >
-          + 新增快捷键
-        </button>
+        <div className="sl-sl-table__actions">
+          {/* 条件筛选:仅当组里存在带 condition 的快捷键才显示,否则是噪音。
+              选中后精确匹配,与右上角搜索框(全局)做 AND。 */}
+          {conditionOptions.length > 0 && (
+            <select
+              className="sl-sl-filter"
+              value={condFilter}
+              onChange={(e) => setCondFilter(e.target.value)}
+              aria-label="按条件筛选"
+            >
+              <option value="">全部条件</option>
+              {conditionOptions.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          )}
+          <button
+            className="sl-sl-btn sl-sl-btn--primary"
+            onClick={startAdd}
+            disabled={adding}
+          >
+            + 新增快捷键
+          </button>
+        </div>
       </header>
 
       {group.shortcuts.length === 0 && !adding ? (
+        // 触发条件:组里一条都没有且不在添加中 → 显示引导空状态。
         <div className="sl-sl-table__empty">
           还没有快捷键,点击右上角&ldquo;新增快捷键&rdquo;开始。
         </div>
@@ -108,8 +159,8 @@ export default function ShortcutTable({
             <thead>
               <tr>
                 <th className="sl-sl-table__col-combo">组合键</th>
-                <th className="sl-sl-table__col-desc">说明</th>
                 <th className="sl-sl-table__col-cond">条件</th>
+                <th className="sl-sl-table__col-desc">说明</th>
                 <th className="sl-sl-table__col-act">操作</th>
               </tr>
             </thead>
@@ -136,6 +187,8 @@ export default function ShortcutTable({
                     key={s.id}
                     className={`sl-sl-row ${isConflict ? 'sl-sl-row--conflict' : ''}`}
                     title={isConflict ? '同组内已有相同组合' : undefined}
+                    // 行 hover 行为:mouseenter 把该行的 combo codes 推到父组件(键盘预览高亮),
+                    // 同时上 rect(供 description tooltip 定位);mouseleave 全部清掉。
                     onMouseEnter={(e) => {
                       onHover?.(new Set(s.combo.map(k => k.code)));
                       if (onShortcutHover) {
@@ -153,11 +206,11 @@ export default function ShortcutTable({
                         <span className="sl-sl-table__conflict-tag">冲突</span>
                       )}
                     </td>
-                    <td className="sl-sl-table__col-desc">
-                      {s.description || <span className="sl-sl-empty">未填写</span>}
-                    </td>
                     <td className="sl-sl-table__col-cond">
                       {s.condition || <span className="sl-sl-empty">—</span>}
+                    </td>
+                    <td className="sl-sl-table__col-desc">
+                      {s.description || <span className="sl-sl-empty">未填写</span>}
                     </td>
                     <td className="sl-sl-table__col-act">
                       <button
@@ -227,7 +280,12 @@ export default function ShortcutTable({
             </tbody>
           </table>
           {filtered.length === 0 && group.shortcuts.length > 0 && (
-            <div className="sl-sl-table__empty">没有匹配 &ldquo;{query}&rdquo; 的快捷键</div>
+            // 触发条件:组里有快捷键但全被条件筛选 / 搜索词过滤掉 → 显示无匹配空状态。
+            <div className="sl-sl-table__empty">
+              {condFilter
+                ? `没有条件为“${condFilter}”${q ? ` 且匹配“${query}”` : ''} 的快捷键`
+                : `没有匹配“${query}”的快捷键`}
+            </div>
           )}
         </div>
       )}

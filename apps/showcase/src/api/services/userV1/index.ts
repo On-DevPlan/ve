@@ -40,6 +40,11 @@ export class UserV1Service extends HttpService {
   regenerateInvitation(): Promise<{ invitationCode: string }> {
     return this.reqPost<{ invitationCode: string }>('/invitation/regenerate');
   }
+
+  /** 切换默认工作空间 —— 必须是目标组成员。 */
+  setDefaultGroup(groupId: number): Promise<{ groupId: number; message: string }> {
+    return this.reqPatch<{ groupId: number; message: string }>('/default-group', { groupId });
+  }
 }
 
 export const userV1Service = new UserV1Service();

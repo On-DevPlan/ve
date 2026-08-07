@@ -10,7 +10,7 @@
 
 import { onMounted, onBeforeUnmount, ref, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { jwtAuth } from '@/shared/auth-store';
+import { jwtAuth } from '@/api/http/auth-store';
 import { closeLoginModal } from '@/shared/useLoginModal';
 import { startCanvas } from '@/shared/canvas-engine';
 import './login-page.css';

@@ -11,9 +11,6 @@
 
 import { useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { useJwtAuth } from '../hooks/useAuth';
-import { useLoginModal } from '../hooks/useLoginModal';
-import { logoutWithConfirm } from '../hooks/logoutWithConfirm';
 
 export interface SettingsPanelProps {
   open: boolean;
@@ -44,8 +41,6 @@ function useEscapeClose(open: boolean, onClose: () => void): void {
 
 export default function SettingsPanel(props: SettingsPanelProps) {
   const { open, onClose, saveMode, onChangeSaveMode, warnOnDirtyExit, onToggleWarnOnDirtyExit, dirty, saving, onFlushDirty } = props;
-  const auth = useJwtAuth();
-  const loginModal = useLoginModal();
   useEscapeClose(open, onClose);
 
   // 防止背景滚动
@@ -86,32 +81,7 @@ export default function SettingsPanel(props: SettingsPanelProps) {
         </header>
 
         <div className="sl-sl-settings-panel__body">
-          {/* 0. 账号(登录 / 退出) */}
-          {auth.jwtAuthState !== 'logged-in' || !auth.token ? (
-            <div className="sl-sl-settings__auth">
-              <p className="sl-sl-settings__hint">登录后可保存快捷键到云端,跨设备同步。</p>
-              <button className="sl-sl-btn sl-sl-btn--primary" onClick={loginModal.open}>
-                登录
-              </button>
-            </div>
-          ) : (
-            <div className="sl-sl-settings__auth">
-              <p className="sl-sl-settings__hint">已登录为 {auth.jwtUser?.email}</p>
-              <button
-                className="sl-sl-btn sl-sl-btn--ghost"
-                onClick={() =>
-                  void logoutWithConfirm({
-                    saveMode,
-                    dirty,
-                    warnOnDirtyExit,
-                    flushDirty: onFlushDirty,
-                  })
-                }
-              >
-                退出登录
-              </button>
-            </div>
-          )}
+          {/* 账号(登录/退出)不在此处 —— 认证只在全局 host UI 显示 */}
 
           {/* 1. 同步模式 */}
           <section className="sl-sl-settings-row">
