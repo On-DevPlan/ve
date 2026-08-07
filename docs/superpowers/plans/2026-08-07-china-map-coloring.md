@@ -205,31 +205,39 @@ export function decodeRing(encoded: string, offset: [number, number]): [number, 
  * 解码一个 MultiPolygon 的全部多边形。
  * encodeOffsets 与 coordinates 逐多边形对齐：coordinates[p][r] ↔ encodeOffsets[p][r]。
  */
+/** 把 encodeOffsets 中某环的原始条目规整为 [x, y]；兼容 [[x,y]] 与 [x,y] 两种形态。 */
+function toOffset(raw: number[] | number[][] | undefined): [number, number] {
+  if (!raw) return [0, 0];
+  const pair = Array.isArray(raw[0]) ? (raw[0] as number[]) : (raw as number[]);
+  return [pair[0] ?? 0, pair[1] ?? 0];
+}
+
+/**
+ * 解码一个 MultiPolygon 的全部多边形，展平为「环」数组：一环 → 一个 [lng,lat] 点数组。
+ * encodeOffsets 与 coordinates 逐多边形对齐：coordinates[p][r] ↔ encodeOffsets[p][r]。
+ */
 export function decodeCoordinates(
   coordinates: string[][],
   encodeOffsets: number[][][],
 ): [number, number][][] {
-  return coordinates.map((rings, p) =>
-    rings.map((ring, r) => {
-      const raw = encodeOffsets[p]?.[r] ?? encodeOffsets[p]?.[0] ?? [0, 0];
-      const off: [number, number] = Array.isArray(raw[0])
-        ? (raw[0] as [number, number])
-        : (raw as [number, number]);
-      return decodeRing(ring, off);
-    }),
+  return coordinates.flatMap((rings, p) =>
+    rings.map((ring, r) => decodeRing(ring, toOffset(encodeOffsets[p]?.[r] ?? encodeOffsets[p]?.[0]))),
   );
 }
 
-/** 解码一个 feature 的 geometry（MultiPolygon / Polygon 均处理）。 */
+/** 解码一个 feature 的 geometry（MultiPolygon / Polygon 均处理），返回「环」数组。 */
 export function decodeGeometry(feature: GeoJsonFeature): [number, number][][] {
   const g = feature.geometry;
   if (g.type === 'Polygon') {
     const rings = g.coordinates as string[];
-    const offsets = g.encodeOffsets.map((o) => o[0] as [number, number]);
-    return [rings.map((ring, r) => decodeRing(ring, offsets[r] ?? [0, 0]))];
+    const offsets = g.encodeOffsets as unknown as (number[] | number[][])[];
+    return rings.map((ring, r) => decodeRing(ring, toOffset(offsets[r])));
   }
   return decodeCoordinates(g.coordinates as string[][], g.encodeOffsets);
 }
+```
+
+> **实测修正（Task 1 验证时发现）**：`decodeCoordinates` 原用 `map` 保留多边形嵌套，导致 `decodeGeometry` 返回 `[polygon][ring][point]` 三层，而 `buildProvinces` 与测试按「环」数组（一层 `Path2D` 一环）消费，测试报 NaN。改为 `flatMap` 展平为 `[ring][point]`。`buildProvinces`（Task 2）与测试结构不变。
 ```
 
 `src/lib/projection.ts`:
