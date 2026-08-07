@@ -133,7 +133,7 @@ const handleFocus = () => {
         class="search-input"
         :placeholder="placeholder"
         @focus="handleFocus"
-        @blur="() => setTimeout(() => showResults = false, 200)"
+        @blur="() => window.setTimeout(() => showResults = false, 200)"
       >
       <button
         v-if="keyword"
