@@ -292,14 +292,16 @@ export default function ShortcutLibrary() {
   // 长按 popup:查询并展示
   // - 通过 Keyboard 子组件回调拿到 code 和 rect
   // - 用 createPortal 渲染到 host portal target,避免被 .sl-sl-preview 的 overflow 裁剪
+  // 范围:只在当前选中组里找(用户要求"切组即重渲 + popup/快照都收窄")
   const handleLongPress = useCallback(
     (code: string, rect: DOMRect) => {
-      const hits = findBindingsByCode(store.groups, code);
+      const scope = store.selectedGroup ? [store.selectedGroup] : [];
+      const hits = findBindingsByCode(scope, code);
       // 即使没有 hits 也展示 popup,告诉用户「该键未被任何分组使用」。
       // 长按是非 pin 的(松开后可被外部点击关闭)。
       setLongPressPopup({ code, rect, hits });
     },
-    [store.groups],
+    [store.selectedGroup],
   );
 
   const handleLongPressClose = useCallback(() => {
@@ -309,6 +311,7 @@ export default function ShortcutLibrary() {
   // 悬停进入:延迟 HOVER_OPEN_DELAY 后弹(无绑定不弹)。
   // 用 setLongPressPopup 的函数式更新读最新 popup,避免闭包里 popup 过期。
   // 任何新触发(hover / hold / dblclick)都会覆盖当前 popup —— 没有"锁住"逻辑。
+  // 范围:仅当前选中组。
   const handleHoverEnter = useCallback(
     (code: string, rect: DOMRect) => {
       // 先清掉上一个未触发的 hover timer,快速划过时不连发
@@ -318,7 +321,8 @@ export default function ShortcutLibrary() {
       }
       const t = window.setTimeout(() => {
         hoverTimer.current = undefined;
-        const hits = findBindingsByCode(store.groups, code);
+        const scope = store.selectedGroup ? [store.selectedGroup] : [];
+        const hits = findBindingsByCode(scope, code);
         setLongPressPopup((prev) => {
           if (hits.length === 0) return prev; // 无绑定不弹(悬停是"扫一眼",空 popup 是噪音)
           return { code, rect, hits };
@@ -326,7 +330,7 @@ export default function ShortcutLibrary() {
       }, HOVER_OPEN_DELAY);
       hoverTimer.current = t;
     },
-    [store.groups],
+    [store.selectedGroup],
   );
 
   // 悬停离开:取消待触发的 hover timer;关闭当前 popup。
@@ -340,6 +344,7 @@ export default function ShortcutLibrary() {
 
   // 双击:弹 popup 并 pin 住。清掉可能残留的 hold / hover 定时器,避免它们事后
   // 把 pin 改回非 pin。即使无绑定也弹(pin 是用户主动检查)。
+  // 范围:仅当前选中组。
   const handleDoubleClickKey = useCallback(
     (code: string, rect: DOMRect) => {
       if (hoverTimer.current !== undefined) {
@@ -352,10 +357,11 @@ export default function ShortcutLibrary() {
         window.clearTimeout(ht);
         holdTimers.current.delete(code);
       }
-      const hits = findBindingsByCode(store.groups, code);
+      const scope = store.selectedGroup ? [store.selectedGroup] : [];
+      const hits = findBindingsByCode(scope, code);
       setLongPressPopup({ code, rect, hits });
     },
-    [store.groups],
+    [store.selectedGroup],
   );
 
   // 统一的「按下」「松开」入口(鼠标 / 触屏 / 物理键共享)。
@@ -691,6 +697,11 @@ export default function ShortcutLibrary() {
               highlightedCodes={highlightedCodes}
               hoveredCodes={hoveredCodes}
               heldKeys={heldKeys}
+              boundCodes={
+                store.selectedGroup
+                  ? new Set(store.selectedGroup.shortcuts.flatMap((s) => s.combo.map((k) => k.code)))
+                  : undefined
+              }
               onPress={holdPress}
               onRelease={holdRelease}
               onKeyHoverEnter={handleHoverEnter}
