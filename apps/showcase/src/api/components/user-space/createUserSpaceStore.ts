@@ -35,6 +35,7 @@ import type {
   KvListResult,
   KvView,
   KvVersionView,
+  KvTagCount,
   KvEditorPayload,
   UserSpaceStore,
   ShortcutsBlob,
@@ -331,6 +332,11 @@ export function createUserSpaceStore(): UserSpaceStore {
     return { items: items.map(toKvView), total, page: opts.page, pageSize: opts.pageSize };
   }
 
+  async function listKvTags(groupId: number): Promise<KvTagCount[]> {
+    requireAuth();
+    return kvV1Service.tags({ groupId });
+  }
+
   async function listKvVersions(groupId: number, key: string): Promise<KvVersionView[]> {
     requireAuth();
     const vers = await kvV1Service.versions({ key, groupId });
@@ -507,6 +513,7 @@ export function createUserSpaceStore(): UserSpaceStore {
     deleteKv,
     getKvDetail,
     listKvs,
+    listKvTags,
     listKvVersions,
     restoreKv,
     duplicateKv,

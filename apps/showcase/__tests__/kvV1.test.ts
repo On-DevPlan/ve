@@ -128,15 +128,26 @@ describe('kvV1 service (throw model)', () => {
     expect(url).toBe('/api/v1/kv?tags=prod&tags=cache&match=all');
   });
 
-  it('tags() GETs the facet endpoint', async () => {
+  it('tags() GETs the facet endpoint for the selected group', async () => {
     const mockFetch = vi.fn().mockResolvedValue(
       mockJSON(200, { code: 0, data: [{ tag: 'prod', count: 3 }, { tag: 'cache', count: 1 }] }),
     );
     global.fetch = mockFetch;
 
-    const out = await kvV1Service.tags();
+    const out = await kvV1Service.tags({ groupId: 42 });
     expect(out).toEqual([{ tag: 'prod', count: 3 }, { tag: 'cache', count: 1 }]);
+    expect(mockFetch.mock.calls[0][0]).toBe('/api/v1/kv/tags?groupId=42');
+  });
+
+  it('tags() omits groupId when 0 or undefined', async () => {
+    const mockFetch = vi.fn().mockResolvedValue(mockJSON(200, { code: 0, data: [] }));
+    global.fetch = mockFetch;
+
+    await kvV1Service.tags({ groupId: 0 });
     expect(mockFetch.mock.calls[0][0]).toBe('/api/v1/kv/tags');
+
+    await kvV1Service.tags();
+    expect(mockFetch.mock.calls[1][0]).toBe('/api/v1/kv/tags');
   });
 
   it('versions GETs /kv/:key/versions with groupId and unwraps versions array', async () => {

@@ -23,6 +23,7 @@ import type {
   GroupMemberView,
   GroupSummary,
   KvListResult,
+  KvTagCount,
   KvVersionView,
   KvView,
   ViewMode,
@@ -63,6 +64,10 @@ export default function UserSpace() {
   const [kvError, setKvError] = useState<string | null>(null);
   const [kvPage, setKvPage] = useState(1);
   const [kvTag, setKvTag] = useState<string | null>(null);
+  // KV tag facet(组内全部成员的 tag 频次),与 kv 列表并行拉;空 tag 集合时
+  // Inventory tag 下拉只显示「所有 tag」,不显示任何选项。后端契约 GET /kv/tags
+  // ?groupId=...,由 store.listKvTags 包,接口职责清晰。
+  const [kvTags, setKvTags] = useState<KvTagCount[]>([]);
   const [kvEditorOpen, setKvEditorOpen] = useState(false);
   const [kvEditorMode, setKvEditorMode] = useState<'create' | 'edit'>('create');
   const [kvEditorInit, setKvEditorInit] = useState<KvView | null>(null);
@@ -128,6 +133,7 @@ export default function UserSpace() {
     setKv(null);
     setKvPage(1);
     setKvTag(null);
+    setKvTags([]);
     setKvEditorOpen(false);
     setKvVersions([]);
     setDuplicateOpen(false);
@@ -180,11 +186,29 @@ export default function UserSpace() {
     }
   }, [currentSelected, store, kvPageSize]);
 
+  // KV tag facet —— 组内全部成员的 tag 频次。失败不阻塞列表(下拉只显示「所有 tag」)。
+  // 与 kv 列表并行拉(loadKv / loadKvTags 在 view==='inventory' effect 同步调用)。
+  // CRUD 完成后要重新拉 —— 单条 tag 修改可能新增/删除 facet 条目。
+  const loadKvTags = useCallback(async () => {
+    if (!currentSelected) return;
+    try {
+      const list = await store.listKvTags(currentSelected);
+      setKvTags(list);
+    } catch {
+      // facet 失败不阻断 inventory;降级到空下拉
+      setKvTags([]);
+    }
+  }, [currentSelected, store]);
+
   useEffect(() => {
     if (view === 'members') void loadMembers();
     if (view === 'invitations') void loadInvitations();
-    if (view === 'inventory') void loadKv(kvPage, kvTag);
-  }, [view, loadMembers, loadInvitations, loadKv, kvPage, kvTag]);
+    if (view === 'inventory') {
+      // kv 列表 + tag facet 并行 —— facet 失败不阻塞列表,各自降级
+      void loadKv(kvPage, kvTag);
+      void loadKvTags();
+    }
+  }, [view, loadMembers, loadInvitations, loadKv, loadKvTags, kvPage, kvTag]);
 
   // 打开编辑弹窗时拉一次版本历史;创建模式不拉。恢复成功后父级会 setKvEditorInit
   // 换新引用,本 effect 随之重跑,自动刷新版本列表(restore 会新拍一份快照)。
@@ -314,7 +338,7 @@ export default function UserSpace() {
       await store.createKv(currentSelected, payload);
       setKvEditorOpen(false);
       setKvPage(1); // 新建后回到第一页,新 key 在前
-      await loadKv(1, kvTag);
+      await Promise.all([loadKv(1, kvTag), loadKvTags()]);
     });
   }
 
@@ -323,7 +347,7 @@ export default function UserSpace() {
     await withError(async () => {
       await store.updateKv(currentSelected, payload);
       setKvEditorOpen(false);
-      await loadKv(kvPage, kvTag);
+      await Promise.all([loadKv(kvPage, kvTag), loadKvTags()]);
     });
   }
 
@@ -337,7 +361,7 @@ export default function UserSpace() {
         nextPage = kvPage - 1;
         setKvPage(nextPage);
       }
-      await loadKv(nextPage, kvTag);
+      await Promise.all([loadKv(nextPage, kvTag), loadKvTags()]);
     });
   }
 
@@ -350,7 +374,7 @@ export default function UserSpace() {
       // + 刷新列表预览;版本列表由上面的 effect 随 kvEditorInit 变化自动重拉。
       const detail = await store.getKvDetail(currentSelected, kvEditorInit.key);
       setKvEditorInit(detail);
-      await loadKv(kvPage, kvTag);
+      await Promise.all([loadKv(kvPage, kvTag), loadKvTags()]);
     });
   }
 
@@ -561,6 +585,7 @@ export default function UserSpace() {
                   page={kvPage}
                   pageSize={kvPageSize}
                   selectedTag={kvTag}
+                  tags={kvTags}
                   onPageChange={(p) => setKvPage(p)}
                   onTagChange={(t) => { setKvTag(t); setKvPage(1); }}
                   onCreate={() => { setKvEditorMode('create'); setKvEditorInit(null); setKvEditorOpen(true); }}

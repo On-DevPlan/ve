@@ -76,8 +76,9 @@ export class KvV1Service extends HttpService {
   }
 
   /** GET /kv/tags —— 当前用户非过期 KV 的 {tag, count} facet(按 count desc / tag asc)。 */
-  async tags(): Promise<KvTagCount[]> {
-    return this.reqGet<KvTagCount[]>('/tags');
+  async tags(args: { groupId?: number } = {}): Promise<KvTagCount[]> {
+    const qs = args.groupId && args.groupId > 0 ? `?groupId=${args.groupId}` : '';
+    return this.reqGet<KvTagCount[]>(`/tags${qs}`);
   }
 
   /** GET /kv/:key/versions —— 历史版本摘要(version_no / value_len / replaced_at,不回 value 全文)。read+。 */

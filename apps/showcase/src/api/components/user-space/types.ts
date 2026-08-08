@@ -9,11 +9,11 @@
 
 import type { GroupRole } from '../../services/groupV1/types';
 import type { DefaultGroupInfo } from '../../services/userV1/types';
-import type { KvDuplicateArgs, KvDuplicateResponse } from '../../services/kvV1/types';
+import type { KvDuplicateArgs, KvDuplicateResponse, KvTagCount } from '../../services/kvV1/types';
 
 export type { GroupRole };
 export type { DefaultGroupInfo };
-export type { KvDuplicateArgs, KvDuplicateResponse };
+export type { KvDuplicateArgs, KvDuplicateResponse, KvTagCount };
 
 export interface GroupSummary {
   id: number;
@@ -123,6 +123,7 @@ export interface UserSpaceStore {
   deleteKv(groupId: number, key: string): Promise<void>;
   getKvDetail(groupId: number, key: string): Promise<KvView>;
   listKvs(groupId: number, opts: { page: number; pageSize: number; tags?: string[] }): Promise<KvListResult>;
+  listKvTags(groupId: number): Promise<KvTagCount[]>;
   /** 历史版本摘要列表(不回 value 全文),用于编辑框里的版本选择器。read+。 */
   listKvVersions(groupId: number, key: string): Promise<KvVersionView[]>;
   /** 回滚到指定版本。write+;恢复后需重新拉详情刷新当前值。 */
