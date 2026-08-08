@@ -21,6 +21,7 @@ import SettingsPanel from './src/pages/SettingsPanel';
 import Sidebar from './src/pages/Sidebar';
 import ShortcutTable from './src/pages/ShortcutTable';
 import Keyboard from './src/pages/Keyboard';
+import FullscreenCanvas from './src/pages/FullscreenCanvas';
 
 
 // 物理键盘长按阈值 —— 按住多少毫秒后弹 mapping popup。
@@ -76,6 +77,8 @@ export default function ShortcutLibrary() {
   const [hoveredCodes, setHoveredCodes] = useState<Set<string>>(new Set());
   const [showImport, setShowImport] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  // 全屏画布开关
+  const [canvasOpen, setCanvasOpen] = useState(false);
   // 键盘预览折叠态 —— 默认展开;用户手动收起后写入 LS,下次进详情页保持
   const [previewCollapsed, setPreviewCollapsed] = useState<boolean>(loadPreviewCollapsed);
 
@@ -623,6 +626,14 @@ export default function ShortcutLibrary() {
           >
             导入
           </button>
+          <button
+            className="sl-sl-btn sl-sl-btn--ghost"
+            onClick={() => setCanvasOpen(true)}
+            disabled={!store.selectedGroup}
+            title="全屏查看当前组的快捷键"
+          >
+            全屏
+          </button>
           <span className="sl-sl-topbar__meta">
             {store.groups.length} 个分组 · 共{' '}
             {store.groups.reduce((n, g) => n + g.shortcuts.length, 0)} 条
@@ -810,6 +821,14 @@ export default function ShortcutLibrary() {
         </div>,
         portalRoot,
       )}
+
+      {/* 全屏浮窗画布 —— 当前选中组的所有快捷键,可缩放可拖动 */}
+      <FullscreenCanvas
+        open={canvasOpen}
+        onClose={() => setCanvasOpen(false)}
+        shortcuts={store.selectedGroup?.shortcuts ?? []}
+        groupName={store.selectedGroup?.name ?? ''}
+      />
     </div>
   );
 }
