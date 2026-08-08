@@ -542,6 +542,17 @@
   font-size: 12.5px;
   margin: 0 20px 12px;
 }
+/* 复制成功等正向反馈:沿用 .sl-us-error 的间距 + 居中性,把背景换成
+   success-soft(没用 --success-soft token 因为整套 design tokens 没引入) */
+.sl-us-toast {
+  padding: 8px 12px;
+  background: #ecfdf5;
+  border: 1px solid #bbf7d0;
+  border-radius: var(--radius);
+  color: var(--success);
+  font-size: 12.5px;
+  margin: 0 20px 12px;
+}
 .sl-us-muted { color: var(--fg-3); font-size: 12.5px; }
 .sl-us-key { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; }
 .sl-us-code {
