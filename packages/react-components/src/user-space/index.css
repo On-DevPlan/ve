@@ -224,23 +224,20 @@
   transition: color 0.1s, background 0.1s;
 }
 .sl-us-tab:hover { color: var(--fg); background: var(--hover); }
+/* 选中态用 inset box-shadow 画 3px 底部实线 —— 占据 padding 区域,
+   跨过容器 1px hairline。box-shadow inset 不影响元素 box 尺寸,
+   不会撑高 tab 导致布局抖动,绝对可见(不被 ::after 裁剪问题困扰)。 */
 .sl-us-tab.is-active {
   color: var(--fg);
   font-weight: 700;
   background: var(--hover);
+  box-shadow:
+    inset 0 -3px 0 var(--fg),
+    /* 保留 ::after 作为冗余(默认隐藏,视觉上只用 box-shadow) */
+    inset 0 calc(-1 * var(--tabs-pad-y, 10px) + 2px) 0 var(--fg);
 }
 .sl-us-tab.is-active::after {
-  content: "";
-  position: absolute;
-  left: 14px; right: 14px;
-  /* 跨过容器 padding + 1px border,让 3px 实线下沿正好覆盖 hairline,
-     避免 active tab 下面出现"黑 + 灰"叠加。bottom = -pad-y - 1px */
-  bottom: calc(-1 * var(--tabs-pad-y, 10px) - 1px);
-  height: 3px;                                              /* ↑ 从 2px */
-  background: var(--fg);
-  border-radius: 0;                                        /* ↑ 去圆角,贴齐 hairline */
-  /* 用阴影抵消容器 1px border-bottom,确保底线厚于 hairline 不被"挤"丢 */
-  box-shadow: 0 1px 0 var(--fg);
+  display: none;
 }
 .sl-us-tab__count {
   display: inline-block;
