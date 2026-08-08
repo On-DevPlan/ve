@@ -233,12 +233,14 @@
   content: "";
   position: absolute;
   left: 14px; right: 14px;
-  /* 跨过容器 padding + 1px border,让 2px 实线下沿正好覆盖 hairline,
+  /* 跨过容器 padding + 1px border,让 3px 实线下沿正好覆盖 hairline,
      避免 active tab 下面出现"黑 + 灰"叠加。bottom = -pad-y - 1px */
   bottom: calc(-1 * var(--tabs-pad-y, 10px) - 1px);
-  height: 2px;
+  height: 3px;                                              /* ↑ 从 2px */
   background: var(--fg);
-  border-radius: 1px 1px 0 0;
+  border-radius: 0;                                        /* ↑ 去圆角,贴齐 hairline */
+  /* 用阴影抵消容器 1px border-bottom,确保底线厚于 hairline 不被"挤"丢 */
+  box-shadow: 0 1px 0 var(--fg);
 }
 .sl-us-tab__count {
   display: inline-block;
