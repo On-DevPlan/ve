@@ -36,6 +36,7 @@ export default function Invitations({
   const [maxUses, setMaxUses] = useState(1);
   const [ttlDays, setTtlDays] = useState(7);
   const [lastCreated, setLastCreated] = useState<GroupInvitationView | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const [acceptCode, setAcceptCode] = useState('');
   const [accepting, setAccepting] = useState(false);
@@ -47,13 +48,24 @@ export default function Invitations({
     setRole('writer');
     setMaxUses(1);
     setTtlDays(7);
+    setCopied(false);
   }, [group.id]);
 
   const canInvite = hasMinRole(group.myRole, 'admin');
 
+  async function copyCode(code: string): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // 降级:老浏览器 / HTTP 下 clipboard API 不可用 → prompt 手动复制
+      window.prompt('复制邀请码:', code);
+    }
+  }
+
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!email.trim()) return;
     const ttlSeconds = ttlDays > 0 ? ttlDays * 86400 : 0;
     const maxUsesFinal = maxUses > 0 ? maxUses : 0;
     const created = await onCreate({
@@ -100,21 +112,22 @@ export default function Invitations({
       {error && <div className="sl-us-error">{error}</div>}
 
       {lastCreated && (
-        <div className="sl-us-banner">
-          <span>邀请已创建,验证码:</span>
-          <code className="sl-us-code">{lastCreated.code}</code>
-          <button
-            className="sl-us-btn"
-            onClick={() => {
-              try {
-                void navigator.clipboard.writeText(lastCreated.code);
-              } catch {
-                /* ignore */
-              }
-            }}
-          >
-            复制
-          </button>
+        <div className="sl-us-invite-result">
+          <div className="sl-us-invite-result__row">
+            <span className="sl-us-invite-result__label">邀请码</span>
+            <code className="sl-us-invite-result__code">{lastCreated.code}</code>
+            <button
+              className="sl-us-btn sl-us-btn--sm"
+              onClick={() => void copyCode(lastCreated.code)}
+            >
+              {copied ? '已复制' : '复制'}
+            </button>
+          </div>
+          {!lastCreated.inviteeEmail && (
+            <div className="sl-us-invite-result__hint">
+              未指定收件人,请手动把邀请码发给对方
+            </div>
+          )}
         </div>
       )}
 
@@ -142,12 +155,11 @@ export default function Invitations({
           <input
             className="sl-us-input"
             type="email"
-            placeholder="收件人邮箱"
+            placeholder="收件人邮箱(可选,留空则手动分发)"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             disabled={saving}
             autoFocus
-            required
           />
           <select
             className="sl-us-input"
@@ -180,7 +192,7 @@ export default function Invitations({
           <button
             type="submit"
             className="sl-us-btn sl-us-btn--primary"
-            disabled={saving || !email.trim()}
+            disabled={saving}
           >
             {saving ? '创建中…' : '创建邀请'}
           </button>
@@ -211,7 +223,11 @@ export default function Invitations({
               <td>
                 <code className="sl-us-code">{inv.code}</code>
               </td>
-              <td>{inv.inviteeEmail}</td>
+              <td>
+                {inv.inviteeEmail
+                  ? inv.inviteeEmail
+                  : <span className="sl-us-muted" title="待 admin 分发">—</span>}
+              </td>
               <td>
                 <span className={`sl-us-badge sl-us-badge--role-${inv.role}`}>
                   {inv.role.toUpperCase()}

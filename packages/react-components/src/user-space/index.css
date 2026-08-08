@@ -536,6 +536,28 @@
 .sl-us-invite__field { display: flex; flex-direction: column; gap: 4px; }
 .sl-us-invite__label { font-size: 11px; color: var(--fg-3); font-weight: 500; }
 
+/* 邀请创建成功后的「待分发」码面板:大行(码 + 复制按钮) + 可选 hint */
+.sl-us-invite-result {
+  margin: 0 20px 16px;
+  padding: 12px 14px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: flex; flex-direction: column; gap: 6px;
+}
+.sl-us-invite-result__row { display: flex; align-items: center; gap: 10px; }
+.sl-us-invite-result__label { font-size: 11px; color: var(--fg-3); text-transform: uppercase; letter-spacing: 0.05em; }
+.sl-us-invite-result__code {
+  flex: 1; min-width: 0;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 12.5px;
+  background: var(--panel);
+  padding: 4px 8px;
+  border-radius: 4px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.sl-us-invite-result__hint { font-size: 11.5px; color: var(--fg-3); }
+
 /* ── error / muted ─────────────────────────────── */
 .sl-us-error {
   padding: 8px 12px;
@@ -745,6 +767,9 @@
     -webkit-overflow-scrolling: touch;
   }
   .sl-us-table { min-width: 480px; }   /* 表不收缩到挤,触发滚动 */
+
+  /* 邀请结果面板 margin 与 table-wrap 对齐 */
+  .sl-us-invite-result { margin: 0 12px 16px; }
 
   /* 触控 44px:按钮/输入最小高(WCAG) */
   .sl-us-btn { min-height: 44px; padding: 8px 12px; }

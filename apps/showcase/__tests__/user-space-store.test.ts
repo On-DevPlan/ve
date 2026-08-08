@@ -28,6 +28,24 @@ function okBody(data: unknown): Response {
 describe('user-space store KV CRUD', () => {
   beforeEach(() => loggedIn());
 
+  it('createInvitation passes empty inviteeEmail without throwing', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      okBody({
+        invitation: {
+          id: 1, code: 'ABCD', inviterUserId: 8, inviteeEmail: '',
+          role: 'writer', maxUses: 1, usedCount: 0,
+          expiresAt: '', status: 1, createdAt: '',
+        },
+      }),
+    );
+    const store = createUserSpaceStore();
+    await expect(
+      store.createInvitation(42, { inviteeEmail: '', role: 'writer', maxUses: 1, ttlSeconds: 86400 }),
+    ).resolves.toMatchObject({ code: 'ABCD', inviteeEmail: '' });
+    const body = JSON.parse(String((fetchMock.mock.calls[0][1] as RequestInit).body));
+    expect(body.inviteeEmail).toBe('');
+  });
+
   it('createKv POSTs set with groupId and no visibility', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(okBody(null));
     const store = createUserSpaceStore();
