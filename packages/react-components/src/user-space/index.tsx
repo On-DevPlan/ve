@@ -14,6 +14,7 @@ import Members from './src/pages/Members';
 import Invitations from './src/pages/Invitations';
 import Inventory from './src/pages/Inventory';
 import KvEditorModal from './src/pages/KvEditorModal';
+import DuplicateKvModal from './src/pages/DuplicateKvModal';
 import SettingsPanel from './src/pages/SettingsPanel';
 import { hasMinRole } from '@api/components/user-space';
 import type {
@@ -62,6 +63,11 @@ export default function UserSpace() {
   const [kvEditorInit, setKvEditorInit] = useState<KvView | null>(null);
   const [kvVersions, setKvVersions] = useState<KvVersionView[]>([]);
   const [kvVersionsLoading, setKvVersionsLoading] = useState(false);
+  // 复制 KV → 其他工作空间 的 modal 态。
+  const [duplicateOpen, setDuplicateOpen] = useState(false);
+  const [duplicateSource, setDuplicateSource] = useState<KvView | null>(null);
+  // 复制成功的瞬时反馈(顶部 banner);与 actionError(失败 banner)分开,避免互相覆盖。
+  const [duplicateToast, setDuplicateToast] = useState<string | null>(null);
   // KV 每页条数 —— 可设置(设置面板),持久化到 LS
   const [kvPageSize, setKvPageSize] = useState<number>(() => {
     try {
@@ -103,6 +109,8 @@ export default function UserSpace() {
     setKvTag(null);
     setKvEditorOpen(false);
     setKvVersions([]);
+    setDuplicateOpen(false);
+    setDuplicateSource(null);
     setMembersError(null);
     setInvitationsError(null);
     setKvError(null);
@@ -325,6 +333,37 @@ export default function UserSpace() {
     });
   }
 
+  // 把 sourceItem.key 从当前组复制到另一个 group。DuplicateKvModal 已经过滤
+  // 掉源组 + 只留 writer+ 候选,所以这里不再二次校验。成功 → 关弹窗 + 顶部
+  // 短暂 banner(复用 .sl-us-success 样式,见渲染处)+ reload 当前源组列表
+  // (复制对源组视图没影响,但 brief 要求 onReload,保持与 create/update/delete 一致)。
+  async function handleDuplicateKv(args: { targetGroupId: number }): Promise<{ newKey: string }> {
+    if (!currentSelected || !duplicateSource) {
+      throw new Error('no kv to duplicate');
+    }
+    let newKey = '';
+    await withError(async () => {
+      const res = await store.duplicateKv({
+        key: duplicateSource.key,
+        sourceGroupId: currentSelected,
+        targetGroupId: args.targetGroupId,
+      });
+      newKey = res.newKey;
+      setDuplicateOpen(false);
+      setDuplicateSource(null);
+      setDuplicateToast(`已复制为「${newKey}」`);
+      await loadKv(kvPage, kvTag);
+    });
+    return { newKey };
+  }
+
+  // duplicateToast 自动消失:8s 后清空,避免长时间挂着旧消息。
+  useEffect(() => {
+    if (!duplicateToast) return;
+    const t = setTimeout(() => setDuplicateToast(null), 8000);
+    return () => clearTimeout(t);
+  }, [duplicateToast]);
+
   // ── 渲染 ─────────────────────────────────────────
   if (auth.jwtAuthState !== 'logged-in' || !auth.token) {
     return (
@@ -391,6 +430,9 @@ export default function UserSpace() {
       <main className="sl-us-main">
         {actionError && (
           <div className="sl-us-error">{actionError}</div>
+        )}
+        {duplicateToast && (
+          <div className="sl-us-toast" role="status">{duplicateToast}</div>
         )}
 
         {selectedGroup ? (
@@ -484,6 +526,7 @@ export default function UserSpace() {
                   onCreate={() => { setKvEditorMode('create'); setKvEditorInit(null); setKvEditorOpen(true); }}
                   onEdit={(item) => { setKvEditorMode('edit'); setKvEditorInit(item); setKvEditorOpen(true); }}
                   onDelete={handleDeleteKv}
+                  onDuplicate={(item) => { setDuplicateSource(item); setDuplicateOpen(true); }}
                   onReload={() => loadKv(kvPage, kvTag)}
                 />
                 <KvEditorModal
@@ -497,6 +540,15 @@ export default function UserSpace() {
                   onRestoreVersion={(v) => void handleRestoreKv(v)}
                   onSave={kvEditorMode === 'create' ? handleCreateKv : handleUpdateKv}
                   onClose={() => setKvEditorOpen(false)}
+                />
+                <DuplicateKvModal
+                  open={duplicateOpen}
+                  sourceGroup={selectedGroup}
+                  sourceKey={duplicateSource?.key ?? ''}
+                  groups={safeGroups}
+                  saving={saving}
+                  onDuplicate={handleDuplicateKv}
+                  onClose={() => { setDuplicateOpen(false); setDuplicateSource(null); }}
                 />
               </>
             )}

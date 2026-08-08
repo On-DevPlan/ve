@@ -8,8 +8,10 @@
 // 声明一份造成 api/index.ts barrel 的 export collision。
 
 import type { GroupRole } from '../../services/groupV1/types';
+import type { KvDuplicateArgs, KvDuplicateResponse } from '../../services/kvV1/types';
 
 export type { GroupRole };
+export type { KvDuplicateArgs, KvDuplicateResponse };
 
 export interface GroupSummary {
   id: number;
@@ -121,6 +123,8 @@ export interface UserSpaceStore {
   listKvVersions(groupId: number, key: string): Promise<KvVersionView[]>;
   /** 回滚到指定版本。write+;恢复后需重新拉详情刷新当前值。 */
   restoreKv(groupId: number, key: string, version: number): Promise<void>;
+  /** 跨组复制 KV(source read+ → target write+)。targetGroupId 必须 ≥ 1。 */
+  duplicateKv(args: KvDuplicateArgs): Promise<KvDuplicateResponse>;
 
   // ── 组件业务封装(per-component contract)──────────────────────
   // shortcut-library 的整个库作为单个 KV 整体存取,内部固定 key='shortcuts'。

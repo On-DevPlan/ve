@@ -30,6 +30,8 @@ import type {
   GroupMemberView,
   GroupSummary,
   GroupInvitationView,
+  KvDuplicateArgs,
+  KvDuplicateResponse,
   KvListResult,
   KvView,
   KvVersionView,
@@ -316,6 +318,11 @@ export function createUserSpaceStore(): UserSpaceStore {
     await kvV1Service.restore({ key, version, groupId });
   }
 
+  async function duplicateKv(args: KvDuplicateArgs): Promise<KvDuplicateResponse> {
+    requireAuth();
+    return kvV1Service.duplicate(args);
+  }
+
   // ─── 组件业务封装(per-component contract)────────────────────────
   // shortcut-library 的整个库作为单个 KV 整体存取,内部固定 key='shortcuts'。
   // shortcut-library 不知道 KV 协议,也不直接接触 kvV1Service。
@@ -477,6 +484,7 @@ export function createUserSpaceStore(): UserSpaceStore {
     listKvs,
     listKvVersions,
     restoreKv,
+    duplicateKv,
     getShortcuts,
     setShortcuts,
   };

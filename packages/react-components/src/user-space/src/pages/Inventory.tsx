@@ -21,6 +21,8 @@ export interface InventoryProps {
   onCreate: () => void;
   onEdit: (item: KvView) => void;
   onDelete: (item: KvView) => void;
+  /** 复制到其他工作空间(父级开 DuplicateKvModal);仅 canWrite 显示按钮。 */
+  onDuplicate: (item: KvView) => void;
   onReload: () => Promise<void>;
 }
 
@@ -33,7 +35,7 @@ function formatReplacedAt(s: string | null | undefined): string {
 }
 
 export default function Inventory(props: InventoryProps) {
-  const { group, kv, loading, error, saving, page, pageSize, selectedTag, onPageChange, onTagChange, onCreate, onEdit, onDelete, onReload } = props;
+  const { group, kv, loading, error, saving, page, pageSize, selectedTag, onPageChange, onTagChange, onCreate, onEdit, onDelete, onDuplicate, onReload } = props;
   const canWrite = hasMinRole(group.myRole, 'writer');
 
   const tagOptions = useMemo(() => {
@@ -121,6 +123,17 @@ export default function Inventory(props: InventoryProps) {
                       >
                         ✎
                       </button>
+                      {canWrite && (
+                        <button
+                          className="sl-us-btn sl-us-btn--ghost sl-us-btn--icon-sm"
+                          disabled={saving}
+                          onClick={() => onDuplicate(item)}
+                          title="复制到其他工作空间"
+                          aria-label="复制"
+                        >
+                          ⎘
+                        </button>
+                      )}
                       {canWrite && (
                         <button
                           className="sl-us-btn sl-us-btn--danger-ghost sl-us-btn--icon-sm"

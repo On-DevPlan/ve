@@ -54,3 +54,20 @@ export interface KvVersionInfo {
   value_len: number;
   replaced_at: string;
 }
+
+/** POST /kv/:key/duplicate —— 跨组复制 KV(source → target;源 read+,目标 write+)。
+ * 后端在源/目标都把 caller 的 default_group_id 作为 fallback(0 或不传)——这里
+ * 显式传入实际 groupId,避免「我在 A 组复制,默认组是 B」时被默认组解析劫持。 */
+export interface KvDuplicateArgs {
+  key: string;
+  /** ≥ 1;0 或不传=回退到 caller default group */
+  sourceGroupId?: number;
+  /** ≥ 1 */
+  targetGroupId: number;
+}
+
+/** POST /kv/:key/duplicate 返回;newKey 即真实写入目标组的 key(冲突后自动加 _copy 后缀)。 */
+export interface KvDuplicateResponse {
+  newKey: string;
+  targetGroupId: number;
+}

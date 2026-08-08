@@ -20,6 +20,8 @@ import type {
   KvDeleteArgs,
   KvTagCount,
   KvVersionInfo,
+  KvDuplicateArgs,
+  KvDuplicateResponse,
 } from './types';
 
 export { ApiError } from '../base';
@@ -32,6 +34,8 @@ export type {
   KvDeleteArgs,
   KvTagCount,
   KvVersionInfo,
+  KvDuplicateArgs,
+  KvDuplicateResponse,
 } from './types';
 
 export class KvV1Service extends HttpService {
@@ -88,6 +92,16 @@ export class KvV1Service extends HttpService {
     const body: { version: number; groupId?: number } = { version: args.version };
     if (args.groupId !== undefined && args.groupId > 0) body.groupId = args.groupId;
     await this.reqPost(`/${encodeURIComponent(args.key)}/restore`, body);
+  }
+
+  /** POST /kv/:key/duplicate —— 把 KV 从 sourceGroupId 复制到 targetGroupId(源 read+,目标 write+)。
+   * 后端 key 冲突自动加 _copy 后缀;caller 须对两端组都有权限。 */
+  async duplicate(args: KvDuplicateArgs): Promise<KvDuplicateResponse> {
+    const body: { sourceGroupId?: number; targetGroupId: number } = {
+      targetGroupId: args.targetGroupId,
+    };
+    if (args.sourceGroupId !== undefined && args.sourceGroupId > 0) body.sourceGroupId = args.sourceGroupId;
+    return this.reqPost<KvDuplicateResponse>(`/${encodeURIComponent(args.key)}/duplicate`, body);
   }
 }
 
