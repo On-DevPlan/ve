@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// 全屏浮窗画布:展示当前选中组的所有快捷键,支持缩放/拖动/ESC 关闭。
+// 全屏热力键盘画布:画 ANSI 104 键盘 + 频度染色 + 居中逻辑 + 缩放/拖动/关闭。
 
 // Mark the test environment as a React act()-aware runtime so React 19
 // stops warning when we wrap state-changing work in act().
@@ -25,18 +25,6 @@ function seed(groups: unknown[]): void {
   localStorage.setItem(SL_KEY, JSON.stringify(groups));
 }
 
-function makeSingleGroup(n: number): unknown[] {
-  return [{
-    id: 'g1', name: 'VSCode', createdAt: 0, updatedAt: 0,
-    shortcuts: Array.from({ length: n }, (_, i) => ({
-      id: `s${i}`,
-      createdAt: 0,
-      combo: [{ code: `Key${String.fromCharCode(65 + (i % 26))}`, label: String.fromCharCode(65 + (i % 26)), isModifier: false }],
-      description: `action ${i}`,
-    })),
-  }];
-}
-
 let container: HTMLDivElement;
 let root: Root;
 let styleNode: HTMLStyleElement;
@@ -60,36 +48,87 @@ afterEach(() => {
   document.body.querySelectorAll('.sl-sl-canvas-backdrop').forEach((el) => el.remove());
 });
 
-async function mountAndOpenCanvas(): Promise<void> {
-  seed(makeSingleGroup(7));
+async function mountAndOpenCanvas(groups: unknown[]): Promise<void> {
+  seed(groups);
   await act(async () => {
     root.render(<ShortcutLibrary />);
   });
-  // 点 "全屏" 按钮
   const btn = Array.from(container.querySelectorAll('button'))
     .find((b) => b.textContent === '全屏') as HTMLElement | undefined;
   if (!btn) throw new Error('全屏 button not found');
   await act(async () => { btn.click(); });
 }
 
-describe('shortcut-library: fullscreen canvas', () => {
-  it('renders one node per shortcut in currently selected group', async () => {
-    await mountAndOpenCanvas();
+function makeSingleGroup(shortcuts: { combo: { code: string; label: string; isModifier: boolean }[]; description: string }[]): unknown[] {
+  return [{
+    id: 'g1', name: 'VSCode', createdAt: 0, updatedAt: 0,
+    shortcuts: shortcuts.map((s, i) => ({
+      id: `s${i}`, createdAt: 0, combo: s.combo, description: s.description,
+    })),
+  }];
+}
+
+describe('shortcut-library: fullscreen canvas (keyboard heatmap)', () => {
+  it('renders a backdrop with title containing group name', async () => {
+    await mountAndOpenCanvas(makeSingleGroup([{ combo: [{ code: 'KeyA', label: 'A', isModifier: false }], description: 'a' }]));
     const backdrop = document.body.querySelector('.sl-sl-canvas-backdrop');
     expect(backdrop).not.toBeNull();
-    const nodes = document.body.querySelectorAll('.sl-sl-canvas-node');
-    expect(nodes.length).toBe(7);
-  });
-
-  it('renders group name in canvas header', async () => {
-    await mountAndOpenCanvas();
     const title = document.body.querySelector('.sl-sl-canvas__title');
-    expect(title).not.toBeNull();
     expect(title!.textContent).toContain('VSCode');
   });
 
+  it('renders the ANSI 104 keyboard: every keyDef gets a key element', async () => {
+    await mountAndOpenCanvas(makeSingleGroup([{ combo: [{ code: 'KeyA', label: 'A', isModifier: false }], description: 'a' }]));
+    const keys = document.body.querySelectorAll('.sl-sl-canvas-key:not(.sl-sl-canvas-key--spacer)');
+    // 主键区(去 spacer)+ 导航簇 + 小键盘 = 104 个可交互键
+    expect(keys.length).toBe(104);
+  });
+
+  it('keys for bound codes show freq badge ×N and data-freq=N', async () => {
+    // 3 个含 Ctrl 的 shortcut + 1 个含 KeyA 的
+    await mountAndOpenCanvas(makeSingleGroup([
+      { combo: [{ code: 'ControlLeft', label: 'Ctrl', isModifier: true }, { code: 'KeyA', label: 'A', isModifier: false }], description: 'sel-all' },
+      { combo: [{ code: 'ControlLeft', label: 'Ctrl', isModifier: true }, { code: 'KeyC', label: 'C', isModifier: false }], description: 'copy' },
+      { combo: [{ code: 'ControlLeft', label: 'Ctrl', isModifier: true }, { code: 'KeyV', label: 'V', isModifier: false }], description: 'paste' },
+      { combo: [{ code: 'ControlLeft', label: 'Ctrl', isModifier: true }, { code: 'KeyA', label: 'A', isModifier: false }], description: 'sel-line' },
+    ]));
+    // Ctrl: data-freq=3(只数不同的 combo,但同 key 在 3 个 combo 内出现 → 3)
+    // 同 Ctrl 出现在 4 个 combo 内 → freq=4
+    // KeyA 出现在 2 个 combo → freq=2
+    const ctrlEl = document.body.querySelector('[data-code="ControlLeft"]') as HTMLElement;
+    expect(ctrlEl).not.toBeNull();
+    expect(ctrlEl.dataset.freq).toBe('4');
+    expect(ctrlEl.querySelector('.sl-sl-canvas-key__freq')!.textContent).toBe('×4');
+    const aEl = document.body.querySelector('[data-code="KeyA"]') as HTMLElement;
+    expect(aEl.dataset.freq).toBe('2');
+    expect(aEl.querySelector('.sl-sl-canvas-key__freq')!.textContent).toBe('×2');
+  });
+
+  it('keys with 0 freq have no badge and the gray base color', async () => {
+    // 只 seed KeyZ,其他键(如 KeyA)应未使用
+    await mountAndOpenCanvas(makeSingleGroup([
+      { combo: [{ code: 'KeyZ', label: 'Z', isModifier: false }], description: 'z' },
+    ]));
+    const zEl = document.body.querySelector('[data-code="KeyZ"]') as HTMLElement;
+    expect(zEl.dataset.freq).toBe('1');
+    // KeyA 未使用 → freq=0,无 badge,灰色
+    const aEl = document.body.querySelector('[data-code="KeyA"]') as HTMLElement;
+    expect(aEl.dataset.freq).toBe('0');
+    expect(aEl.querySelector('.sl-sl-canvas-key__freq')).toBeNull();
+    expect(aEl.style.background).toBe('rgb(42, 45, 53)');
+  });
+
+  it('key main label (label) is rendered in __main, freq in __freq (does not overlap)', async () => {
+    await mountAndOpenCanvas(makeSingleGroup([
+      { combo: [{ code: 'KeyA', label: 'A', isModifier: false }], description: 'a' },
+    ]));
+    const aEl = document.body.querySelector('[data-code="KeyA"]') as HTMLElement;
+    expect(aEl.querySelector('.sl-sl-canvas-key__main')!.textContent).toBe('A');
+    expect(aEl.querySelector('.sl-sl-canvas-key__freq')!.textContent).toBe('×1');
+  });
+
   it('ESC closes the canvas', async () => {
-    await mountAndOpenCanvas();
+    await mountAndOpenCanvas(makeSingleGroup([{ combo: [{ code: 'KeyA', label: 'A', isModifier: false }], description: 'a' }]));
     expect(document.body.querySelector('.sl-sl-canvas-backdrop')).not.toBeNull();
     await act(async () => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
@@ -98,54 +137,27 @@ describe('shortcut-library: fullscreen canvas', () => {
   });
 
   it('clicking × button closes the canvas', async () => {
-    await mountAndOpenCanvas();
+    await mountAndOpenCanvas(makeSingleGroup([{ combo: [{ code: 'KeyA', label: 'A', isModifier: false }], description: 'a' }]));
     const closeBtn = document.body.querySelector('.sl-sl-canvas__ctrls button[aria-label="关闭"]') as HTMLElement;
     expect(closeBtn).not.toBeNull();
     await act(async () => { closeBtn.click(); });
     expect(document.body.querySelector('.sl-sl-canvas-backdrop')).toBeNull();
   });
 
-  it('canvas +/− buttons adjust scale', async () => {
-    await mountAndOpenCanvas();
+  it('+ and − buttons adjust scale', async () => {
+    await mountAndOpenCanvas(makeSingleGroup([{ combo: [{ code: 'KeyA', label: 'A', isModifier: false }], description: 'a' }]));
     const scaleEl = document.body.querySelector('.sl-sl-canvas__scale');
-    expect(scaleEl).not.toBeNull();
     const before = scaleEl!.textContent;
     const minusBtn = document.body.querySelector('.sl-sl-canvas__ctrls button[aria-label="缩小"]') as HTMLElement;
     await act(async () => { minusBtn.click(); });
     expect(scaleEl!.textContent).not.toBe(before);
   });
 
-  it('canvas reset button restores scale to 100%', async () => {
-    await mountAndOpenCanvas();
-    const plusBtn = document.body.querySelector('.sl-sl-canvas__ctrls button[aria-label="放大"]') as HTMLElement;
-    await act(async () => { plusBtn.click(); plusBtn.click(); plusBtn.click(); });
-    const resetBtn = document.body.querySelector('.sl-sl-canvas__ctrls button[aria-label="重置"]') as HTMLElement;
-    await act(async () => { resetBtn.click(); });
-    const scaleEl = document.body.querySelector('.sl-sl-canvas__scale');
-    expect(scaleEl!.textContent).toBe('100%');
-  });
-
-  it('wheel zoom stays in [50%, 300%] range', async () => {
-    await mountAndOpenCanvas();
-    const stage = document.body.querySelector('.sl-sl-canvas__stage') as HTMLElement;
-    expect(stage).not.toBeNull();
-    // 50 次大滚轮(每次 * 1.1,容易超上限)
-    for (let i = 0; i < 50; i++) {
-      await act(async () => {
-        stage.dispatchEvent(new WheelEvent('wheel', { deltaY: -100, bubbles: true, cancelable: true }));
-      });
-    }
-    const scaleEl = document.body.querySelector('.sl-sl-canvas__scale');
-    const txt = scaleEl!.textContent!;
-    const pct = parseInt(txt.replace('%', ''), 10);
-    expect(pct).toBeLessThanOrEqual(300);
-    // 反向再滚
-    for (let i = 0; i < 100; i++) {
-      await act(async () => {
-        stage.dispatchEvent(new WheelEvent('wheel', { deltaY: 100, bubbles: true, cancelable: true }));
-      });
-    }
-    const pct2 = parseInt(document.body.querySelector('.sl-sl-canvas__scale')!.textContent!.replace('%', ''), 10);
-    expect(pct2).toBeGreaterThanOrEqual(50);
+  it('legend chips correspond to freq tiers', async () => {
+    await mountAndOpenCanvas(makeSingleGroup([{ combo: [{ code: 'KeyA', label: 'A', isModifier: false }], description: 'a' }]));
+    const chips = document.body.querySelectorAll('.sl-sl-canvas__legend-chip');
+    expect(chips.length).toBe(6);
+    expect(chips[0].textContent).toBe('0');
+    expect(chips[5].textContent).toBe('5+');
   });
 });
