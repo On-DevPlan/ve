@@ -1,53 +1,154 @@
-/* skeleton.css —— 0.6s ease transition + spinner + 文字 + 占位元素样式。
-   主题色用现有 CSS 变量(--sl-color-*),与 defaultTokens 对齐。 */
+/* skeleton.css —— 首次会话骨架样式。
+   视觉构成:
+     1) 容器卡片化(surface-alt 背景 + 圆角 + 内边距),不再是裸的散块;
+     2) spinner 加大并加双层柔光(主圈 + 外圈 pulse),视觉重量更聚焦;
+     3) 占位 bar 用主题色微调的渐变 + 横向 shimmer 扫光,层次柔和不死板;
+     4) 文字 "加载中…" 提字号加 weight,与 spinner 形成呼吸节奏。
+   主题色全部走现有 CSS 变量(--sl-color-* / --sl-radius-*),与 defaultTokens 对齐。 */
 
+/* ---------- 容器:卡片化 ---------- */
 .sl-skel {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
-  padding: 16px;
-  min-height: 120px;
+  gap: 14px;
+  padding: 20px 24px 24px;
+  min-height: 140px;
+  background: var(--sl-color-surface-alt, #f3f4f6);
+  border-radius: var(--sl-radius-md, 8px);
+  /* 容器不再加 border —— 视觉更像"占位卡"而非"边框框",更接近真实组件预览态 */
 }
+
+/* ---------- Spinner:环形 + 外圈 pulse ---------- */
 .sl-skel__spinner {
-  width: 28px;
-  height: 28px;
+  position: relative;
+  width: 36px;
+  height: 36px;
+  margin-top: 4px;
+}
+
+/* 外圈:pulse 柔光环 */
+.sl-skel__spinner::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  background: var(--sl-color-primary, #2563eb);
+  opacity: 0.18;
+  animation: sl-skel-pulse 1.6s ease-in-out infinite;
+}
+
+/* 主圈:旋转环 */
+.sl-skel__spinner::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
   border: 3px solid var(--sl-color-border, #d1d5db);
   border-top-color: var(--sl-color-primary, #2563eb);
-  border-radius: 50%;
   animation: sl-skel-spin 0.9s linear infinite;
 }
+
+/* ---------- 文字 ---------- */
 .sl-skel__text {
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 500;
   color: var(--sl-color-text-muted, #6b7280);
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
+  /* 占位内容分组 —— 给 spinner→text→bars 一段微缩进 */
 }
+
+/* ---------- 占位 bar:渐变 + shimmer 扫光 ---------- */
 .sl-skel__bars {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
   width: 100%;
-  margin-top: 4px;
-}
-.sl-skel__bar {
-  height: 14px;
-  border-radius: var(--sl-radius-md, 6px);
-  background: var(--sl-color-border, #d1d5db);
-  opacity: 0.6;
-  width: 100%;
-}
-.sl-skel__bar--title {
-  height: 22px;
-  width: 40%;
-  margin-bottom: 6px;
-  opacity: 0.8;
+  margin-top: 2px;
 }
 
+.sl-skel__bar {
+  position: relative;
+  height: 12px;
+  border-radius: var(--sl-radius-md, 8px);
+  /* 用 surface-alt 的更浅变体做底 —— 不再直接复用 border 色(避免与卡片背景撞色) */
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.06) 0%,
+    rgba(0, 0, 0, 0.09) 50%,
+    rgba(0, 0, 0, 0.06) 100%
+  );
+  overflow: hidden;
+  /* 用伪元素做横向扫光,主元素做底色 —— 比 transform 背景动画更可控 */
+}
+
+/* shimmer 扫光层:更亮的横向高亮条 */
+.sl-skel__bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.85) 50%,
+    transparent 100%
+  );
+  transform: translateX(-100%);
+  animation: sl-skel-shimmer 1.6s ease-in-out infinite;
+}
+
+.sl-skel__bar--title {
+  height: 18px;
+  width: 42%;
+  margin-bottom: 4px;
+}
+
+/* ---------- 动画 ---------- */
 @keyframes sl-skel-spin {
-  from {
-    transform: rotate(0deg);
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes sl-skel-pulse {
+  0%, 100% {
+    opacity: 0.18;
+    transform: scale(1);
   }
-  to {
-    transform: rotate(360deg);
+  50% {
+    opacity: 0.05;
+    transform: scale(1.15);
+  }
+}
+
+@keyframes sl-skel-shimmer {
+  0%   { transform: translateX(-100%); }
+  60%  { transform: translateX(100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* ---------- 暗色主题适配 ----------
+   默认 token 是浅色,但若站点主题切到 dark(组件 ShadowRoot 接到 :host 的 --sl-color-* 变深),
+   bar 底色用 rgba 黑叠加在 surface 上会看不见,这里用 white 透明度兜底,
+   pulse 用更亮的 primary tone,保持可识别。 */
+@media (prefers-color-scheme: dark) {
+  .sl-skel {
+    /* 在 dark 下让卡片背景明显一点,区分容器 */
+    background: rgba(255, 255, 255, 0.04);
+  }
+  .sl-skel__bar {
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.06) 0%,
+      rgba(255, 255, 255, 0.12) 50%,
+      rgba(255, 255, 255, 0.06) 100%
+    );
+  }
+  .sl-skel__bar::after {
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.18) 50%,
+      transparent 100%
+    );
   }
 }

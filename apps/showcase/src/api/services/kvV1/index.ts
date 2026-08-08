@@ -75,10 +75,12 @@ export class KvV1Service extends HttpService {
     return this.reqGet<KvListResponse>(path);
   }
 
-  /** GET /kv/tags —— 当前用户非过期 KV 的 {tag, count} facet(按 count desc / tag asc)。 */
+  /** GET /kv/tags —— 当前用户非过期 KV 的 {tag, count} facet(按 count desc / tag asc)。
+   *  后端响应是 `{tags: [{tag,count}, ...]}`(KvTagsRes),信封解一层后拿 data.tags。 */
   async tags(args: { groupId?: number } = {}): Promise<KvTagCount[]> {
     const qs = args.groupId && args.groupId > 0 ? `?groupId=${args.groupId}` : '';
-    return this.reqGet<KvTagCount[]>(`/tags${qs}`);
+    const res = await this.reqGet<{ tags: KvTagCount[] }>(`/tags${qs}`);
+    return res?.tags ?? [];
   }
 
   /** GET /kv/:key/versions —— 历史版本摘要(version_no / value_len / replaced_at,不回 value 全文)。read+。 */
