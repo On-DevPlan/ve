@@ -3,8 +3,7 @@
 // 权限:myRole ∈ {owner,admin,writer} 显示写操作;reader 只读。删除走行内 hover 确认。
 // 行 actions 默认隐藏,hover 整行才显示(避免视觉噪音)。
 
-import { useMemo } from 'react';
-import type { KvListResult, KvView } from '@api/components/user-space';
+import type { KvListResult, KvTagCount, KvView } from '@api/components/user-space';
 import { hasMinRole } from '@api/components/user-space';
 
 export interface InventoryProps {
@@ -16,6 +15,7 @@ export interface InventoryProps {
   page: number;
   pageSize: number;
   selectedTag: string | null;
+  tags: KvTagCount[];
   onPageChange: (page: number) => void;
   onTagChange: (tag: string | null) => void;
   onCreate: () => void;
@@ -35,14 +35,8 @@ function formatReplacedAt(s: string | null | undefined): string {
 }
 
 export default function Inventory(props: InventoryProps) {
-  const { group, kv, loading, error, saving, page, pageSize, selectedTag, onPageChange, onTagChange, onCreate, onEdit, onDelete, onDuplicate, onReload } = props;
+  const { group, kv, loading, error, saving, page, pageSize, selectedTag, tags, onPageChange, onTagChange, onCreate, onEdit, onDelete, onDuplicate, onReload } = props;
   const canWrite = hasMinRole(group.myRole, 'writer');
-
-  const tagOptions = useMemo(() => {
-    const set = new Set<string>();
-    for (const item of kv?.items ?? []) for (const t of item.tags ?? []) set.add(t);
-    return Array.from(set).sort();
-  }, [kv]);
 
   const totalPages = kv ? Math.max(1, Math.ceil(kv.total / pageSize)) : 1;
 
@@ -57,7 +51,7 @@ export default function Inventory(props: InventoryProps) {
           aria-label="按 tag 过滤"
         >
           <option value="">所有 tag</option>
-          {tagOptions.map((t) => <option key={t} value={t}>{t}</option>)}
+          {tags.map((t) => <option key={t.tag} value={t.tag}>{t.tag} ({t.count})</option>)}
         </select>
         <span className="sl-us-toolbar__spacer" />
         <button className="sl-us-btn" onClick={() => void onReload()} disabled={loading || saving}>

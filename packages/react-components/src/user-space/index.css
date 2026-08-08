@@ -71,6 +71,10 @@
   background: var(--panel);
   display: flex; flex-direction: column;
   min-height: 0;
+  /* 桌面默认:grid item 参与布局,不是 fixed 浮层。
+     显式声明 position/transform 让 mobile @media 覆盖时无残留。 */
+  position: relative;
+  transform: none;
 }
 .sl-us-side__brand {
   padding: 14px 16px;
@@ -203,43 +207,45 @@
    bottom: calc(-1 * var(--tabs-pad-y)) 跨过 padding 压到 hairline ——
    改 --tabs-pad-y 时不用动 ::after。 */
 .sl-us-tabs {
-  --tabs-pad-y: 10px;
+  --tabs-pad-y: 18px;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 20px;
   padding: var(--tabs-pad-y) 20px;
   border-bottom: 1px solid var(--border);
 }
 .sl-us-tab {
-  padding: 8px 14px;
-  font-size: 12.5px;
+  padding: 12px 14px;
+  font-size: 14px;
   color: var(--fg-2);
   font-weight: 500;
   position: relative;
+  border-radius: var(--radius-sm);
+  transition: color 0.1s, background 0.1s;
 }
-.sl-us-tab:hover { color: var(--fg); }
+.sl-us-tab:hover { color: var(--fg); background: var(--hover); }
+/* 选中态用 inset box-shadow 画 3px 底部实线 —— 占据 padding 区域,
+   跨过容器 1px hairline。box-shadow inset 不影响元素 box 尺寸,
+   不会撑高 tab 导致布局抖动,绝对可见(不被 ::after 裁剪问题困扰)。 */
 .sl-us-tab.is-active {
   color: var(--fg);
-  font-weight: 600;
+  font-weight: 700;
+  background: var(--hover);
+  box-shadow:
+    inset 0 -3px 0 var(--fg),
+    /* 保留 ::after 作为冗余(默认隐藏,视觉上只用 box-shadow) */
+    inset 0 calc(-1 * var(--tabs-pad-y, 10px) + 2px) 0 var(--fg);
 }
 .sl-us-tab.is-active::after {
-  content: "";
-  position: absolute;
-  left: 14px; right: 14px;
-  /* 跨过容器 padding + 1px border,让 2px 实线下沿正好覆盖 hairline,
-     避免 active tab 下面出现"黑 + 灰"叠加。bottom = -pad-y - 1px */
-  bottom: calc(-1 * var(--tabs-pad-y, 10px) - 1px);
-  height: 2px;
-  background: var(--fg);
-  border-radius: 1px 1px 0 0;
+  display: none;
 }
 .sl-us-tab__count {
   display: inline-block;
-  margin-left: 6px;
-  padding: 0 5px;
-  font-size: 10px;
-  background: var(--hover);
-  color: var(--fg-2);
+  margin-left: 8px;
+  padding: 1px 7px;
+  font-size: 11.5px;
+  background: var(--bg);
+  color: var(--fg-3);
   border-radius: 8px;
   vertical-align: 1px;
   font-weight: 500;
@@ -532,6 +538,28 @@
 .sl-us-invite__field { display: flex; flex-direction: column; gap: 4px; }
 .sl-us-invite__label { font-size: 11px; color: var(--fg-3); font-weight: 500; }
 
+/* 邀请创建成功后的「待分发」码面板:大行(码 + 复制按钮) + 可选 hint */
+.sl-us-invite-result {
+  margin: 0 20px 16px;
+  padding: 12px 14px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: flex; flex-direction: column; gap: 6px;
+}
+.sl-us-invite-result__row { display: flex; align-items: center; gap: 10px; }
+.sl-us-invite-result__label { font-size: 11px; color: var(--fg-3); text-transform: uppercase; letter-spacing: 0.05em; }
+.sl-us-invite-result__code {
+  flex: 1; min-width: 0;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 12.5px;
+  background: var(--panel);
+  padding: 4px 8px;
+  border-radius: 4px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.sl-us-invite-result__hint { font-size: 11.5px; color: var(--fg-3); }
+
 /* ── error / muted ─────────────────────────────── */
 .sl-us-error {
   padding: 8px 12px;
@@ -648,3 +676,121 @@
 .sl-us-danger__row:last-child { border-bottom: none; }
 .sl-us-danger__row-main { flex: 1; }
 .sl-us-danger__row-confirm { display: flex; gap: 6px; }
+
+/* ── responsive break ─────────────────────────────
+   desktop  (>900px): default —— 两栏 grid(sidebar 240px + main 1fr)
+   tablet   (641-900px): 同 desktop 但 sidebar 180px,padding 缩到 16px
+   mobile   (≤640px):  sidebar 抽屉(默认关),topbar + 汉堡按钮,
+                       tabs 横滚,表格横滚,触控 44px
+
+   实现位置:每档 @media 独立块,集中在 CSS 末尾「media queries」章节,
+   避免分散到原始声明里;响应式层是叠加在桌面默认上的修改,
+   删掉响应式层不会回不去。
+
+   默认显示 hamburger(JS 仅控制侧栏 is-open).即使 JS disabled / 失败,
+   移动端用户仍能看到汉堡按钮(Sidebar 永远存在,只是默认关)。
+*/
+.sl-us-topbar__burger {
+  width: 44px; height: 44px;
+  display: none;                  /* 桌面默认隐藏;mobile @media 内才显 */
+  align-items: center; justify-content: center;
+  border-radius: 6px;
+  color: var(--fg-2);
+  flex-shrink: 0;
+  font-size: 18px;
+}
+.sl-us-topbar__burger:hover { background: var(--hover); color: var(--fg); }
+
+/* 抽屉 backdrop:默认不渲染(仅 mobile + open 时有用) */
+.sl-us-side-backdrop { display: none; }
+
+/* ── media queries ─────────────────────────────── */
+/* tablet: 641-900px(sidebar 缩到 180px,padding 留呼吸) */
+@media (max-width: 900px) {
+  .sl-us-root { grid-template-columns: 180px 1fr; }
+  .sl-us-side__brand { padding: 12px 12px; }
+  .sl-us-side__section { padding: 10px 6px; }
+  .sl-us-side__brand-name { font-size: 12px; }
+  .sl-us-side__item { padding: 5px 6px; font-size: 12px; }
+  .sl-us-topbar, .sl-us-tabs, .sl-us-toolbar { padding-left: 14px; padding-right: 14px; }
+  .sl-us-table-wrap { margin-left: 14px; margin-right: 14px; }
+  .sl-us-modal { width: min(520px, 92vw); }
+}
+
+/* mobile: ≤640px(单栏 + 抽屉 + 横滚 + 全屏 modal + 44px 触控) */
+@media (max-width: 640px) {
+  .sl-us-root {
+    grid-template-columns: 1fr;     /* 单栏,sidebar 浮层 */
+    font-size: 14px;                /* 加大基础字号 */
+  }
+  /* Sidebar 改为左抽屉:默认滑出,is-open 时滑入 */
+  .sl-us-side {
+    position: fixed; inset: 0 auto 0 0;       /* 左抽屉 */
+    width: min(280px, 80vw);
+    z-index: 100;
+    transform: translateX(-100%);             /* 默认滑出 */
+    transition: transform 0.18s ease;
+    border-right: 1px solid var(--border);
+  }
+  .sl-us-side.is-open {
+    transform: translateX(0);
+  }
+  /* 抽屉打开时的暗色遮罩(点击关闭) —— z-index < sidebar 但 > main */
+  .sl-us-side-backdrop {
+    display: block;
+    position: fixed; inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 99;
+  }
+  /* topbar 加汉堡按钮位置 */
+  .sl-us-topbar__burger { display: inline-flex; }
+  .sl-us-topbar { padding: 8px 12px; gap: 8px; }
+  .sl-us-topbar__title {
+    font-size: 14px; max-width: 50vw;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  /* tabs 横滚 —— 保持舒适档的 gap 与 py,只缩左右 padding,加横向滚动 */
+  .sl-us-tabs {
+    padding-left: 12px;
+    padding-right: 12px;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+    /* 不覆盖 --tabs-pad-y / gap —— 保留 18px / 20px 的舒适档 */
+  }
+  .sl-us-tab {
+    flex-shrink: 0;
+    padding: 12px 14px;   /* 覆盖任何同名声明,确保 mobile 也有 ~44px 高 */
+  }
+
+  /* 工具栏 padding 缩 + 换行 */
+  .sl-us-toolbar { padding: 8px 12px; flex-wrap: wrap; }
+
+  /* 表格水平滚(关键修复:原 overflow:hidden 会截掉) */
+  .sl-us-table-wrap {
+    margin: 0 12px 16px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .sl-us-table { min-width: 480px; }   /* 表不收缩到挤,触发滚动 */
+
+  /* 邀请结果面板 margin 与 table-wrap 对齐 */
+  .sl-us-invite-result { margin: 0 12px 16px; }
+
+  /* 触控 44px:按钮/输入最小高(WCAG) */
+  .sl-us-btn { min-height: 44px; padding: 8px 12px; }
+  .sl-us-btn--sm { min-height: 36px; }
+  .sl-us-input, .sl-us-side__add, .sl-us-side__user-action {
+    min-height: 44px;
+  }
+
+  /* modal 占满全屏(100dvh 避免 iOS Safari 地址栏视觉跳动) */
+  .sl-us-modal {
+    width: 100vw;
+    max-height: 100vh;
+    height: 100dvh;
+    border-radius: 0;
+    border: none;
+  }
+}

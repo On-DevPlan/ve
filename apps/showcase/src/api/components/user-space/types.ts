@@ -8,10 +8,12 @@
 // 声明一份造成 api/index.ts barrel 的 export collision。
 
 import type { GroupRole } from '../../services/groupV1/types';
-import type { KvDuplicateArgs, KvDuplicateResponse } from '../../services/kvV1/types';
+import type { DefaultGroupInfo } from '../../services/userV1/types';
+import type { KvDuplicateArgs, KvDuplicateResponse, KvTagCount } from '../../services/kvV1/types';
 
 export type { GroupRole };
-export type { KvDuplicateArgs, KvDuplicateResponse };
+export type { DefaultGroupInfo };
+export type { KvDuplicateArgs, KvDuplicateResponse, KvTagCount };
 
 export interface GroupSummary {
   id: number;
@@ -91,6 +93,8 @@ export interface UserSpaceStore {
   getGroupDetail(id: number): Promise<GroupSummary>;
   /** 拉一次当前默认组 id;不存在返回 null */
   getDefaultGroupId(): Promise<number | null>;
+  /** 拉一次当前默认组 {groupId, name, myRole};失败降级到 groupId=0 占位。供 UI 顶部徽章展示。 */
+  getDefaultGroupInfo(): Promise<DefaultGroupInfo>;
 
   // ── CRUD ─────────────────────────────────────────
   createGroup(args: { name: string; description?: string }): Promise<GroupSummary>;
@@ -119,6 +123,7 @@ export interface UserSpaceStore {
   deleteKv(groupId: number, key: string): Promise<void>;
   getKvDetail(groupId: number, key: string): Promise<KvView>;
   listKvs(groupId: number, opts: { page: number; pageSize: number; tags?: string[] }): Promise<KvListResult>;
+  listKvTags(groupId: number): Promise<KvTagCount[]>;
   /** 历史版本摘要列表(不回 value 全文),用于编辑框里的版本选择器。read+。 */
   listKvVersions(groupId: number, key: string): Promise<KvVersionView[]>;
   /** 回滚到指定版本。write+;恢复后需重新拉详情刷新当前值。 */

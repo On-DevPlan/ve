@@ -28,6 +28,24 @@ function okBody(data: unknown): Response {
 describe('user-space store KV CRUD', () => {
   beforeEach(() => loggedIn());
 
+  it('createInvitation passes empty inviteeEmail without throwing', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      okBody({
+        invitation: {
+          id: 1, code: 'ABCD', inviterUserId: 8, inviteeEmail: '',
+          role: 'writer', maxUses: 1, usedCount: 0,
+          expiresAt: '', status: 1, createdAt: '',
+        },
+      }),
+    );
+    const store = createUserSpaceStore();
+    await expect(
+      store.createInvitation(42, { inviteeEmail: '', role: 'writer', maxUses: 1, ttlSeconds: 86400 }),
+    ).resolves.toMatchObject({ code: 'ABCD', inviteeEmail: '' });
+    const body = JSON.parse(String((fetchMock.mock.calls[0][1] as RequestInit).body));
+    expect(body.inviteeEmail).toBe('');
+  });
+
   it('createKv POSTs set with groupId and no visibility', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(okBody(null));
     const store = createUserSpaceStore();
@@ -119,6 +137,71 @@ describe('user-space store KV CRUD', () => {
     // 覆盖 loggedIn mock,切回 logged-out
     Object.defineProperty(jwtAuth, 'state', { configurable: true, get: () => originalState });
     await expect(store.createKv(1, { key: 'k', value: 'v', tags: [], ttl: 0 })).rejects.toThrow('not logged in');
+  });
+
+  describe('default group resolution', () => {
+    it('resolveDefaultGroupId prefers /user/default-group (no listGroups fallback)', async () => {
+      loggedIn(0);
+      const fetchMock = vi.spyOn(globalThis, 'fetch')
+        .mockResolvedValueOnce(okBody({ groupId: 99, name: 'p', myRole: 'owner' }))
+        // 任何进一步 fetch 都让它抛,这样万一 store 兜底再调 listGroups,会暴露
+        .mockImplementation(() => { throw new Error('unexpected fetch'); });
+
+      const store = createUserSpaceStore();
+      const id = await store.getDefaultGroupId();
+      expect(id).toBe(99);
+      // 只发了 /default-group 一次,没碰 listGroups
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const url = String(fetchMock.mock.calls[0][0]);
+      expect(url).toBe('/api/v1/user/default-group');
+    });
+
+    it('resolveDefaultGroupId falls back to listGroups when /default-group fails', async () => {
+      loggedIn(0);
+      const fetchMock = vi.spyOn(globalThis, 'fetch')
+        // 1) /default-group → 500
+        .mockResolvedValueOnce(new Response(JSON.stringify({ code: 500, message: 'boom' }), { status: 500 }))
+        // 2) listGroups → 第一个组的 id
+        .mockResolvedValueOnce(okBody({
+          groups: [{ id: 7, name: 'fallback', description: '', ownerId: 1, myRole: 'owner', memberCount: 1, createdAt: '', updatedAt: '' }],
+        }));
+
+      const store = createUserSpaceStore();
+      const id = await store.getDefaultGroupId();
+      expect(id).toBe(7);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(String(fetchMock.mock.calls[1][0])).toBe('/api/v1/groups');
+    });
+
+    it('resolveDefaultGroupId returns null when default is unset (groupId=0), no listGroups fallback', async () => {
+      loggedIn(0);
+      const fetchMock = vi.spyOn(globalThis, 'fetch')
+        .mockResolvedValueOnce(okBody({ groupId: 0, name: '', myRole: 'reader' }))
+        .mockImplementation(() => { throw new Error('unexpected fetch — should not listGroups'); });
+
+      const store = createUserSpaceStore();
+      const id = await store.getDefaultGroupId();
+      expect(id).toBeNull();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('getDefaultGroupInfo returns {groupId, name, myRole} from the new endpoint', async () => {
+      loggedIn(0);
+      vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+        okBody({ groupId: 42, name: 'project-x', myRole: 'owner' }),
+      );
+      const store = createUserSpaceStore();
+      const info = await store.getDefaultGroupInfo();
+      expect(info).toEqual({ groupId: 42, name: 'project-x', myRole: 'owner' });
+    });
+
+    it('getDefaultGroupInfo returns a safe placeholder when the endpoint fails', async () => {
+      loggedIn(0);
+      vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('network down'));
+      const store = createUserSpaceStore();
+      const info = await store.getDefaultGroupInfo();
+      expect(info).toEqual({ groupId: 0, name: '', myRole: 'reader' });
+    });
   });
 
   describe('getShortcuts lazy migration', () => {

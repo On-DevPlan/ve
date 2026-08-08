@@ -10,7 +10,12 @@ import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 
 const root = '.claude/skills/user-kv-integration';
-const references = ['protocol.md', 'deployment.md'];
+const references = [
+  'auth-jwt.md',
+  'api-reference.md',
+  'usage-scope.md',
+  'adding-a-component.md',
+];
 
 describe('user-kv-integration skill', () => {
   it('has SKILL.md and all references', () => {

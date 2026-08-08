@@ -16,6 +16,8 @@ interface Props {
   defaultGroupId: number | null;
   /** 当前登录用户邮箱(用户卡展示当前身份);未登录传 null */
   userEmail: string | null;
+  /** 移动端抽屉开关状态:为 true 时 root <aside> 加 `is-open` 类(CSS 才把抽屉滑入) */
+  open: boolean;
   onSelect: (id: number) => void;
   onCreate: (name: string, description: string) => Promise<void> | void;
   onSetDefault: (id: number) => Promise<void> | void;
@@ -29,6 +31,7 @@ export default function Sidebar({
   selectedGroupId,
   defaultGroupId,
   userEmail,
+  open,
   onSelect,
   onCreate,
   onSetDefault,
@@ -63,7 +66,7 @@ export default function Sidebar({
   const avatarLetter = userEmail ? userEmail.slice(0, 1).toUpperCase() : '?';
 
   return (
-    <aside className="sl-us-side">
+    <aside className={`sl-us-side${open ? ' is-open' : ''}`}>
       {/* 品牌 */}
       <div className="sl-us-side__brand">
         <div className="sl-us-side__brand-mark" />

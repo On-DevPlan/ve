@@ -3,6 +3,10 @@
 // 与 userV1/index.ts 的 service class 分离:域类型独立可被下游(如 auth-store)
 // 引入,不需要把整个 service class 拖进来。
 
+import type { GroupRole } from '../groupV1/types';
+
+export type { GroupRole };
+
 export interface UserInfo {
   id: number;
   email: string;
@@ -23,4 +27,11 @@ export interface RegisterArgs {
   code: string;
   invitationCode: string;
   nickname?: string;
+}
+
+/** GET /default-group —— 当前默认工作空间;groupId=0 表示未设置。 */
+export interface DefaultGroupInfo {
+  groupId: number;
+  name: string;
+  myRole: GroupRole;
 }

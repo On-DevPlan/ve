@@ -2,4 +2,5 @@
 // 避免组件 import 跨包深路径)。
 
 export type { GroupRole, GroupSummary, GroupMemberView, GroupInvitationView, ViewMode } from '@api/components/user-space';
-export type { KvListResult, KvView } from '@api/components/user-space';
+export type { KvListResult, KvView, KvTagCount } from '@api/components/user-space';
+export type { DefaultGroupInfo } from '@api/components/user-space';

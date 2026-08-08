@@ -18,10 +18,12 @@ import DuplicateKvModal from './src/pages/DuplicateKvModal';
 import SettingsPanel from './src/pages/SettingsPanel';
 import { hasMinRole } from '@api/components/user-space';
 import type {
+  DefaultGroupInfo,
   GroupInvitationView,
   GroupMemberView,
   GroupSummary,
   KvListResult,
+  KvTagCount,
   KvVersionView,
   KvView,
   ViewMode,
@@ -43,6 +45,10 @@ export default function UserSpace() {
   const [view, setView] = useState<ViewMode>('overview');
   const [actionError, setActionError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // 当前默认工作空间 {groupId, name, myRole} —— 顶部默认徽章展示 name+role。
+  // store.getDefaultGroupInfo() 失败时也会回占位(由 store 内部 catch),
+  // UI 永远拿到一个稳定形态,不需再判空。
+  const [defaultGroupInfo, setDefaultGroupInfo] = useState<DefaultGroupInfo | null>(null);
 
   // ── 各视图子状态 ─────────────────────────────────
   const [members, setMembers] = useState<GroupMemberView[]>([]);
@@ -58,6 +64,10 @@ export default function UserSpace() {
   const [kvError, setKvError] = useState<string | null>(null);
   const [kvPage, setKvPage] = useState(1);
   const [kvTag, setKvTag] = useState<string | null>(null);
+  // KV tag facet(组内全部成员的 tag 频次),与 kv 列表并行拉;空 tag 集合时
+  // Inventory tag 下拉只显示「所有 tag」,不显示任何选项。后端契约 GET /kv/tags
+  // ?groupId=...,由 store.listKvTags 包,接口职责清晰。
+  const [kvTags, setKvTags] = useState<KvTagCount[]>([]);
   const [kvEditorOpen, setKvEditorOpen] = useState(false);
   const [kvEditorMode, setKvEditorMode] = useState<'create' | 'edit'>('create');
   const [kvEditorInit, setKvEditorInit] = useState<KvView | null>(null);
@@ -76,6 +86,8 @@ export default function UserSpace() {
     } catch { return 10; }
   });
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // 移动端 sidebar 抽屉开关(≤640px 有效);切组后也自动关闭,避免遮挡新视图。
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // 改每页条数 → 回到第 1 页
   function changeKvPageSize(n: number): void {
@@ -83,6 +95,20 @@ export default function UserSpace() {
     try { localStorage.setItem('sl-us:v1:kvPageSize', String(n)); } catch { /* ignore */ }
     setKvPage(1);
   }
+
+  // 拉当前默认工作空间 {groupId, name, myRole} —— 顶部默认徽章展示用。
+  // 与列表 reload 同步:登录态变 / 切默认组 / 退登 → 重拉。
+  useEffect(() => {
+    if (auth.jwtAuthState !== 'logged-in' || !auth.token) {
+      setDefaultGroupInfo(null);
+      return;
+    }
+    let cancelled = false;
+    store.getDefaultGroupInfo()
+      .then((info) => { if (!cancelled) setDefaultGroupInfo(info); })
+      .catch(() => { if (!cancelled) setDefaultGroupInfo({ groupId: 0, name: '', myRole: 'reader' }); });
+    return () => { cancelled = true; };
+  }, [auth.jwtAuthState, auth.token, store]);
 
   // 选中态:默认进第一个组 / 用户手动选过的优先
   const currentSelected = useMemo(() => {
@@ -107,6 +133,7 @@ export default function UserSpace() {
     setKv(null);
     setKvPage(1);
     setKvTag(null);
+    setKvTags([]);
     setKvEditorOpen(false);
     setKvVersions([]);
     setDuplicateOpen(false);
@@ -159,11 +186,29 @@ export default function UserSpace() {
     }
   }, [currentSelected, store, kvPageSize]);
 
+  // KV tag facet —— 组内全部成员的 tag 频次。失败不阻塞列表(下拉只显示「所有 tag」)。
+  // 与 kv 列表并行拉(loadKv / loadKvTags 在 view==='inventory' effect 同步调用)。
+  // CRUD 完成后要重新拉 —— 单条 tag 修改可能新增/删除 facet 条目。
+  const loadKvTags = useCallback(async () => {
+    if (!currentSelected) return;
+    try {
+      const list = await store.listKvTags(currentSelected);
+      setKvTags(list);
+    } catch {
+      // facet 失败不阻断 inventory;降级到空下拉
+      setKvTags([]);
+    }
+  }, [currentSelected, store]);
+
   useEffect(() => {
     if (view === 'members') void loadMembers();
     if (view === 'invitations') void loadInvitations();
-    if (view === 'inventory') void loadKv(kvPage, kvTag);
-  }, [view, loadMembers, loadInvitations, loadKv, kvPage, kvTag]);
+    if (view === 'inventory') {
+      // kv 列表 + tag facet 并行 —— facet 失败不阻塞列表,各自降级
+      void loadKv(kvPage, kvTag);
+      void loadKvTags();
+    }
+  }, [view, loadMembers, loadInvitations, loadKv, loadKvTags, kvPage, kvTag]);
 
   // 打开编辑弹窗时拉一次版本历史;创建模式不拉。恢复成功后父级会 setKvEditorInit
   // 换新引用,本 effect 随之重跑,自动刷新版本列表(restore 会新拍一份快照)。
@@ -293,7 +338,7 @@ export default function UserSpace() {
       await store.createKv(currentSelected, payload);
       setKvEditorOpen(false);
       setKvPage(1); // 新建后回到第一页,新 key 在前
-      await loadKv(1, kvTag);
+      await Promise.all([loadKv(1, kvTag), loadKvTags()]);
     });
   }
 
@@ -302,7 +347,7 @@ export default function UserSpace() {
     await withError(async () => {
       await store.updateKv(currentSelected, payload);
       setKvEditorOpen(false);
-      await loadKv(kvPage, kvTag);
+      await Promise.all([loadKv(kvPage, kvTag), loadKvTags()]);
     });
   }
 
@@ -316,7 +361,7 @@ export default function UserSpace() {
         nextPage = kvPage - 1;
         setKvPage(nextPage);
       }
-      await loadKv(nextPage, kvTag);
+      await Promise.all([loadKv(nextPage, kvTag), loadKvTags()]);
     });
   }
 
@@ -329,7 +374,7 @@ export default function UserSpace() {
       // + 刷新列表预览;版本列表由上面的 effect 随 kvEditorInit 变化自动重拉。
       const detail = await store.getKvDetail(currentSelected, kvEditorInit.key);
       setKvEditorInit(detail);
-      await loadKv(kvPage, kvTag);
+      await Promise.all([loadKv(kvPage, kvTag), loadKvTags()]);
     });
   }
 
@@ -415,12 +460,19 @@ export default function UserSpace() {
 
   return (
     <div className="sl-us-root">
+      {/* drawer backdrop —— 仅 mobile 显(mobile @media 才 display: block),桌面 no-op */}
+      <div
+        className="sl-us-side-backdrop"
+        onClick={() => setSidebarOpen(false)}
+        aria-hidden="true"
+      />
       <Sidebar
+        open={sidebarOpen}
         groups={safeGroups}
         selectedGroupId={currentSelected}
         defaultGroupId={defaultGroupId}
         userEmail={auth.jwtUser?.email ?? null}
-        onSelect={(id) => setSelectedId(id)}
+        onSelect={(id) => { setSelectedId(id); setSidebarOpen(false); }}
         onCreate={(name, description) => handleCreate(name, description)}
         onSetDefault={(id) => handleSetDefault(id)}
         onOpenSettings={() => setSettingsOpen(true)}
@@ -438,6 +490,14 @@ export default function UserSpace() {
         {selectedGroup ? (
           <>
             <div className="sl-us-topbar">
+              <button
+                className="sl-us-topbar__burger"
+                onClick={() => setSidebarOpen((v) => !v)}
+                aria-label="切换工作空间列表"
+                aria-expanded={sidebarOpen}
+              >
+                ☰
+              </button>
               <div className="sl-us-topbar__title">{selectedGroup.name}</div>
               <span className="sl-us-topbar__crumb-sep">/</span>
               <div className="sl-us-topbar__crumb">{VIEW_TABS.find((t) => t.key === view)?.label}</div>
@@ -446,7 +506,11 @@ export default function UserSpace() {
                 {selectedGroup.myRole.toUpperCase()}
               </span>
               {selectedGroup.isDefault && (
-                <span className="sl-us-chip sl-us-chip--default">默认</span>
+                <span className="sl-us-chip sl-us-chip--default">
+                  {defaultGroupInfo?.name
+                    ? `${defaultGroupInfo.name} · ${defaultGroupInfo.myRole.toUpperCase()}`
+                    : '默认'}
+                </span>
               )}
             </div>
 
@@ -521,6 +585,7 @@ export default function UserSpace() {
                   page={kvPage}
                   pageSize={kvPageSize}
                   selectedTag={kvTag}
+                  tags={kvTags}
                   onPageChange={(p) => setKvPage(p)}
                   onTagChange={(t) => { setKvTag(t); setKvPage(1); }}
                   onCreate={() => { setKvEditorMode('create'); setKvEditorInit(null); setKvEditorOpen(true); }}
