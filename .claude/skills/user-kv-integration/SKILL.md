@@ -1,6 +1,6 @@
 ---
 name: user-kv-integration
-description: 把前端组件接到后端 user/kv + user/groups + file 体系(/api/v1,邮箱 + JWT + group 维度键值存储 + 文件图床)。Triggers on building email login flows, JWT-bearer storage, single-blob cloud sync with offline LS fallback, sync mode toggles (auto/manual), dirty-state tracking, group/RBAC-aware KV or file reads, backend default-group resolution, or adding a new component that needs backend API.
+description: 把前端组件接到后端 user/kv + user/groups + file 体系(/api/v1,邮箱 + JWT + group 维度键值存储 + 文件图床 + 匿名上传 + 共享 key)。Triggers on building email login flows, JWT-bearer storage, single-blob cloud sync with offline LS fallback, sync mode toggles (auto/manual), dirty-state tracking, group/RBAC-aware KV or file reads, backend default-group resolution, anonymous file upload, file shared-key (by-key) access, or adding a new component that needs backend API.
 ---
 
 # user-kv-integration

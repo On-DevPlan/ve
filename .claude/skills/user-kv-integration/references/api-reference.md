@@ -8,7 +8,7 @@ parent: user-kv-integration
 > **纯接口契约**:路径 / 方法 / 鉴权 / 请求字段 / 响应字段 / 错误码。分两大域:
 >
 > - **字符串域(kv/v1)**:`kv_items` 表,value 是**字符串**,按 group 归属 + RBAC。共 8 个端点。
-> - **文件域(file/v1)**:`files` / `file_tags` / `file_shares` / `file_access_logs` 表,value 是**文件本体**(磁盘),图床 / 工作空间文件 + 分享。共 12 个端点(2026-08-08 新增)。
+> - **文件域(file/v1)**:`files` / `file_tags` / `file_shares` / `file_access_logs` 表,value 是**文件本体**(磁盘),图床 / 工作空间文件 + 分享 + 匿名上传 + 共享 key。共 13 个端点(2026-08-08 新增)。
 >
 > 登录注册 / JWT 见 [[auth-jwt]];「我这种组件该用哪几个接口」见 [[usage-scope]];groupId 契约两者完全一致。
 
@@ -76,7 +76,7 @@ qs.append('tags', 'cache');
 
 # 域 A:字符串 KV(kv/v1) — 8 个端点
 
-> 全在 `/api/v1` 前缀下,除下载外全 MustAuth。
+> 全在 `/api/v1` 前缀下,全部 MustAuth(KV 无公开端点,与文件域的 VirtualUser 匿名不同)。
 
 ## A1. `POST /kv` — Set
 
@@ -200,12 +200,14 @@ qs.append('tags', 'cache');
 
 ---
 
-# 域 B:文件(file/v1) — 12 个端点
+# 域 B:文件(file/v1) — 13 个端点
 
-> 图床 / 工作空间文件。10 个管理端点(MustAuth,前缀 `/api/v1`)+ 2 个公开出图路由(`/files/...`,**不**挂 `/api/v1`,走 `middleware.FileAccess`)。
+> 图床 / 工作空间文件。10 个管理端点(前缀 `/api/v1`,走 **VirtualUser 中间件**:匿名或登录)+ 3 个公开出图路由(`/files/...`,**不**挂 `/api/v1`,走 `middleware.FileAccess`)。
+>
+> **鉴权(VirtualUser,2026-08-08 新增)**:文件管理接口**不再强制登录**。无 token → 注入虚拟匿名身份(落匿名公共组 + **强制 `accessLevel=public`** + 只能操作匿名组内文件);有 token → 真实 uid + 自己的组。user-space(登录态)不受影响 —— 匿名上传主要服务**免费图床**场景。
 >
 > **数据模型**:
-> - `files`:`UNIQUE(group_id, file_id) WHERE is_deleted=FALSE`(同组内 file_id 唯一,删除后可复用);`uploader_id` **仅审计不参与权限**
+> - `files`:`UNIQUE(group_id, file_id) WHERE is_deleted=FALSE`(同组内 file_id 唯一,删除后可复用);**`UNIQUE(group_id, file_key) WHERE file_key IS NOT NULL AND is_deleted=FALSE`**(2026-08-08 新增共享 key,组内唯一);`uploader_id` **仅审计不参与权限**
 > - `file_tags`:每文件多 tag,PK(file_id, tag)
 > - `file_shares`:`code` 10-hex UNIQUE,`status` 是 **SMALLINT**(1=active / 0=revoked)—— 与 `files.status` VARCHAR(16) **不同类型别混**
 > - `file_access_logs`:出图流水(result ∈ OK / DENIED / NOT_FOUND / EXPIRED),匿名 viewer 存 NULL
@@ -217,17 +219,19 @@ qs.append('tags', 'cache');
 | 字段 | 类型 | 必填 | 默认 | 说明 |
 |---|---|---|---|---|
 | `file` | binary | 是 | — | 文件本体(multipart 字段名 = `file`) |
+| `key` | string | 否 | `` | **共享 key**(2026-08-08 新增):组内唯一,上传覆盖该 key 当前版本(软删旧行);带 key 上传**跳过 md5 dedup** |
 | `accessLevel` | string | 否 | `public` | `public` / `private` / `protected` |
 | `expireSeconds` | int64 | 否 | `0` | 0=永不过期 |
 | `tags` | []string | 否 | `[]` | 传 `tags[]=test&tags[]=blog` 多值最稳(CSV `"test,blog"` 服务端也会拆,见 controller) |
 | `groupId` | int64 | 否 | `0` | 0=落 caller 的 default_group_id |
 
-权限:`write+`
+权限:`write+`(匿名身份强制 public + 落匿名组,见文件域引言)
 
 响应:
 ```json
 {
   "fileId": "1dda8ad322522d987626a13bd251196e",
+  "key": "avatar",
   "url": "http://localhost:8080/files/1dda8ad322522d987626a13bd251196e",
   "accessLevel": "public",
   "expireAt": "",
@@ -243,6 +247,7 @@ qs.append('tags', 'cache');
 ```
 
 - 流式计算 md5/sha256;同 group 内同 md5 命中 → 复用旧记录,**不重复落盘**
+- **带 `key` 上传跳过 md5 dedup**(否则 key 会命中旧 md5 记录导致更新丢失);响应 `key` 字段可直接拼 `/files/by-key/<key>` 访问地址(见 B13)
 
 ## B2. `GET /files/:fileId` — Download(公开 + Range)
 
@@ -412,7 +417,20 @@ curl -s $BASE/files/$FILE_ID?share=abc123 -o /tmp/file   # 私图 + share 码
 无需 JWT。校验 share 有效(status=1 + 未过期 + 未超 max_uses)→ 出图 + 计数 +1。
 失败:share 不存在 / 已撤销 / 已过期 / 已用完 → 404 `share invalid`(**对外统一 404**,细节进 file_access_logs)。
 
-> **路由注册顺序敏感**:`/files/share/:code` 必须**先于** `/files/:fileId` 注册,否则 share 子路径会被 `:fileId` 通配吞掉(后端 cmd.go 已处理)。
+## B13. `GET /files/by-key/:key` — 按共享 key 出图
+
+> ⚠️ **公开路由**(`/files/...` 前缀),由 middleware.FileAccess 处理。
+
+按 **共享 key** 出图 + Range(2026-08-08 新增)。组内一个 key 唯一,**永远返回该 key 最新 active 文件**(谁上传就覆盖谁)。匿名访问自动用虚拟匿名身份 + 匿名组,与匿名上传对称。
+
+```bash
+curl -X POST /api/v1/files -F "file=@a.txt" -F "key=avatar" -F "groupId=42"   # 上传 key=avatar
+curl /files/by-key/avatar?groupId=42                                         # → a.txt
+curl -X POST /api/v1/files -F "file=@b.txt" -F "key=avatar" -F "groupId=42"   # 覆盖
+curl /files/by-key/avatar?groupId=42                                         # → b.txt(旧 a 软删)
+```
+
+> **路由注册顺序敏感**:`/files/by-key/:key` → `/files/share/:code` → `/files/:fileId`(先长后短)。by-key / share 子路径若晚于 `:fileId` 注册会被通配吞掉(后端 cmd.go 已处理)。
 
 ---
 

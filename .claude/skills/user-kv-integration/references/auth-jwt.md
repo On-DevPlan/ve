@@ -17,6 +17,8 @@ parent: user-kv-integration
 | JWT 有效期 | **30 天**(HS256) |
 | 响应信封 | `{ code, message, data }` —— **业务错误(code 50/51/52)HTTP 仍是 200**,看 `body.code` 判断成败 |
 
+> ⚠️ **例外(file 域)**:`/files/*` 管理接口走 **VirtualUser 中间件**,无 token 也能调(落匿名公共组 + 强制 public)—— 免费图床场景。user / groups / kv 域仍全部 MustAuth。见 [[api-reference]] 文件域引言。
+
 ## 流程总览
 
 ```

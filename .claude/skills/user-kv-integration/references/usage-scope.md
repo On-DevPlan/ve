@@ -57,12 +57,16 @@ parent: user-kv-integration
 
 | 接口 | 用途 | groupId |
 |---|---|---|
-| `POST /files` | 上传到所选组 | ✅ 显式传 |
+| `POST /files` | 上传到所选组(可带 `key` 做覆盖更新,见下) | ✅ 显式传 |
 | `GET /files` | 列所选组文件 | ✅ 显式传 |
 | `GET /files/:fileId/info` / `PATCH` / `DELETE` | 元数据 / 改 / 软删 | ✅ 显式传 |
 | `POST /files/:fileId/duplicate` | 跨组硬复制 | ✅ 两个都显式 |
 | `POST /files/share` / `GET /files/shares` / `DELETE /files/share/:code` | 分享管理 | ✅ 显式传 |
-| `GET /files/:fileId` / `GET /files/share/:code` | 出图(前端直接 `<img src>` 即可) | 无(公开路由) |
+| `GET /files/:fileId` / `GET /files/share/:code` / `GET /files/by-key/:key` | 出图(前端直接 `<img src>` 即可) | 无(公开路由) |
+
+> **共享 key(2026-08-08 新增)**:像 KV 的 `Set(key)` 一样给文件一个固定 key(如 `avatar` / `banner`),组内同一 key 只对应一个文件,谁上传覆盖谁,`GET /files/by-key/<key>` 永远拿到最新 active。适合「工作空间级单一资源」。**但它仍是 per-file,不是单 blob** —— 普通组件要整库同步还是走模型二。
+>
+> **文件接口支持匿名**(VirtualUser:无 token 落匿名公共组 + 强制 public)—— 但那是**免费图床**场景,user-space 是登录态,只在独立图床组件里才会用到匿名路径。
 
 ### 用(groups 系列 — user-space 组管理 UI)
 
