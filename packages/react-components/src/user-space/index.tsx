@@ -81,6 +81,8 @@ export default function UserSpace() {
     } catch { return 10; }
   });
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // 移动端 sidebar 抽屉开关(≤640px 有效);切组后也自动关闭,避免遮挡新视图。
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // 改每页条数 → 回到第 1 页
   function changeKvPageSize(n: number): void {
@@ -434,12 +436,19 @@ export default function UserSpace() {
 
   return (
     <div className="sl-us-root">
+      {/* drawer backdrop —— 仅 mobile 显(mobile @media 才 display: block),桌面 no-op */}
+      <div
+        className="sl-us-side-backdrop"
+        onClick={() => setSidebarOpen(false)}
+        aria-hidden="true"
+      />
       <Sidebar
+        open={sidebarOpen}
         groups={safeGroups}
         selectedGroupId={currentSelected}
         defaultGroupId={defaultGroupId}
         userEmail={auth.jwtUser?.email ?? null}
-        onSelect={(id) => setSelectedId(id)}
+        onSelect={(id) => { setSelectedId(id); setSidebarOpen(false); }}
         onCreate={(name, description) => handleCreate(name, description)}
         onSetDefault={(id) => handleSetDefault(id)}
         onOpenSettings={() => setSettingsOpen(true)}
@@ -457,6 +466,14 @@ export default function UserSpace() {
         {selectedGroup ? (
           <>
             <div className="sl-us-topbar">
+              <button
+                className="sl-us-topbar__burger"
+                onClick={() => setSidebarOpen((v) => !v)}
+                aria-label="切换工作空间列表"
+                aria-expanded={sidebarOpen}
+              >
+                ☰
+              </button>
               <div className="sl-us-topbar__title">{selectedGroup.name}</div>
               <span className="sl-us-topbar__crumb-sep">/</span>
               <div className="sl-us-topbar__crumb">{VIEW_TABS.find((t) => t.key === view)?.label}</div>

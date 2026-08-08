@@ -71,6 +71,10 @@
   background: var(--panel);
   display: flex; flex-direction: column;
   min-height: 0;
+  /* 桌面默认:grid item 参与布局,不是 fixed 浮层。
+     显式声明 position/transform 让 mobile @media 覆盖时无残留。 */
+  position: relative;
+  transform: none;
 }
 .sl-us-side__brand {
   padding: 14px 16px;
@@ -648,3 +652,113 @@
 .sl-us-danger__row:last-child { border-bottom: none; }
 .sl-us-danger__row-main { flex: 1; }
 .sl-us-danger__row-confirm { display: flex; gap: 6px; }
+
+/* ── responsive break ─────────────────────────────
+   desktop  (>900px): default —— 两栏 grid(sidebar 240px + main 1fr)
+   tablet   (641-900px): 同 desktop 但 sidebar 180px,padding 缩到 16px
+   mobile   (≤640px):  sidebar 抽屉(默认关),topbar + 汉堡按钮,
+                       tabs 横滚,表格横滚,触控 44px
+
+   实现位置:每档 @media 独立块,集中在 CSS 末尾「media queries」章节,
+   避免分散到原始声明里;响应式层是叠加在桌面默认上的修改,
+   删掉响应式层不会回不去。
+
+   默认显示 hamburger(JS 仅控制侧栏 is-open).即使 JS disabled / 失败,
+   移动端用户仍能看到汉堡按钮(Sidebar 永远存在,只是默认关)。
+*/
+.sl-us-topbar__burger {
+  width: 44px; height: 44px;
+  display: none;                  /* 桌面默认隐藏;mobile @media 内才显 */
+  align-items: center; justify-content: center;
+  border-radius: 6px;
+  color: var(--fg-2);
+  flex-shrink: 0;
+  font-size: 18px;
+}
+.sl-us-topbar__burger:hover { background: var(--hover); color: var(--fg); }
+
+/* 抽屉 backdrop:默认不渲染(仅 mobile + open 时有用) */
+.sl-us-side-backdrop { display: none; }
+
+/* ── media queries ─────────────────────────────── */
+/* tablet: 641-900px(sidebar 缩到 180px,padding 留呼吸) */
+@media (max-width: 900px) {
+  .sl-us-root { grid-template-columns: 180px 1fr; }
+  .sl-us-side__brand { padding: 12px 12px; }
+  .sl-us-side__section { padding: 10px 6px; }
+  .sl-us-side__brand-name { font-size: 12px; }
+  .sl-us-side__item { padding: 5px 6px; font-size: 12px; }
+  .sl-us-topbar, .sl-us-tabs, .sl-us-toolbar { padding-left: 14px; padding-right: 14px; }
+  .sl-us-table-wrap { margin-left: 14px; margin-right: 14px; }
+  .sl-us-modal { width: min(520px, 92vw); }
+}
+
+/* mobile: ≤640px(单栏 + 抽屉 + 横滚 + 全屏 modal + 44px 触控) */
+@media (max-width: 640px) {
+  .sl-us-root {
+    grid-template-columns: 1fr;     /* 单栏,sidebar 浮层 */
+    font-size: 14px;                /* 加大基础字号 */
+  }
+  /* Sidebar 改为左抽屉:默认滑出,is-open 时滑入 */
+  .sl-us-side {
+    position: fixed; inset: 0 auto 0 0;       /* 左抽屉 */
+    width: min(280px, 80vw);
+    z-index: 100;
+    transform: translateX(-100%);             /* 默认滑出 */
+    transition: transform 0.18s ease;
+    border-right: 1px solid var(--border);
+  }
+  .sl-us-side.is-open {
+    transform: translateX(0);
+  }
+  /* 抽屉打开时的暗色遮罩(点击关闭) —— z-index < sidebar 但 > main */
+  .sl-us-side-backdrop {
+    display: block;
+    position: fixed; inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 99;
+  }
+  /* topbar 加汉堡按钮位置 */
+  .sl-us-topbar__burger { display: inline-flex; }
+  .sl-us-topbar { padding: 8px 12px; gap: 8px; }
+  .sl-us-topbar__title {
+    font-size: 14px; max-width: 50vw;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  /* tabs 横滚(4 tab 不再挤) */
+  .sl-us-tabs {
+    padding: 8px 12px; gap: 4px;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+  }
+  .sl-us-tab { padding: 8px 12px; flex-shrink: 0; }
+
+  /* 工具栏 padding 缩 + 换行 */
+  .sl-us-toolbar { padding: 8px 12px; flex-wrap: wrap; }
+
+  /* 表格水平滚(关键修复:原 overflow:hidden 会截掉) */
+  .sl-us-table-wrap {
+    margin: 0 12px 16px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .sl-us-table { min-width: 480px; }   /* 表不收缩到挤,触发滚动 */
+
+  /* 触控 44px:按钮/输入最小高(WCAG) */
+  .sl-us-btn { min-height: 44px; padding: 8px 12px; }
+  .sl-us-btn--sm { min-height: 36px; }
+  .sl-us-input, .sl-us-side__add, .sl-us-side__user-action {
+    min-height: 44px;
+  }
+
+  /* modal 占满全屏(100dvh 避免 iOS Safari 地址栏视觉跳动) */
+  .sl-us-modal {
+    width: 100vw;
+    max-height: 100vh;
+    height: 100dvh;
+    border-radius: 0;
+    border: none;
+  }
+}
