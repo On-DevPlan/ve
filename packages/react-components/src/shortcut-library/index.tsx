@@ -35,11 +35,29 @@ const LONG_PRESS_MAX = 5;
 // 避免清空数据时连带把"是否折叠"也抹掉
 const PREVIEW_COLLAPSED_KEY = 'sl-shortcut-library:v1:previewCollapsed';
 
+// 边框比例持久化 key —— 全局单一值(不按组存,简单 key 命名)
+const SIDEBAR_W_KEY = 'sl-shortcut-library:v1:sidebarW';
+const PREVIEW_H_KEY = 'sl-shortcut-library:v1:previewH';
+const SIDEBAR_DEFAULT = 280;
+const PREVIEW_DEFAULT = 200;
+
 function loadPreviewCollapsed(): boolean {
   try {
     return localStorage.getItem(PREVIEW_COLLAPSED_KEY) === '1';
   } catch {
     return false;
+  }
+}
+
+function loadNumber(key: string, fallback: number, min: number, max: number): number {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return fallback;
+    return Math.min(max, Math.max(min, n));
+  } catch {
+    return fallback;
   }
 }
 
@@ -61,7 +79,7 @@ export default function ShortcutLibrary() {
   // 键盘预览折叠态 —— 默认展开;用户手动收起后写入 LS,下次进详情页保持
   const [previewCollapsed, setPreviewCollapsed] = useState<boolean>(loadPreviewCollapsed);
 
-  // 拖拽布局:sidebar 宽度 + 键盘预览高度(都不持久化,组件实例间独立)。
+  // 拖拽布局:sidebar 宽度 + 键盘预览高度(全局单一值持久化到 LS)。
   //
   // 性能设计(冻结快照):拖拽期间内容子树【完全不参与 layout】。
   //   - 每个可变面板 = 一层 panel(尺寸随 grid/flex 变)+ 一层 inner(冻结内容)。
@@ -70,8 +88,19 @@ export default function ShortcutLibrary() {
   //     不传导进子树。每帧 layout 节点从"57 键 + N 行"降到常数级(几个容器)。
   //   - pointermove / rAF:只写 --sidebar-w / --preview-h,面板层 reflow,内容层跳过。
   //   - pointerup:解冻 inner + setState 同帧(避免解冻跳一下)。
-  const [sidebarWidth, setSidebarWidth] = useState(280);
-  const [previewHeight, setPreviewHeight] = useState(200);
+
+  // 边界常量(惰性初始化器要引用,必须先声明)
+  const SIDEBAR_MIN = 200;
+  const SIDEBAR_MAX = 500;
+  const PREVIEW_MIN = 80;
+  const PREVIEW_MAX = 500;
+
+  const [sidebarWidth, setSidebarWidth] = useState(() =>
+    loadNumber(SIDEBAR_W_KEY, SIDEBAR_DEFAULT, SIDEBAR_MIN, SIDEBAR_MAX),
+  );
+  const [previewHeight, setPreviewHeight] = useState(() =>
+    loadNumber(PREVIEW_H_KEY, PREVIEW_DEFAULT, PREVIEW_MIN, PREVIEW_MAX),
+  );
   const rootRef = useRef<HTMLDivElement | null>(null);
   // 面板(尺寸变)与 inner(冻结内容)的引用
   const sidebarPanelRef = useRef<HTMLDivElement | null>(null);
@@ -88,11 +117,6 @@ export default function ShortcutLibrary() {
   // rAF 去重标记 + 最新指针偏移(ref 写入,不触发渲染)
   const rafId = useRef<number | null>(null);
   const latest = useRef<{ dx: number; dy: number } | null>(null);
-
-  const SIDEBAR_MIN = 200;
-  const SIDEBAR_MAX = 500;
-  const PREVIEW_MIN = 80;
-  const PREVIEW_MAX = 500;
 
   // pointerdown 冻结:读一次 panel 尺寸,inner 钉死(切断父尺寸→子树重排)
   function freezePanels() {
@@ -167,9 +191,13 @@ export default function ShortcutLibrary() {
     const t = dragType.current;
     if (t) {
       if (t === 'sidebar') {
-        setSidebarWidth(Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, dragStart.current.w + (e.clientX - dragStart.current.x))));
+        const w = Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, dragStart.current.w + (e.clientX - dragStart.current.x)));
+        setSidebarWidth(w);
+        try { localStorage.setItem(SIDEBAR_W_KEY, String(w)); } catch { /* quota / private mode — ignore */ }
       } else {
-        setPreviewHeight(Math.min(PREVIEW_MAX, Math.max(PREVIEW_MIN, dragStart.current.h - (e.clientY - dragStart.current.y))));
+        const h = Math.min(PREVIEW_MAX, Math.max(PREVIEW_MIN, dragStart.current.h - (e.clientY - dragStart.current.y)));
+        setPreviewHeight(h);
+        try { localStorage.setItem(PREVIEW_H_KEY, String(h)); } catch { /* quota / private mode — ignore */ }
       }
     }
     unfreezePanels();
