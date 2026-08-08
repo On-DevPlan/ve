@@ -12,10 +12,10 @@
 
 import { HttpService } from '../base';
 import { apiPaths } from '../../registry';
-import type { UserInfo, RegisterArgs } from './types';
+import type { UserInfo, RegisterArgs, DefaultGroupInfo } from './types';
 
 export { ApiError } from '../base';
-export type { UserInfo, RegisterArgs } from './types';
+export type { UserInfo, RegisterArgs, DefaultGroupInfo } from './types';
 
 export class UserV1Service extends HttpService {
   readonly BASE = apiPaths.userV1;
@@ -35,6 +35,11 @@ export class UserV1Service extends HttpService {
 
   info(): Promise<UserInfo> {
     return this.reqGet<UserInfo>('/info');
+  }
+
+  /** GET /default-group —— 当前默认工作空间 {groupId, name, myRole};未设置返回 groupId=0。 */
+  getDefaultGroup(): Promise<DefaultGroupInfo> {
+    return this.reqGet<DefaultGroupInfo>('/default-group');
   }
 
   regenerateInvitation(): Promise<{ invitationCode: string }> {

@@ -8,9 +8,11 @@
 // 声明一份造成 api/index.ts barrel 的 export collision。
 
 import type { GroupRole } from '../../services/groupV1/types';
+import type { DefaultGroupInfo } from '../../services/userV1/types';
 import type { KvDuplicateArgs, KvDuplicateResponse } from '../../services/kvV1/types';
 
 export type { GroupRole };
+export type { DefaultGroupInfo };
 export type { KvDuplicateArgs, KvDuplicateResponse };
 
 export interface GroupSummary {
@@ -91,6 +93,8 @@ export interface UserSpaceStore {
   getGroupDetail(id: number): Promise<GroupSummary>;
   /** 拉一次当前默认组 id;不存在返回 null */
   getDefaultGroupId(): Promise<number | null>;
+  /** 拉一次当前默认组 {groupId, name, myRole};失败降级到 groupId=0 占位。供 UI 顶部徽章展示。 */
+  getDefaultGroupInfo(): Promise<DefaultGroupInfo>;
 
   // ── CRUD ─────────────────────────────────────────
   createGroup(args: { name: string; description?: string }): Promise<GroupSummary>;

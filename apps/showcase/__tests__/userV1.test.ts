@@ -103,4 +103,45 @@ describe('userV1 service (throw model)', () => {
       userV1Service.login({ email: 'a@b.com', password: 'wrong' }),
     ).rejects.toMatchObject({ code: 401 });
   });
+
+  it('getDefaultGroup GETs /api/v1/user/default-group and unwraps {groupId, name, myRole}', async () => {
+    const mockFetch = vi.fn().mockResolvedValue(
+      mockJSON(200, {
+        code: 0,
+        data: { groupId: 42, name: 'project-x', myRole: 'owner' },
+      }),
+    );
+    global.fetch = mockFetch;
+
+    const result = await userV1Service.getDefaultGroup();
+    expect(result).toEqual({ groupId: 42, name: 'project-x', myRole: 'owner' });
+    const url = mockFetch.mock.calls[0][0] as string;
+    expect(url).toBe('/api/v1/user/default-group');
+    const init = mockFetch.mock.calls[0][1] as RequestInit;
+    expect(init.method).toBe('GET');
+    expect(init.headers).toMatchObject({ Authorization: 'Bearer jwt' });
+  });
+
+  it('getDefaultGroup returns {groupId:0,...} when caller has not set a default', async () => {
+    const mockFetch = vi.fn().mockResolvedValue(
+      mockJSON(200, {
+        code: 0,
+        data: { groupId: 0, name: '', myRole: 'reader' },
+      }),
+    );
+    global.fetch = mockFetch;
+    await expect(userV1Service.getDefaultGroup()).resolves.toEqual({
+      groupId: 0,
+      name: '',
+      myRole: 'reader',
+    });
+  });
+
+  it('getDefaultGroup propagates 401 as ApiError', async () => {
+    const mockFetch = vi.fn().mockResolvedValue(
+      mockJSON(401, { code: 401, message: 'unauthorized' }),
+    );
+    global.fetch = mockFetch;
+    await expect(userV1Service.getDefaultGroup()).rejects.toMatchObject({ code: 401 });
+  });
 });

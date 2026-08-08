@@ -18,6 +18,7 @@ import DuplicateKvModal from './src/pages/DuplicateKvModal';
 import SettingsPanel from './src/pages/SettingsPanel';
 import { hasMinRole } from '@api/components/user-space';
 import type {
+  DefaultGroupInfo,
   GroupInvitationView,
   GroupMemberView,
   GroupSummary,
@@ -43,6 +44,10 @@ export default function UserSpace() {
   const [view, setView] = useState<ViewMode>('overview');
   const [actionError, setActionError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // 当前默认工作空间 {groupId, name, myRole} —— 顶部默认徽章展示 name+role。
+  // store.getDefaultGroupInfo() 失败时也会回占位(由 store 内部 catch),
+  // UI 永远拿到一个稳定形态,不需再判空。
+  const [defaultGroupInfo, setDefaultGroupInfo] = useState<DefaultGroupInfo | null>(null);
 
   // ── 各视图子状态 ─────────────────────────────────
   const [members, setMembers] = useState<GroupMemberView[]>([]);
@@ -83,6 +88,20 @@ export default function UserSpace() {
     try { localStorage.setItem('sl-us:v1:kvPageSize', String(n)); } catch { /* ignore */ }
     setKvPage(1);
   }
+
+  // 拉当前默认工作空间 {groupId, name, myRole} —— 顶部默认徽章展示用。
+  // 与列表 reload 同步:登录态变 / 切默认组 / 退登 → 重拉。
+  useEffect(() => {
+    if (auth.jwtAuthState !== 'logged-in' || !auth.token) {
+      setDefaultGroupInfo(null);
+      return;
+    }
+    let cancelled = false;
+    store.getDefaultGroupInfo()
+      .then((info) => { if (!cancelled) setDefaultGroupInfo(info); })
+      .catch(() => { if (!cancelled) setDefaultGroupInfo({ groupId: 0, name: '', myRole: 'reader' }); });
+    return () => { cancelled = true; };
+  }, [auth.jwtAuthState, auth.token, store]);
 
   // 选中态:默认进第一个组 / 用户手动选过的优先
   const currentSelected = useMemo(() => {
@@ -446,7 +465,11 @@ export default function UserSpace() {
                 {selectedGroup.myRole.toUpperCase()}
               </span>
               {selectedGroup.isDefault && (
-                <span className="sl-us-chip sl-us-chip--default">默认</span>
+                <span className="sl-us-chip sl-us-chip--default">
+                  {defaultGroupInfo?.name
+                    ? `${defaultGroupInfo.name} · ${defaultGroupInfo.myRole.toUpperCase()}`
+                    : '默认'}
+                </span>
               )}
             </div>
 

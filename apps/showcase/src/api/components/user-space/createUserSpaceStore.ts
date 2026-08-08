@@ -39,6 +39,7 @@ import type {
   UserSpaceStore,
   ShortcutsBlob,
 } from './types';
+import type { DefaultGroupInfo } from '../../services/userV1/types';
 import { ApiError } from '../../services/base';
 
 const VALUE_PREVIEW_MAX = 80;
@@ -106,16 +107,26 @@ export function createUserSpaceStore(): UserSpaceStore {
 
   async function resolveDefaultGroupId(): Promise<number | null> {
     // 顺序:
-    //   1) /user/info 是否回 defaultGroupId(后续 DTO 补字段)
-    //   2) 兜底:listGroups() 挑第一个(caller 注册时一定有「个人空间」组,
+    //   1) GET /user/default-group(优先;后端契约稳定后这才是单一事实源)
+    //   2) 兜底:jwtUser.defaultGroupId(legacy DTO)
+    //   3) 兜底:listGroups() 挑第一个(caller 注册时一定有「个人空间」组,
     //      所以 pick-first 不会误中其他组;多组用户显式 setDefaultGroup
     //      后就走路径 1 了)
     // 用处:仅给 user-space 多组管理 UI(decorate / 各种 group CRUD 返回
     // isDefault)用。shortcut-library 的 get/set 不调这里 —— 它直接不传
     // groupId,让后端 KV 端点自己走 default(见 [[client-api]] §6「groupId
     // 0 或不传 → 回退到 caller 的 default_group_id」),更省事也更准。
-    const info = jwtAuth.state.jwtUser;
-    if (info?.defaultGroupId && info.defaultGroupId > 0) return info.defaultGroupId;
+    try {
+      const info = await userV1Service.getDefaultGroup();
+      if (info.groupId > 0) return info.groupId;
+      // 未设置(后端返 groupId=0):不走兜底 pick-first —— 避免把「第一个组」
+      // 误当默认。UI 此时不展示默认徽章。
+      return null;
+    } catch {
+      // 网络/401/500 → 继续走兜底
+    }
+    const cached = jwtAuth.state.jwtUser;
+    if (cached?.defaultGroupId && cached.defaultGroupId > 0) return cached.defaultGroupId;
     try {
       const { groups } = await groupV1Service.list();
       if (groups.length > 0) return groups[0].id;
@@ -147,6 +158,19 @@ export function createUserSpaceStore(): UserSpaceStore {
   async function getDefaultGroupId(): Promise<number | null> {
     requireAuth();
     return resolveDefaultGroupId();
+  }
+
+  /** 拉当前默认组的 {groupId, name, myRole};供 UI 顶部徽章展示 name+role。
+   * 未设置返回 groupId=0/name=''/myRole='reader' 的占位。失败同样降级到占位
+   * —— UI 永远拿得到一个稳定形态,不需再判空。 */
+  async function getDefaultGroupInfo(): Promise<DefaultGroupInfo> {
+    requireAuth();
+    try {
+      return await userV1Service.getDefaultGroup();
+    } catch {
+      // request.ts 已对 401 静默降级;这里继续吞掉其它失败 → UI 拿到占位
+      return { groupId: 0, name: '', myRole: 'reader' };
+    }
   }
 
   // ── CRUD ─────────────────────────────────────────
@@ -465,6 +489,7 @@ export function createUserSpaceStore(): UserSpaceStore {
     listGroups,
     getGroupDetail,
     getDefaultGroupId,
+    getDefaultGroupInfo,
     createGroup,
     updateGroup,
     dissolveGroup,
