@@ -12,16 +12,21 @@
 import { useMemo } from 'react';
 import type { FileAccessLevel, FileListResult, FileView, GroupSummary } from '@api/components/user-space';
 import { hasMinRole } from '@api/components/user-space';
+import { ApiError } from '@api/services/base';
 
 export interface FilesProps {
   group: GroupSummary;
   files: FileListResult | null;
   loading: boolean;
-  error: string | null;
+  /** 原始失败对象(保留 Error 形态,用来读 ApiError.code)。
+   * null 时不渲染错误条。 */
+  error: unknown | null;
   saving: boolean;
   page: number;
   pageSize: number;
   selectedTag: string | null;
+  /** 当前失败动作 —— 用来把后端 code:50「permission denied」翻成中文可读消息。 */
+  errorAction: 'list' | 'upload' | 'patch' | 'delete' | 'duplicate' | null;
   onPageChange: (page: number) => void;
   onTagChange: (tag: string | null) => void;
   onUpload: () => void;
@@ -61,8 +66,34 @@ function fileKindIcon(kind: FileView['fileKind']): string {
   }
 }
 
+/** 文件 tab 失败消息翻译器 —— 后端 ApiError(尤其 code:50「permission denied」)
+ *  对普通用户不可读。已知动作 + role 上下文 → 中文可执行提示。
+ *  默认 fall through 到原始 message,兜底任何未识别错误。 */
+function fileErrorMessage(
+  err: unknown,
+  action: 'list' | 'upload' | 'patch' | 'delete' | 'duplicate',
+  group: GroupSummary,
+): string {
+  if (!(err instanceof ApiError) || err.code !== 50) {
+    return err instanceof Error ? err.message : String(err);
+  }
+  const role = group.myRole;
+  switch (action) {
+    case 'list':
+      return `你不是该工作空间的成员,无法查看文件`;
+    case 'upload':
+      return `需要 writer 或更高权限才能上传文件。当前角色:${role}`;
+    case 'patch':
+      return `需要 writer 或更高权限才能修改文件属性。当前角色:${role}`;
+    case 'duplicate':
+      return `需要 writer 或更高权限才能复制文件到其他工作空间。当前角色:${role}`;
+    case 'delete':
+      return `只有 owner/admin 才能删除文件。当前角色:${role}`;
+  }
+}
+
 export default function Files(props: FilesProps) {
-  const { group, files, loading, error, saving, page, pageSize, selectedTag, onPageChange, onTagChange, onUpload, onAccessLevelChange, onDuplicate, onDelete, onReload } = props;
+  const { group, files, loading, error, errorAction, saving, page, pageSize, selectedTag, onPageChange, onTagChange, onUpload, onAccessLevelChange, onDuplicate, onDelete, onReload } = props;
   const canWrite = hasMinRole(group.myRole, 'writer');
   const canDelete = hasMinRole(group.myRole, 'admin');
 
@@ -78,6 +109,14 @@ export default function Files(props: FilesProps) {
   }, [files?.items]);
 
   const totalPages = files ? Math.max(1, Math.ceil(files.total / pageSize)) : 1;
+
+  // 文件 tab 错误消息:code:50「permission denied」按动作翻译成中文可读;
+  // 其他错误回落到原始 message。
+  const errorMessage: string | null = error
+    ? (errorAction
+        ? fileErrorMessage(error, errorAction, group)
+        : error instanceof Error ? error.message : String(error))
+    : null;
 
   return (
     <div>
@@ -103,7 +142,9 @@ export default function Files(props: FilesProps) {
         )}
       </div>
 
-      {error && <div className="sl-us-error">{error}</div>}
+      {errorMessage && (
+        <div className="sl-us-error">{errorMessage}</div>
+      )}
 
       {(!files || files.items.length === 0) && !loading ? (
         <div className="sl-us-empty">

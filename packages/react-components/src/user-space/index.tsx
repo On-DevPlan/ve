@@ -104,7 +104,10 @@ export default function UserSpace() {
   // 一致行为。displayName = fileId[:8] 唯一展示名,见 FileView 注释。
   const [files, setFiles] = useState<FileListResult | null>(null);
   const [filesLoading, setFilesLoading] = useState(false);
-  const [filesError, setFilesError] = useState<string | null>(null);
+  // 保留原始 Error 对象(用来在 Files.tsx 里识别 ApiError.code === 50 「permission denied」)。
+  // 不直接 toString,避免丢 code / stack。
+  const [filesError, setFilesError] = useState<unknown | null>(null);
+  const [filesErrorAction, setFilesErrorAction] = useState<'list' | 'upload' | 'patch' | 'delete' | 'duplicate' | null>(null);
   const [filesPage, setFilesPage] = useState(1);
   const [filesTag, setFilesTag] = useState<string | null>(null);
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -172,6 +175,7 @@ export default function UserSpace() {
     setDuplicateFileOpen(false);
     setDuplicateFileSource(null);
     setFilesError(null);
+    setFilesErrorAction(null);
   }, [currentSelected]);
 
   // ── 各视图 lazy load ───────────────────────────────
@@ -236,6 +240,7 @@ export default function UserSpace() {
     if (!currentSelected) return;
     setFilesLoading(true);
     setFilesError(null);
+    setFilesErrorAction('list');
     try {
       const result = await store.listFiles(currentSelected, {
         page,
@@ -244,7 +249,7 @@ export default function UserSpace() {
       });
       setFiles(result);
     } catch (e) {
-      setFilesError(e instanceof Error ? e.message : 'load files failed');
+      setFilesError(e);
     } finally {
       setFilesLoading(false);
     }
@@ -463,17 +468,21 @@ export default function UserSpace() {
     await withError(async () => {
       await store.uploadFile(currentSelected, { file: args.file, tags: args.tags });
       setUploadOpen(false);
+      setFilesError(null);
+      setFilesErrorAction(null);
       setFilesPage(1); // 新建后回到第一页,新文件出现在前
       await loadFiles(1, filesTag);
-    });
+    }).catch((e) => { setFilesError(e); setFilesErrorAction('upload'); });
   }
 
   async function handleAccessLevelChange(item: FileView, accessLevel: FileAccessLevel): Promise<void> {
     if (!currentSelected) return;
     await withError(async () => {
       await store.updateFileMeta(currentSelected, item.fileId, { accessLevel });
+      setFilesError(null);
+      setFilesErrorAction(null);
       await loadFiles(filesPage, filesTag);
-    });
+    }).catch((e) => { setFilesError(e); setFilesErrorAction('patch'); });
   }
 
   async function handleDeleteFile(item: FileView): Promise<void> {
@@ -487,8 +496,10 @@ export default function UserSpace() {
         nextPage = filesPage - 1;
         setFilesPage(nextPage);
       }
+      setFilesError(null);
+      setFilesErrorAction(null);
       await loadFiles(nextPage, filesTag);
-    });
+    }).catch((e) => { setFilesError(e); setFilesErrorAction('delete'); });
   }
 
   // 把 sourceFile 从当前组复制到另一个 group。DuplicateFileModal 已经过滤
@@ -508,8 +519,10 @@ export default function UserSpace() {
       setDuplicateFileOpen(false);
       setDuplicateFileSource(null);
       setFileToast(`已复制为「${res.fileId.slice(0, 8)}」`);
+      setFilesError(null);
+      setFilesErrorAction(null);
       await loadFiles(filesPage, filesTag);
-    });
+    }).catch((e) => { setFilesError(e); setFilesErrorAction('duplicate'); });
     return { newFileId };
   }
 
@@ -746,6 +759,7 @@ export default function UserSpace() {
                   files={files}
                   loading={filesLoading}
                   error={filesError}
+                  errorAction={filesErrorAction}
                   saving={saving}
                   page={filesPage}
                   pageSize={filesPageSize}
