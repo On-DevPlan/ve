@@ -42,6 +42,16 @@ const FORMAT_PROMPT = `你是一个快捷键数据生成助手。根据用户需
 # === 修饰键写法(不区分左右) ===
 # Ctrl  Shift  Alt  ⌘(Meta/Command)
 
+# === 单键快捷键(无修饰键)也是合法的 ===
+# combo 可以只写一个主键,不带任何修饰键。
+# 很多非编码类应用 —— 尤其是传媒/剪辑软件(Premiere / 达芬奇 / 剪映 / DaVinci 等),
+# 为了让素材编排"手不离键",大量使用单键:
+#   J / K / L   快退 / 暂停 / 快进
+#   I / O       标记入点 / 出点
+#   C / V       切刀 / 选择
+#   Space       播放/暂停
+# 这类应用请大胆输出单键 combo(如 combo = "K"),不必强行加 Ctrl。
+
 # === 主键写法(大小写不敏感) ===
 # 字母: A-Z     数字: 0-9     功能键: F1-F12
 # 方向: ↑ ↓ ← →
@@ -131,7 +141,39 @@ combo = "Ctrl+Shift+L"
 desc = "切换侧边栏"
 condition = "仅 Windows/Linux"
 
-# === 示例 4:导航键 + 符号键 + 转义(照这个写法准没错) ===
+# === 示例 4:传媒剪辑软件(大量单键,手不离键) ===
+[[groups]]
+name = "DaVinci Resolve"
+
+[[groups.shortcuts]]
+combo = "Space"
+desc = "播放/暂停"
+
+[[groups.shortcuts]]
+combo = "J"
+desc = "快退(连按加速)"
+
+[[groups.shortcuts]]
+combo = "K"
+desc = "停止"
+
+[[groups.shortcuts]]
+combo = "L"
+desc = "快进(连按加速)"
+
+[[groups.shortcuts]]
+combo = "I"
+desc = "标记入点"
+
+[[groups.shortcuts]]
+combo = "O"
+desc = "标记出点"
+
+[[groups.shortcuts]]
+combo = "C"
+desc = "切刀工具"
+
+# === 示例 5:导航键 + 符号键 + 转义(照这个写法准没错) ===
 [[groups]]
 name = "Krita"
 
