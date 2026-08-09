@@ -10,10 +10,12 @@
 import type { GroupRole } from '../../services/groupV1/types';
 import type { DefaultGroupInfo } from '../../services/userV1/types';
 import type { KvDuplicateArgs, KvDuplicateResponse, KvTagCount } from '../../services/kvV1/types';
+import type { FileAccessLevel, FileDuplicateArgs, FileDuplicateResponse } from '../../services/fileV1/types';
 
 export type { GroupRole };
 export type { DefaultGroupInfo };
 export type { KvDuplicateArgs, KvDuplicateResponse, KvTagCount };
+export type { FileAccessLevel, FileDuplicateArgs, FileDuplicateResponse };
 
 export interface GroupSummary {
   id: number;
@@ -68,6 +70,37 @@ export interface KvListResult {
   pageSize: number;
 }
 
+/** 文件视图(组件侧语义)。
+ *  displayName:后端未补 originalName,前端临时用 fileId 前 8 hex 作展示名;
+ *              调用方应将 displayName 用于 UI 唯一识别 + confirm 提示。
+ *  isPreviewable:public + image MIME 才能在表格里出缩略图;其余类型只出图标。
+ *  fileKind:image/text/other —— UI 按此决定缩略图 / 类型图标 / 文案。 */
+export interface FileView {
+  fileId: string;
+  url: string;
+  displayName: string;
+  accessLevel: FileAccessLevel;
+  size: number;
+  contentType: string;
+  groupId: number;
+  groupName: string;
+  myRole: GroupRole;
+  tags: string[];
+  md5: string;
+  sha256: string;
+  createdAt: string;
+  expireAt: string;
+  isPreviewable: boolean;
+  fileKind: 'image' | 'text' | 'other';
+}
+
+export interface FileListResult {
+  items: FileView[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
 /** 历史版本摘要(组件侧语义,由 kvV1 的 version_no/value_len/replaced_at 映射)。 */
 export interface KvVersionView {
   versionNo: number;
@@ -83,8 +116,8 @@ export interface KvEditorPayload {
   ttl: number;
 }
 
-/** 三视图模式:only one of Overview / Members / Invitations / Inventory */
-export type ViewMode = 'overview' | 'members' | 'invitations' | 'inventory';
+/** 三视图模式:only one of Overview / Members / Invitations / Inventory / Files */
+export type ViewMode = 'overview' | 'members' | 'invitations' | 'inventory' | 'files';
 
 /** createUserSpaceStore 返回给组件的统一句柄 */
 export interface UserSpaceStore {
@@ -130,6 +163,25 @@ export interface UserSpaceStore {
   restoreKv(groupId: number, key: string, version: number): Promise<void>;
   /** 跨组复制 KV(source read+ → target write+)。targetGroupId 必须 ≥ 1。 */
   duplicateKv(args: KvDuplicateArgs): Promise<KvDuplicateResponse>;
+
+  // ── 文件(本期为公开图床) ─────────────────────────
+  // upload 固定 accessLevel='public';tags replace 语义。displayName 由后端
+  // fileId[:8] 派生,见 FileView.comment 解释。
+  uploadFile(groupId: number, args: { file: Blob; tags?: string[] }): Promise<FileView>;
+  listFiles(
+    groupId: number,
+    opts: { page: number; pageSize: number; tags?: string[] },
+  ): Promise<FileListResult>;
+  /** 行内改 accessLevel / tags。accessLevel 永远发完整值(后端 PATCH pointer 字段)。 */
+  updateFileMeta(
+    groupId: number,
+    fileId: string,
+    args: { accessLevel?: FileAccessLevel; tags?: string[] },
+  ): Promise<FileView>;
+  /** 删除文件。后端 owner/admin only;reader/writer 调用会 403。 */
+  deleteFile(groupId: number, fileId: string): Promise<void>;
+  /** 跨组复制文件(source read+ → target write+)。新 fileId 由后端生成。 */
+  duplicateFile(args: FileDuplicateArgs): Promise<FileDuplicateResponse>;
 
   // ── 组件业务封装(per-component contract)──────────────────────
   // shortcut-library 的整个库作为单个 KV 整体存取,内部固定 key='shortcuts'。

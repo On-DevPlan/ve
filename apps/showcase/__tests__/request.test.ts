@@ -192,6 +192,35 @@ describe('request — fetch / 网络', () => {
     expect(init.body).toBe('{"email":"x@y.z"}');
   });
 
+  it('FormData body 不被 JSON.stringify(透传原始 FormData 实例)', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify(envelope({ ok: true })), { status: 200 }),
+    );
+
+    const { api } = await importFreshApi();
+    const fd = new FormData();
+    fd.append('file', new Blob(['hello']), 'hello.txt');
+    await api.post('/api/v1/files', fd);
+    const [, init] = mockFetch.mock.calls[0];
+    // body 必须是 FormData 自身(无 JSON.stringify 包装)
+    expect(init.body).toBe(fd);
+    expect(typeof init.body).not.toBe('string');
+  });
+
+  it('FormData body 时不设置 content-type 头(浏览器会自动加 multipart boundary)', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify(envelope({ ok: true })), { status: 200 }),
+    );
+
+    const { api } = await importFreshApi();
+    const fd = new FormData();
+    fd.append('file', new Blob(['hello']), 'hello.txt');
+    await api.post('/api/v1/files', fd);
+    const [, init] = mockFetch.mock.calls[0];
+    // FormData 必须不带 content-type —— 浏览器会附 multipart boundary;手动设会丢失
+    expect(init.headers['content-type']).toBeUndefined();
+  });
+
   it('fetch 抛 TypeError(断网)被包装成 code=0 ApiError', async () => {
     mockFetch.mockRejectedValueOnce(new TypeError('Failed to fetch'));
 

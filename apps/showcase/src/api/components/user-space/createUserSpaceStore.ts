@@ -25,6 +25,7 @@ import {
   groupInvitationV1Service,
   userV1Service,
   kvV1Service,
+  fileV1Service,
 } from '../../services';
 import type {
   GroupMemberView,
@@ -39,8 +40,14 @@ import type {
   KvEditorPayload,
   UserSpaceStore,
   ShortcutsBlob,
+  FileView,
+  FileListResult,
+  FileAccessLevel,
+  FileDuplicateArgs,
+  FileDuplicateResponse,
 } from './types';
 import type { DefaultGroupInfo } from '../../services/userV1/types';
+import type { FileInfo } from '../../services/fileV1/types';
 import { ApiError } from '../../services/base';
 
 const VALUE_PREVIEW_MAX = 80;
@@ -95,6 +102,35 @@ function toKvView(kv: { key: string; value: string; expires_at: string; groupId:
 
 function toKvVersionView(v: { version_no: number; value_len: number; replaced_at: string }): KvVersionView {
   return { versionNo: v.version_no, valueLen: v.value_len, replacedAt: v.replaced_at };
+}
+
+/** FileInfo → FileView 映射器。后端未补 originalName,前端用 fileId 前 8 hex
+ *  派生 displayName(32 hex 8 字符 = 16^8 = 2^32 几乎不可能碰撞,见 plan 风险 6)。
+ *  isPreviewable = public + image MIME;只有 public + image 才能在 UI 出缩略图。
+ *  fileKind 用于决定出图类型(text/image/other),UI 按钮图标 / 类型文案按此渲染。 */
+function toFileView(info: FileInfo): FileView {
+  return {
+    fileId: info.fileId,
+    url: info.url,
+    displayName: info.fileId.slice(0, 8),
+    accessLevel: info.accessLevel,
+    size: info.size,
+    contentType: info.contentType,
+    groupId: info.groupId,
+    groupName: info.groupName,
+    myRole: info.myRole,
+    tags: info.tags ?? [],
+    md5: info.md5,
+    sha256: info.sha256,
+    createdAt: info.createdAt,
+    expireAt: info.expireAt,
+    isPreviewable: info.accessLevel === 'public' && info.contentType.startsWith('image/'),
+    fileKind: info.contentType.startsWith('image/')
+      ? 'image'
+      : info.contentType.startsWith('text/')
+        ? 'text'
+        : 'other',
+  };
 }
 
 export function createUserSpaceStore(): UserSpaceStore {
@@ -353,6 +389,50 @@ export function createUserSpaceStore(): UserSpaceStore {
     return kvV1Service.duplicate(args);
   }
 
+  // ── 文件 CRUD ──────────────────────────────────
+  // 权限(后端 contract):upload → owner|admin|writer;delete → owner|admin;
+  // patch → owner|admin|writer;list/info → 任意成员。
+  // upload 固定 accessLevel='public',由 fileV1Service 内部设;tags replace 语义,
+  // 空数组 = 清空。
+
+  async function uploadFile(groupId: number, args: { file: Blob; tags?: string[] }): Promise<FileView> {
+    requireAuth();
+    return toFileView(await fileV1Service.upload({ file: args.file, groupId, tags: args.tags }));
+  }
+
+  async function listFiles(
+    groupId: number,
+    opts: { page: number; pageSize: number; tags?: string[] },
+  ): Promise<FileListResult> {
+    requireAuth();
+    const { items, total } = await fileV1Service.list({
+      groupId,
+      limit: opts.pageSize,
+      offset: (opts.page - 1) * opts.pageSize,
+      tags: opts.tags,
+    });
+    return { items: items.map(toFileView), total, page: opts.page, pageSize: opts.pageSize };
+  }
+
+  async function updateFileMeta(
+    groupId: number,
+    fileId: string,
+    args: { accessLevel?: FileAccessLevel; tags?: string[] },
+  ): Promise<FileView> {
+    requireAuth();
+    return toFileView(await fileV1Service.patch({ fileId, groupId, ...args }));
+  }
+
+  async function deleteFile(groupId: number, fileId: string): Promise<void> {
+    requireAuth();
+    await fileV1Service.delete({ fileId, groupId });
+  }
+
+  async function duplicateFile(args: FileDuplicateArgs): Promise<FileDuplicateResponse> {
+    requireAuth();
+    return fileV1Service.duplicate(args);
+  }
+
   // ─── 组件业务封装(per-component contract)────────────────────────
   // shortcut-library 的整个库作为单个 KV 整体存取,内部固定 key='shortcuts'。
   // shortcut-library 不知道 KV 协议,也不直接接触 kvV1Service。
@@ -517,6 +597,11 @@ export function createUserSpaceStore(): UserSpaceStore {
     listKvVersions,
     restoreKv,
     duplicateKv,
+    uploadFile,
+    listFiles,
+    updateFileMeta,
+    deleteFile,
+    duplicateFile,
     getShortcuts,
     setShortcuts,
   };

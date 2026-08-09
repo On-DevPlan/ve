@@ -1,7 +1,7 @@
 # user-space 文件 tab(上传 / 列表 / 删除 / tag / 复制)设计
 
 > 日期:2026-08-08
-> 状态:设计确认(方案 A + 后端补 `originalName` 字段)
+> 状态:设计确认(方案 A + 跳过 originalName)
 > 仓库:ve(前端主改动)+ dev_ctr_hello(后端补 1 字段)
 
 ## 目标
@@ -29,7 +29,7 @@
 - tag 筛选(`?tags[]=...&tags[]=...`)
 - 行内改 accessLevel(select:public/private/protected → PATCH)
 - 复制到其他工作空间(镜像 KV 的 DuplicateKvModal)
-- 后端 `FileInfoRes` 补 `originalName` 字段(否则列表没法显示真文件名)
+- **原文件名展示**(后端没补 `originalName`,列表显示 fileId 截断 + contentType 类型)
 
 ### 不包含(避免越界)
 
@@ -40,15 +40,9 @@
 - 上传进度条(只 loading 态)
 - `visibility` 字段(已废弃)
 
-## 后端改动(dev_ctr_hello,极小)
+## 不做(避免越界)
 
-| 文件 | 改动 |
-|---|---|
-| `api/file/v1/file.go` | `FileInfoRes` 加 `OriginalName string \`json:"originalName"\`` |
-| `internal/controller/file/v1/file.go` | `metaToInfoRes` 加 `OriginalName: m.OriginalName`(`FileMeta` 已有该字段) |
-
-- `service/file.FileMeta` 已含 `OriginalName`,controller 只是没映射 —— 补两行即可
-- 需重新构建 + 部署后端(不影响 ve 前端开发,联调前生效即可)
+- **后端补 `originalName` 字段**(原本 spec 设想)—— 用户明确决定跳过,降低跨仓库改动;列表显示 fileId 截断(前 8 位 hex)+ contentType 标签。后续真要做原文件名再说。
 
 ## 前端改动(ve)
 
@@ -83,13 +77,13 @@ apiPaths.fileV1 = '/api/v1/files';
 
 ```ts
 export interface FileInfo {
-  fileId: string; originalName: string; url: string;
+  fileId: string; url: string;
   accessLevel: 'public' | 'private' | 'protected';
   expireAt: string; size: number; contentType: string;
   groupId: number; groupName: string; myRole: string;
   tags: string[]; md5: string; sha256: string; createdAt: string;
 }
-export interface FileUploadArgs { file: Blob; originalName?: string; groupId?: number; tags?: string[]; accessLevel?: string; expireSeconds?: number }
+export interface FileUploadArgs { file: Blob; groupId?: number; tags?: string[]; accessLevel?: string; expireSeconds?: number }
 export interface FileListArgs { groupId?: number; tags?: string[]; match?: 'any'|'all'; key?: string; accessLevel?: string; limit?: number; offset?: number }
 export interface FileListResponse { items: FileInfo[]; total: number }
 export interface FilePatchArgs { fileId: string; groupId?: number; accessLevel?: string; tags?: string[]; expireSeconds?: number; category?: string }
@@ -102,7 +96,7 @@ export interface FileDuplicateResponse { fileId: string; targetGroupId: number; 
 ```ts
 async upload(args: FileUploadArgs): Promise<FileInfo> {
   const fd = new FormData();
-  fd.append('file', args.file, args.originalName ?? 'file');
+  fd.append('file', args.file, 'file');   // 无 originalName,留 filename 默认
   for (const t of args.tags ?? []) fd.append('tags[]', t);
   fd.append('accessLevel', args.accessLevel ?? 'public');
   if (args.expireSeconds) fd.append('expireSeconds', String(args.expireSeconds));
@@ -135,7 +129,9 @@ async duplicate(args: FileDuplicateArgs): Promise<FileDuplicateResponse> { /* PO
 
 ```ts
 export interface FileView {
-  fileId: string; originalName: string; url: string;
+  fileId: string; url: string;
+  /** 展示名 = fileId 截断前 8 hex;后端没补 originalName */
+  displayName: string;
   accessLevel: FileInfo['accessLevel']; size: number; contentType: string;
   groupId: number; groupName: string; myRole: string;
   tags: string[]; md5: string; sha256: string; createdAt: string;
@@ -150,7 +146,7 @@ export interface FileListResult { items: FileView[]; total: number; page: number
 `ViewMode` 加 `| 'files'`。`UserSpaceStore` 加(5 个方法):
 
 ```ts
-uploadFile(groupId: number, args: { file: Blob; originalName?: string; tags?: string[] }): Promise<FileView>;
+uploadFile(groupId: number, args: { file: Blob; tags?: string[] }): Promise<FileView>;
 listFiles(groupId: number, opts: { page: number; pageSize: number; tags?: string[] }): Promise<FileListResult>;
 updateFileMeta(groupId: number, fileId: string, args: { accessLevel?: FileInfo['accessLevel']; tags?: string[] }): Promise<FileView>;
 deleteFile(groupId: number, fileId: string): Promise<void>;
@@ -242,4 +238,4 @@ duplicateFile(args: { fileId: string; sourceGroupId: number; targetGroupId: numb
 - 删除:writer 无删除按钮;owner/admin 删除 → confirm → 消失
 - 复制到另一工作空间 → 目标组出现副本 + toast
 - reader 只读:无上传/复制/删除/改 accessLevel 控件
-- 后端 `GET /files/:id/info` 返回 `originalName`
+- 后端 `GET /files/:id/info` 返回字段(不含 originalName,展示用 fileId 截断)

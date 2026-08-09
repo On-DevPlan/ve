@@ -111,16 +111,18 @@ async function call<T>(
     ...rest
   } = options;
 
+  const isFormData = body instanceof FormData;
   const init: RequestInit = {
     method,
     credentials: 'include', // 自有后端:httpOnly cookie 由浏览器自动带
     headers: {
       Accept: 'application/json',
-      ...(body !== undefined ? { 'content-type': 'application/json' } : {}),
+      // FormData 时不设 content-type,浏览器自动加 multipart boundary
+      ...(body !== undefined && !isFormData ? { 'content-type': 'application/json' } : {}),
       ...bearerHeader(),
       ...headers,
     },
-    body: body !== undefined ? JSON.stringify(body) : undefined,
+    body: body !== undefined ? (isFormData ? body : JSON.stringify(body)) : undefined,
     signal,
     ...rest,
   };
