@@ -3,4 +3,5 @@
 
 export type { GroupRole, GroupSummary, GroupMemberView, GroupInvitationView, ViewMode } from '@api/components/user-space';
 export type { KvListResult, KvView, KvTagCount } from '@api/components/user-space';
+export type { FileView, FileListResult, FileAccessLevel } from '@api/components/user-space';
 export type { DefaultGroupInfo } from '@api/components/user-space';

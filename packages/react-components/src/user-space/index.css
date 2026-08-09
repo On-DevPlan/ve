@@ -650,6 +650,32 @@
 }
 .sl-us-versions__row .sl-us-input--compact { flex: 1 1 auto; min-width: 180px; }
 
+/* ── 文件 tab 样式 ─────────────────────────────── */
+/* 缩略图:48×48,object-fit:cover 吃任意比例;低彩边框 + 圆角微芯片感。 */
+.sl-us-file-thumb {
+  width: 48px; height: 48px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  display: block;
+}
+/* 非预览文件的图标占位:同样 48×48,emoji 居中 + 边框 + 圆角。 */
+.sl-us-file-icon {
+  width: 48px; height: 48px;
+  display: grid; place-items: center;
+  font-size: 22px;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+/* 大小列:等宽数字 + 小字号,避免 1.5MB / 12B 抖动。 */
+.sl-us-cell-size {
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  color: var(--fg-2);
+}
+
 /* ── danger (Overview) ─────────────────────────── */
 .sl-us-danger {
   margin: 0 20px 20px;

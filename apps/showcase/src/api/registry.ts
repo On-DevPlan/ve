@@ -27,6 +27,7 @@ export const apiPaths = {
   kvV1: '/api/v1/kv',
   groupV1: '/api/v1/groups',
   groupInvitationV1: '/api/v1/group-invitations',
+  fileV1: '/api/v1/files',
 } as const;
 export type ApiPathLiteral = (typeof apiPaths)[keyof typeof apiPaths];
 
@@ -61,6 +62,13 @@ const registry = {
       prod: 'http://47.110.80.47:8988',
     },
     route: apiPaths.groupInvitationV1,
+  },
+  fileV1: {
+    target: {
+      dev: 'http://47.110.80.47:8988',
+      prod: 'http://47.110.80.47:8988',
+    },
+    route: apiPaths.fileV1,
   },
 } as const satisfies ApiRegistry;
 
