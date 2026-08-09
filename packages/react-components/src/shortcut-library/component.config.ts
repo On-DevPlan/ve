@@ -17,7 +17,7 @@ export default {
   mount: { kind: 'react', propsMode: 'none' },
   isolation: { mode: 'shadow-dom' },
   theme: { mode: 'css-variables', namespace: 'sl' },
-  capabilities: { fullscreen: false, resizable: false },
+  capabilities: { fullscreen: true, fullscreenMode: 'viewport', resizable: false },
   // 旧:这里有 api: [...] 字段,由 mfeDynamicProxy + activeId 消费。
   //   现在网关事实源已搬到 apps/showcase/src/api/registry.ts,
   //   组件 config 不再携带任何代理规则 —— 改后端目标请改 registry。

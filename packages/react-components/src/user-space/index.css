@@ -223,7 +223,6 @@
   border-radius: var(--radius-sm);
   transition: color 0.1s, background 0.1s;
 }
-.sl-us-tab:hover { color: var(--fg); background: var(--hover); }
 /* 选中态用 2px border-bottom 画底线 —— 原 inset box-shadow 双层叠成 5px
    视觉过厚。border-bottom 紧贴 tab 底沿,自身占用 padding 内部 2px,不跨容器
    hairline(简洁线性风)。base 类加 transparent 边使 active/inactive 等高,
@@ -232,6 +231,7 @@
   /* base: 透明边占位,让 active / 非 active 等高 */
   border-bottom: 2px solid transparent;
 }
+.sl-us-tab:hover { color: var(--fg); background: var(--hover); }
 .sl-us-tab.is-active {
   color: var(--fg);
   font-weight: 700;

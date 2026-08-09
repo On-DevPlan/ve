@@ -1209,3 +1209,233 @@
   background: var(--sl-color-primary, #2563eb);
   opacity: 0.5;
 }
+
+/* ===== 全屏热力键盘画布 =====
+   一把完整 ANSI 104 键,键背景按频度染色(冷→暖),键内下方一行频度数字。 */
+.sl-sl-canvas-backdrop {
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 50% 30%, #1a1d24 0%, #0d0f13 70%),
+    #0d0f13;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  color: #e8eaed;
+  font-family: var(--sl-font-family, system-ui, -apple-system, "Segoe UI", sans-serif);
+}
+.sl-sl-canvas__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(8px);
+}
+.sl-sl-canvas__title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #f0f2f5;
+}
+.sl-sl-canvas__ctrls { display: flex; gap: 6px; align-items: center; }
+.sl-sl-canvas__scale {
+  font-family: var(--sl-font-mono, ui-monospace, "JetBrains Mono", monospace);
+  font-size: 12px;
+  color: #9ca3af;
+  min-width: 48px;
+  text-align: center;
+}
+.sl-sl-canvas__stage {
+  flex: 1;
+  overflow: hidden;
+  cursor: grab;
+  position: relative;
+  user-select: none;
+}
+.sl-sl-canvas__stage:active { cursor: grabbing; }
+
+/* world:三簇并列(main / nav / numpad) */
+.sl-sl-canvas__world {
+  display: flex;
+  gap: 20px;
+  padding: 0;
+  width: max-content;
+}
+.sl-sl-canvas__cluster {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sl-sl-canvas__cluster--nav { gap: 6px; }
+/* nav 簇行高度对齐:模拟主键区行间距,空行占位 */
+.sl-sl-canvas__cluster--nav .sl-sl-canvas__row:empty {
+  height: 0;
+}
+/* numpad:grid,行高自适应(描述会撑高) */
+.sl-sl-canvas__cluster--numpad {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-auto-rows: min-content;
+  gap: 6px;
+  align-items: start;
+}
+.sl-sl-canvas__row {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start; /* 绑得多的键更高,顶部对齐 */
+}
+
+/* 单个键:键帽头部(固定高)+ 描述栈(自适应高) */
+.sl-sl-canvas-key {
+  --k-w: 1;
+  width: calc(var(--k-w) * 44px);
+  min-height: 44px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow:
+    inset 0 -2px 0 rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 2px 4px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  box-sizing: border-box;
+  position: relative;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  font-family: var(--sl-font-mono, ui-monospace, "JetBrains Mono", monospace);
+  overflow: hidden;
+}
+/* numpad 用 grid 定位:宽度不再由 --k-w 决定 */
+.sl-sl-canvas__cluster--numpad .sl-sl-canvas-key {
+  width: auto;
+  min-width: 44px;
+}
+.sl-sl-canvas-key.is-hot {
+  border-color: rgba(255, 255, 255, 0.35);
+  box-shadow:
+    inset 0 -2px 0 rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 0 12px rgba(229, 62, 62, 0.15),
+    0 2px 6px rgba(0, 0, 0, 0.5);
+}
+.sl-sl-canvas-key--spacer {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  width: calc(var(--k-w) * 44px);
+  min-height: 0;
+}
+
+/* 键帽头部:label + 频度,横排,固定高度 */
+.sl-sl-canvas-key__cap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 26px;
+  flex-shrink: 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.25);
+  padding: 0 4px;
+}
+.sl-sl-canvas-key__main {
+  font-size: 12px;
+  font-weight: 600;
+  color: #f0f2f5;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.sl-sl-canvas-key.is-cold .sl-sl-canvas-key__main {
+  color: #6b7280;
+}
+.sl-sl-canvas-key.is-hot .sl-sl-canvas-key__main {
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+/* 频度数字:键帽头部右侧,小字号 */
+.sl-sl-canvas-key__freq {
+  font-size: 9px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.95);
+  line-height: 1;
+  letter-spacing: 0.02em;
+  font-family: var(--sl-font-mono, ui-monospace, "JetBrains Mono", monospace);
+  background: rgba(0, 0, 0, 0.35);
+  padding: 2px 4px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+/* 该键绑定的快捷键列表(可缩放看清) */
+.sl-sl-canvas-key__bindings {
+  list-style: none;
+  margin: 0;
+  padding: 3px 4px 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-family: var(--sl-font-family, system-ui, -apple-system, "Segoe UI", sans-serif);
+}
+.sl-sl-canvas-key__binding {
+  font-size: 8px;
+  line-height: 1.15;
+  color: rgba(255, 255, 255, 0.92);
+  word-break: break-word;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.sl-sl-canvas-key__combo {
+  font-family: var(--sl-font-mono, ui-monospace, "JetBrains Mono", monospace);
+  font-weight: 700;
+  font-size: 8px;
+  color: #fff;
+  letter-spacing: 0.02em;
+}
+.sl-sl-canvas-key__desc {
+  font-size: 7.5px;
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.1;
+}
+
+
+/* legend(底部频度色阶) */
+.sl-sl-canvas__legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(8px);
+  flex-shrink: 0;
+  font-size: 12px;
+  color: #9ca3af;
+}
+.sl-sl-canvas__legend-label {
+  font-family: var(--sl-font-mono, ui-monospace, "JetBrains Mono", monospace);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 10px;
+  margin-right: 4px;
+}
+.sl-sl-canvas__legend-chip {
+  width: 28px;
+  height: 18px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 600;
+  color: #fff;
+  font-family: var(--sl-font-mono, ui-monospace, "JetBrains Mono", monospace);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}

@@ -1,0 +1,299 @@
+// FullscreenCanvas.tsx —— 全屏快捷键热力键盘(Keyboard Heatmap Canvas)。
+//
+// 设计:不沿用「快捷键卡片网格」(太散、字小、视觉乱)。
+// 改为——画一把完整 ANSI 104 键键盘,把当前组的快捷键频度可视化:
+//   - 键主字符(键本身的 label)在上半部,字号大,清晰
+//   - 频度数字(该键在当前组里出现的 shortcut 数量)在键底部一行,不挡主字符
+//   - 键背景按频度染色:冷色(灰/蓝)=低频,暖色(紫/橙/红)=高频
+//   - 居中逻辑:初始就把键盘整体 fit 到 stage 中心,拖动后继续以中心为原点
+//
+// 数据形状取自 ../data/keyboard-layout.ts(不复用 Keyboard.tsx —
+// 那个组件是预览专用,this 走全屏独立渲染)。
+//
+// 交互:
+//   - 鼠标拖空白处平移
+//   - 滚轮缩放(以鼠标位置为锚,[0.6, 2.5])
+//   - × / ESC 关闭
+//   - + / − / ⟲ 顶部按钮缩放 + 重置居中
+
+import {
+  useCallback, useEffect, useMemo, useRef, useState,
+  type WheelEvent as ReactWheelEvent, type PointerEvent as ReactPointerEvent,
+  type CSSProperties,
+} from 'react';
+import { createPortal } from 'react-dom';
+import type { Shortcut } from '../types';
+import { MAIN_ROWS, NAV_ROWS, NUMPAD_KEYS, type KeyDef, type NumpadKeyDef } from '../data/keyboard-layout';
+
+export interface FullscreenCanvasProps {
+  open: boolean;
+  onClose: () => void;
+  shortcuts: Shortcut[];
+  groupName: string;
+}
+
+const MIN_SCALE = 0.6;
+const MAX_SCALE = 2.5;
+const WHEEL_FACTOR = 1.1;
+
+// 频度色阶:0 → 未用(灰);1-5+ → 冷→暖
+const FREQ_COLORS = [
+  '#2a2d35', // 0
+  '#2b6cb0', // 1
+  '#3182ce', // 2
+  '#805ad5', // 3
+  '#d69e2e', // 4
+  '#e53e3e', // 5+
+] as const;
+
+function freqColor(count: number): string {
+  if (count <= 0) return FREQ_COLORS[0];
+  if (count >= 5) return FREQ_COLORS[5];
+  return FREQ_COLORS[count];
+}
+
+/** 计算每个 code 在当前组出现的次数(同一 combo 内同键重复算 1 次) */
+function buildFreqMap(shortcuts: Shortcut[]): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const s of shortcuts) {
+    const seen = new Set<string>();
+    for (const k of s.combo) {
+      if (seen.has(k.code)) continue;
+      seen.add(k.code);
+      map.set(k.code, (map.get(k.code) ?? 0) + 1);
+    }
+  }
+  return map;
+}
+
+export interface BindingItem {
+  comboLabel: string;
+  description: string;
+}
+
+/**
+ * 按 code 聚合:该键参与了哪些 shortcut(combo 标签 + 描述)。
+ * 一个 shortcut 的 combo 含多个键时,这条 shortcut 会出现在它【每一个键】下面 ——
+ * 例如 Ctrl+C 同时挂在 ControlLeft 和 KeyC 下,用户看 Ctrl 就能扫到所有 Ctrl+X。
+ */
+function buildBindingsByCode(shortcuts: Shortcut[]): Map<string, BindingItem[]> {
+  const map = new Map<string, BindingItem[]>();
+  for (const s of shortcuts) {
+    const comboLabel = s.combo.map((k) => k.label).join('+');
+    const item: BindingItem = { comboLabel, description: s.description };
+    const seen = new Set<string>();
+    for (const k of s.combo) {
+      if (seen.has(k.code)) continue;
+      seen.add(k.code);
+      const arr = map.get(k.code);
+      if (arr) arr.push(item);
+      else map.set(k.code, [item]);
+    }
+  }
+  return map;
+}
+
+export default function FullscreenCanvas({ open, onClose, shortcuts, groupName }: FullscreenCanvasProps) {
+  const [scale, setScale] = useState(1);
+  const [tx, setTx] = useState(0);
+  const [ty, setTy] = useState(0);
+  const dragRef = useRef<{ startX: number; startY: number; baseTx: number; baseTy: number } | null>(null);
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  const worldRef = useRef<HTMLDivElement | null>(null);
+
+  const freqMap = useMemo(() => buildFreqMap(shortcuts), [shortcuts]);
+  const bindingsMap = useMemo(() => buildBindingsByCode(shortcuts), [shortcuts]);
+
+  // ESC 关闭
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent): void {
+      if (e.key === 'Escape') onClose();
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+
+  // 把键盘整体 fit 居中到 stage(初始打开 + resize 时重算)
+  const fitCenter = useCallback(() => {
+    const stage = stageRef.current;
+    const world = worldRef.current;
+    if (!stage || !world) return;
+    const stageRect = stage.getBoundingClientRect();
+    const worldRect = world.getBoundingClientRect();
+    const fitScale = Math.min(
+      (stageRect.width - 64) / worldRect.width,
+      (stageRect.height - 64) / worldRect.height,
+      1,
+    );
+    const s = Math.max(MIN_SCALE, Math.min(MAX_SCALE, fitScale || 1));
+    // 居中:world 左上角偏移到让 world 中心对齐 stage 中心
+    const cx = (stageRect.width - worldRect.width * s) / 2;
+    const cy = (stageRect.height - worldRect.height * s) / 2;
+    setScale(s);
+    setTx(cx);
+    setTy(cy);
+  }, []);
+
+  // 初始打开:等一帧布局完成后居中
+  useEffect(() => {
+    if (!open) return;
+    const id = requestAnimationFrame(() => fitCenter());
+    return () => cancelAnimationFrame(id);
+  }, [open, fitCenter]);
+
+  // 滚轮缩放(以鼠标位置为锚)
+  function onWheel(e: ReactWheelEvent<HTMLDivElement>): void {
+    e.preventDefault();
+    const stage = stageRef.current;
+    if (!stage) return;
+    const rect = stage.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const delta = e.deltaY < 0 ? WHEEL_FACTOR : 1 / WHEEL_FACTOR;
+    setScale((prevScale) => {
+      const newScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, prevScale * delta));
+      const ratio = newScale / prevScale;
+      // 保持鼠标下的内容位置不变
+      setTx((prevTx) => mx - (mx - prevTx) * ratio);
+      setTy((prevTy) => my - (my - prevTy) * ratio);
+      return newScale;
+    });
+  }
+
+  // 拖动平移
+  function onPointerDown(e: ReactPointerEvent<HTMLDivElement>): void {
+    if (e.button !== 0) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    dragRef.current = { startX: e.clientX, startY: e.clientY, baseTx: tx, baseTy: ty };
+  }
+  function onPointerMove(e: ReactPointerEvent<HTMLDivElement>): void {
+    const d = dragRef.current;
+    if (!d) return;
+    setTx(d.baseTx + (e.clientX - d.startX));
+    setTy(d.baseTy + (e.clientY - d.startY));
+  }
+  function onPointerUp(e: ReactPointerEvent<HTMLDivElement>): void {
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+    dragRef.current = null;
+  }
+
+  const reset = useCallback(() => { fitCenter(); }, [fitCenter]);
+
+  if (!open) return null;
+  const portalRoot =
+    (typeof document !== 'undefined' &&
+      document.querySelector('[data-sl-portal]')) ||
+    (typeof document !== 'undefined' ? document.body : null);
+  if (!portalRoot) return null;
+
+  // 渲染一个键:键帽(label + 频度)+ 该键绑定的快捷键列表(可缩放看清)
+  const renderKey = (k: KeyDef | NumpadKeyDef, index: number): JSX.Element => {
+    const w = k.w ?? 1;
+    if (k.spacer) {
+      return <div key={`sp-${index}`} className="sl-sl-canvas-key sl-sl-canvas-key--spacer" style={{ ['--k-w' as string]: String(w) } as CSSProperties} aria-hidden="true" />;
+    }
+    const count = freqMap.get(k.code) ?? 0;
+    const bindings = bindingsMap.get(k.code) ?? [];
+    const numpadStyle = (k as NumpadKeyDef).col !== undefined
+      ? {
+          gridColumn: (k as NumpadKeyDef).col,
+          gridRow: (k as NumpadKeyDef).row,
+          gridColumnSpan: (k as NumpadKeyDef).colSpan ? `span ${(k as NumpadKeyDef).colSpan}` : undefined,
+          gridRowSpan: (k as NumpadKeyDef).rowSpan ? `span ${(k as NumpadKeyDef).rowSpan}` : undefined,
+        }
+      : {};
+    return (
+      <div
+        key={k.code}
+        className={`sl-sl-canvas-key${count === 0 ? ' is-cold' : ' is-hot'}`}
+        style={{
+          ['--k-w' as string]: String(w),
+          background: freqColor(count),
+          ...numpadStyle,
+        } as CSSProperties}
+        data-code={k.code}
+        data-freq={count}
+      >
+        <div className="sl-sl-canvas-key__cap">
+          <span className="sl-sl-canvas-key__main">{k.label || k.code}</span>
+          {count > 0 && <span className="sl-sl-canvas-key__freq">×{count}</span>}
+        </div>
+        {bindings.length > 0 && (
+          <ul className="sl-sl-canvas-key__bindings">
+            {bindings.map((b, bi) => (
+              <li key={bi} className="sl-sl-canvas-key__binding">
+                <span className="sl-sl-canvas-key__combo">{b.comboLabel}</span>
+                <span className="sl-sl-canvas-key__desc">{b.description || '—'}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    );
+  };
+
+  return createPortal(
+    <div className="sl-sl-canvas-backdrop" role="dialog" aria-label={`${groupName} 快捷键热力键盘`}>
+      <header className="sl-sl-canvas__head">
+        <h3 className="sl-sl-canvas__title">{groupName} · 快捷键热力</h3>
+        <div className="sl-sl-canvas__ctrls">
+          <button className="sl-sl-icon-btn" aria-label="缩小" onClick={() => setScale((s) => Math.max(MIN_SCALE, s / 1.2))}>−</button>
+          <span className="sl-sl-canvas__scale">{Math.round(scale * 100)}%</span>
+          <button className="sl-sl-icon-btn" aria-label="放大" onClick={() => setScale((s) => Math.min(MAX_SCALE, s * 1.2))}>+</button>
+          <button className="sl-sl-icon-btn" aria-label="重置" onClick={reset}>⟲</button>
+          <button className="sl-sl-icon-btn" aria-label="关闭" onClick={onClose}>×</button>
+        </div>
+      </header>
+      <div
+        ref={stageRef}
+        className="sl-sl-canvas__stage"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        onWheel={onWheel}
+        style={{ touchAction: 'none' }}
+      >
+        <div
+          ref={worldRef}
+          className="sl-sl-canvas__world"
+          style={{
+            transform: `translate(${tx}px, ${ty}px) scale(${scale})`,
+            transformOrigin: '0 0',
+          }}
+        >
+          {/* 主键区 + 导航簇 + 小键盘 三簇并列 */}
+          <div className="sl-sl-canvas__cluster">
+            {MAIN_ROWS.map((row, ri) => (
+              <div key={`mr-${ri}`} className="sl-sl-canvas__row">
+                {row.map((k, ki) => renderKey(k, ki))}
+              </div>
+            ))}
+          </div>
+          <div className="sl-sl-canvas__cluster sl-sl-canvas__cluster--nav">
+            {NAV_ROWS.map((row, ri) => (
+              <div key={`nr-${ri}`} className="sl-sl-canvas__row">
+                {row.map((k, ki) => renderKey(k, ki))}
+              </div>
+            ))}
+          </div>
+          <div className="sl-sl-canvas__cluster sl-sl-canvas__cluster--numpad">
+            {NUMPAD_KEYS.map((k, ki) => renderKey(k, ki))}
+          </div>
+        </div>
+      </div>
+      <footer className="sl-sl-canvas__legend">
+        <span className="sl-sl-canvas__legend-label">频度</span>
+        {FREQ_COLORS.map((c, i) => (
+          <span key={i} className="sl-sl-canvas__legend-chip" style={{ background: c }}>
+            {i === 0 ? '0' : i === 5 ? '5+' : `${i}`}
+          </span>
+        ))}
+      </footer>
+    </div>,
+    portalRoot,
+  );
+}

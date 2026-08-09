@@ -21,6 +21,7 @@ import SettingsPanel from './src/pages/SettingsPanel';
 import Sidebar from './src/pages/Sidebar';
 import ShortcutTable from './src/pages/ShortcutTable';
 import Keyboard from './src/pages/Keyboard';
+import FullscreenCanvas from './src/pages/FullscreenCanvas';
 
 
 // 物理键盘长按阈值 —— 按住多少毫秒后弹 mapping popup。
@@ -35,11 +36,29 @@ const LONG_PRESS_MAX = 5;
 // 避免清空数据时连带把"是否折叠"也抹掉
 const PREVIEW_COLLAPSED_KEY = 'sl-shortcut-library:v1:previewCollapsed';
 
+// 边框比例持久化 key —— 全局单一值(不按组存,简单 key 命名)
+const SIDEBAR_W_KEY = 'sl-shortcut-library:v1:sidebarW';
+const PREVIEW_H_KEY = 'sl-shortcut-library:v1:previewH';
+const SIDEBAR_DEFAULT = 280;
+const PREVIEW_DEFAULT = 200;
+
 function loadPreviewCollapsed(): boolean {
   try {
     return localStorage.getItem(PREVIEW_COLLAPSED_KEY) === '1';
   } catch {
     return false;
+  }
+}
+
+function loadNumber(key: string, fallback: number, min: number, max: number): number {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return fallback;
+    return Math.min(max, Math.max(min, n));
+  } catch {
+    return fallback;
   }
 }
 
@@ -58,10 +77,12 @@ export default function ShortcutLibrary() {
   const [hoveredCodes, setHoveredCodes] = useState<Set<string>>(new Set());
   const [showImport, setShowImport] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  // 全屏画布开关
+  const [canvasOpen, setCanvasOpen] = useState(false);
   // 键盘预览折叠态 —— 默认展开;用户手动收起后写入 LS,下次进详情页保持
   const [previewCollapsed, setPreviewCollapsed] = useState<boolean>(loadPreviewCollapsed);
 
-  // 拖拽布局:sidebar 宽度 + 键盘预览高度(都不持久化,组件实例间独立)。
+  // 拖拽布局:sidebar 宽度 + 键盘预览高度(全局单一值持久化到 LS)。
   //
   // 性能设计(冻结快照):拖拽期间内容子树【完全不参与 layout】。
   //   - 每个可变面板 = 一层 panel(尺寸随 grid/flex 变)+ 一层 inner(冻结内容)。
@@ -70,8 +91,19 @@ export default function ShortcutLibrary() {
   //     不传导进子树。每帧 layout 节点从"57 键 + N 行"降到常数级(几个容器)。
   //   - pointermove / rAF:只写 --sidebar-w / --preview-h,面板层 reflow,内容层跳过。
   //   - pointerup:解冻 inner + setState 同帧(避免解冻跳一下)。
-  const [sidebarWidth, setSidebarWidth] = useState(280);
-  const [previewHeight, setPreviewHeight] = useState(200);
+
+  // 边界常量(惰性初始化器要引用,必须先声明)
+  const SIDEBAR_MIN = 200;
+  const SIDEBAR_MAX = 500;
+  const PREVIEW_MIN = 80;
+  const PREVIEW_MAX = 500;
+
+  const [sidebarWidth, setSidebarWidth] = useState(() =>
+    loadNumber(SIDEBAR_W_KEY, SIDEBAR_DEFAULT, SIDEBAR_MIN, SIDEBAR_MAX),
+  );
+  const [previewHeight, setPreviewHeight] = useState(() =>
+    loadNumber(PREVIEW_H_KEY, PREVIEW_DEFAULT, PREVIEW_MIN, PREVIEW_MAX),
+  );
   const rootRef = useRef<HTMLDivElement | null>(null);
   // 面板(尺寸变)与 inner(冻结内容)的引用
   const sidebarPanelRef = useRef<HTMLDivElement | null>(null);
@@ -88,11 +120,6 @@ export default function ShortcutLibrary() {
   // rAF 去重标记 + 最新指针偏移(ref 写入,不触发渲染)
   const rafId = useRef<number | null>(null);
   const latest = useRef<{ dx: number; dy: number } | null>(null);
-
-  const SIDEBAR_MIN = 200;
-  const SIDEBAR_MAX = 500;
-  const PREVIEW_MIN = 80;
-  const PREVIEW_MAX = 500;
 
   // pointerdown 冻结:读一次 panel 尺寸,inner 钉死(切断父尺寸→子树重排)
   function freezePanels() {
@@ -167,9 +194,13 @@ export default function ShortcutLibrary() {
     const t = dragType.current;
     if (t) {
       if (t === 'sidebar') {
-        setSidebarWidth(Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, dragStart.current.w + (e.clientX - dragStart.current.x))));
+        const w = Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, dragStart.current.w + (e.clientX - dragStart.current.x)));
+        setSidebarWidth(w);
+        try { localStorage.setItem(SIDEBAR_W_KEY, String(w)); } catch { /* quota / private mode — ignore */ }
       } else {
-        setPreviewHeight(Math.min(PREVIEW_MAX, Math.max(PREVIEW_MIN, dragStart.current.h - (e.clientY - dragStart.current.y))));
+        const h = Math.min(PREVIEW_MAX, Math.max(PREVIEW_MIN, dragStart.current.h - (e.clientY - dragStart.current.y)));
+        setPreviewHeight(h);
+        try { localStorage.setItem(PREVIEW_H_KEY, String(h)); } catch { /* quota / private mode — ignore */ }
       }
     }
     unfreezePanels();
@@ -264,14 +295,16 @@ export default function ShortcutLibrary() {
   // 长按 popup:查询并展示
   // - 通过 Keyboard 子组件回调拿到 code 和 rect
   // - 用 createPortal 渲染到 host portal target,避免被 .sl-sl-preview 的 overflow 裁剪
+  // 范围:只在当前选中组里找(用户要求"切组即重渲 + popup/快照都收窄")
   const handleLongPress = useCallback(
     (code: string, rect: DOMRect) => {
-      const hits = findBindingsByCode(store.groups, code);
+      const scope = store.selectedGroup ? [store.selectedGroup] : [];
+      const hits = findBindingsByCode(scope, code);
       // 即使没有 hits 也展示 popup,告诉用户「该键未被任何分组使用」。
       // 长按是非 pin 的(松开后可被外部点击关闭)。
       setLongPressPopup({ code, rect, hits });
     },
-    [store.groups],
+    [store.selectedGroup],
   );
 
   const handleLongPressClose = useCallback(() => {
@@ -281,6 +314,7 @@ export default function ShortcutLibrary() {
   // 悬停进入:延迟 HOVER_OPEN_DELAY 后弹(无绑定不弹)。
   // 用 setLongPressPopup 的函数式更新读最新 popup,避免闭包里 popup 过期。
   // 任何新触发(hover / hold / dblclick)都会覆盖当前 popup —— 没有"锁住"逻辑。
+  // 范围:仅当前选中组。
   const handleHoverEnter = useCallback(
     (code: string, rect: DOMRect) => {
       // 先清掉上一个未触发的 hover timer,快速划过时不连发
@@ -290,7 +324,8 @@ export default function ShortcutLibrary() {
       }
       const t = window.setTimeout(() => {
         hoverTimer.current = undefined;
-        const hits = findBindingsByCode(store.groups, code);
+        const scope = store.selectedGroup ? [store.selectedGroup] : [];
+        const hits = findBindingsByCode(scope, code);
         setLongPressPopup((prev) => {
           if (hits.length === 0) return prev; // 无绑定不弹(悬停是"扫一眼",空 popup 是噪音)
           return { code, rect, hits };
@@ -298,7 +333,7 @@ export default function ShortcutLibrary() {
       }, HOVER_OPEN_DELAY);
       hoverTimer.current = t;
     },
-    [store.groups],
+    [store.selectedGroup],
   );
 
   // 悬停离开:取消待触发的 hover timer;关闭当前 popup。
@@ -312,6 +347,7 @@ export default function ShortcutLibrary() {
 
   // 双击:弹 popup 并 pin 住。清掉可能残留的 hold / hover 定时器,避免它们事后
   // 把 pin 改回非 pin。即使无绑定也弹(pin 是用户主动检查)。
+  // 范围:仅当前选中组。
   const handleDoubleClickKey = useCallback(
     (code: string, rect: DOMRect) => {
       if (hoverTimer.current !== undefined) {
@@ -324,10 +360,11 @@ export default function ShortcutLibrary() {
         window.clearTimeout(ht);
         holdTimers.current.delete(code);
       }
-      const hits = findBindingsByCode(store.groups, code);
+      const scope = store.selectedGroup ? [store.selectedGroup] : [];
+      const hits = findBindingsByCode(scope, code);
       setLongPressPopup({ code, rect, hits });
     },
-    [store.groups],
+    [store.selectedGroup],
   );
 
   // 统一的「按下」「松开」入口(鼠标 / 触屏 / 物理键共享)。
@@ -589,6 +626,14 @@ export default function ShortcutLibrary() {
           >
             导入
           </button>
+          <button
+            className="sl-sl-btn sl-sl-btn--ghost"
+            onClick={() => setCanvasOpen(true)}
+            disabled={!store.selectedGroup}
+            title="全屏查看当前组的快捷键"
+          >
+            全屏
+          </button>
           <span className="sl-sl-topbar__meta">
             {store.groups.length} 个分组 · 共{' '}
             {store.groups.reduce((n, g) => n + g.shortcuts.length, 0)} 条
@@ -663,6 +708,11 @@ export default function ShortcutLibrary() {
               highlightedCodes={highlightedCodes}
               hoveredCodes={hoveredCodes}
               heldKeys={heldKeys}
+              boundCodes={
+                store.selectedGroup
+                  ? new Set(store.selectedGroup.shortcuts.flatMap((s) => s.combo.map((k) => k.code)))
+                  : undefined
+              }
               onPress={holdPress}
               onRelease={holdRelease}
               onKeyHoverEnter={handleHoverEnter}
@@ -679,6 +729,8 @@ export default function ShortcutLibrary() {
         <ImportModal
           onImport={handleImport}
           onClose={() => setShowImport(false)}
+          selectedGroupName={store.selectedGroup?.name}
+          selectedGroupShortcuts={store.selectedGroup?.shortcuts ?? []}
         />
       )}
 
@@ -771,6 +823,14 @@ export default function ShortcutLibrary() {
         </div>,
         portalRoot,
       )}
+
+      {/* 全屏浮窗画布 —— 当前选中组的所有快捷键,可缩放可拖动 */}
+      <FullscreenCanvas
+        open={canvasOpen}
+        onClose={() => setCanvasOpen(false)}
+        shortcuts={store.selectedGroup?.shortcuts ?? []}
+        groupName={store.selectedGroup?.name ?? ''}
+      />
     </div>
   );
 }
