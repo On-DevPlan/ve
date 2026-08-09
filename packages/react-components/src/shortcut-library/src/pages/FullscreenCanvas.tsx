@@ -66,6 +66,33 @@ function buildFreqMap(shortcuts: Shortcut[]): Map<string, number> {
   return map;
 }
 
+export interface BindingItem {
+  comboLabel: string;
+  description: string;
+}
+
+/**
+ * 按 code 聚合:该键参与了哪些 shortcut(combo 标签 + 描述)。
+ * 一个 shortcut 的 combo 含多个键时,这条 shortcut 会出现在它【每一个键】下面 ——
+ * 例如 Ctrl+C 同时挂在 ControlLeft 和 KeyC 下,用户看 Ctrl 就能扫到所有 Ctrl+X。
+ */
+function buildBindingsByCode(shortcuts: Shortcut[]): Map<string, BindingItem[]> {
+  const map = new Map<string, BindingItem[]>();
+  for (const s of shortcuts) {
+    const comboLabel = s.combo.map((k) => k.label).join('+');
+    const item: BindingItem = { comboLabel, description: s.description };
+    const seen = new Set<string>();
+    for (const k of s.combo) {
+      if (seen.has(k.code)) continue;
+      seen.add(k.code);
+      const arr = map.get(k.code);
+      if (arr) arr.push(item);
+      else map.set(k.code, [item]);
+    }
+  }
+  return map;
+}
+
 export default function FullscreenCanvas({ open, onClose, shortcuts, groupName }: FullscreenCanvasProps) {
   const [scale, setScale] = useState(1);
   const [tx, setTx] = useState(0);
@@ -75,6 +102,7 @@ export default function FullscreenCanvas({ open, onClose, shortcuts, groupName }
   const worldRef = useRef<HTMLDivElement | null>(null);
 
   const freqMap = useMemo(() => buildFreqMap(shortcuts), [shortcuts]);
+  const bindingsMap = useMemo(() => buildBindingsByCode(shortcuts), [shortcuts]);
 
   // ESC 关闭
   useEffect(() => {
@@ -161,13 +189,14 @@ export default function FullscreenCanvas({ open, onClose, shortcuts, groupName }
     (typeof document !== 'undefined' ? document.body : null);
   if (!portalRoot) return null;
 
-  // 渲染一个键:主字符在上,频度数字在下
+  // 渲染一个键:键帽(label + 频度)+ 该键绑定的快捷键列表(可缩放看清)
   const renderKey = (k: KeyDef | NumpadKeyDef, index: number): JSX.Element => {
     const w = k.w ?? 1;
     if (k.spacer) {
       return <div key={`sp-${index}`} className="sl-sl-canvas-key sl-sl-canvas-key--spacer" style={{ ['--k-w' as string]: String(w) } as CSSProperties} aria-hidden="true" />;
     }
     const count = freqMap.get(k.code) ?? 0;
+    const bindings = bindingsMap.get(k.code) ?? [];
     const numpadStyle = (k as NumpadKeyDef).col !== undefined
       ? {
           gridColumn: (k as NumpadKeyDef).col,
@@ -188,8 +217,20 @@ export default function FullscreenCanvas({ open, onClose, shortcuts, groupName }
         data-code={k.code}
         data-freq={count}
       >
-        <span className="sl-sl-canvas-key__main">{k.label || k.code}</span>
-        {count > 0 && <span className="sl-sl-canvas-key__freq">×{count}</span>}
+        <div className="sl-sl-canvas-key__cap">
+          <span className="sl-sl-canvas-key__main">{k.label || k.code}</span>
+          {count > 0 && <span className="sl-sl-canvas-key__freq">×{count}</span>}
+        </div>
+        {bindings.length > 0 && (
+          <ul className="sl-sl-canvas-key__bindings">
+            {bindings.map((b, bi) => (
+              <li key={bi} className="sl-sl-canvas-key__binding">
+                <span className="sl-sl-canvas-key__combo">{b.comboLabel}</span>
+                <span className="sl-sl-canvas-key__desc">{b.description || '—'}</span>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     );
   };

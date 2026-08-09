@@ -127,6 +127,35 @@ describe('shortcut-library: fullscreen canvas (keyboard heatmap)', () => {
     expect(aEl.querySelector('.sl-sl-canvas-key__freq')!.textContent).toBe('×1');
   });
 
+  it('renders each binding (combo + description) inside the key it belongs to', async () => {
+    // Ctrl+C (copy) 和 Ctrl+V (paste):两条 shortcut 都含 ControlLeft
+    await mountAndOpenCanvas(makeSingleGroup([
+      { combo: [{ code: 'ControlLeft', label: 'Ctrl', isModifier: true }, { code: 'KeyC', label: 'C', isModifier: false }], description: 'copy' },
+      { combo: [{ code: 'ControlLeft', label: 'Ctrl', isModifier: true }, { code: 'KeyV', label: 'V', isModifier: false }], description: 'paste' },
+    ]));
+    // ControlLeft 应挂两条 binding
+    const ctrlEl = document.body.querySelector('[data-code="ControlLeft"]') as HTMLElement;
+    const ctrlBindings = ctrlEl.querySelectorAll('.sl-sl-canvas-key__binding');
+    expect(ctrlBindings.length).toBe(2);
+    const ctrlCombos = Array.from(ctrlBindings).map((b) => b.querySelector('.sl-sl-canvas-key__combo')!.textContent);
+    expect(ctrlCombos).toEqual(expect.arrayContaining(['Ctrl+C', 'Ctrl+V']));
+    const ctrlDescs = Array.from(ctrlBindings).map((b) => b.querySelector('.sl-sl-canvas-key__desc')!.textContent);
+    expect(ctrlDescs).toEqual(expect.arrayContaining(['copy', 'paste']));
+    // KeyC 只挂一条(Ctrl+C)
+    const cEl = document.body.querySelector('[data-code="KeyC"]') as HTMLElement;
+    expect(cEl.querySelectorAll('.sl-sl-canvas-key__binding').length).toBe(1);
+    expect(cEl.querySelector('.sl-sl-canvas-key__combo')!.textContent).toBe('Ctrl+C');
+    expect(cEl.querySelector('.sl-sl-canvas-key__desc')!.textContent).toBe('copy');
+  });
+
+  it('keys with 0 bindings have no bindings list', async () => {
+    await mountAndOpenCanvas(makeSingleGroup([
+      { combo: [{ code: 'KeyZ', label: 'Z', isModifier: false }], description: 'z' },
+    ]));
+    const aEl = document.body.querySelector('[data-code="KeyA"]') as HTMLElement;
+    expect(aEl.querySelector('.sl-sl-canvas-key__bindings')).toBeNull();
+  });
+
   it('ESC closes the canvas', async () => {
     await mountAndOpenCanvas(makeSingleGroup([{ combo: [{ code: 'KeyA', label: 'A', isModifier: false }], description: 'a' }]));
     expect(document.body.querySelector('.sl-sl-canvas-backdrop')).not.toBeNull();
