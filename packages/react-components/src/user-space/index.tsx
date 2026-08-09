@@ -235,7 +235,7 @@ export default function UserSpace() {
     }
   }, [currentSelected, store]);
 
-  // 文件列表 —— tag 由后端传给 list,UI 自行从 items 收集(无 facet)。
+// 文件列表 —— tag 由后端传给 list,UI 自行从 items 收集(无 facet)。
   const loadFiles = useCallback(async (page: number, tag: string | null) => {
     if (!currentSelected) return;
     setFilesLoading(true);
