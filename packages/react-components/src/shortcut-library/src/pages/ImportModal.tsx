@@ -2,10 +2,16 @@
 
 import { useRef, useState } from 'react';
 import { parseImportToml, type ImportParseResult } from '../engine/import-parser';
+import type { Shortcut } from '../types';
+import { comboKey } from '../hooks/useShortcuts';
 
 interface Props {
   onImport: (data: ImportParseResult) => { groupsAdded: number; groupsAppended: number; shortcutsAdded: number; errors: string[] };
   onClose: () => void;
+  /** 当前选中组名(用于「AI 增量提示词」按钮;无组时按钮 disabled) */
+  selectedGroupName?: string;
+  /** 当前选中组的 shortcuts(用于在 prompt 里列出已存在 combo,避免冲突) */
+  selectedGroupShortcuts?: Shortcut[];
 }
 
 type TabMode = 'paste' | 'file';
@@ -165,7 +171,7 @@ condition = "US 布局下 + 是 Shift+= ,所以这里写 ="
 # - 不要写解释、不要写前言,直接第一行就是 [[groups]]
 # - 不要使用 [[groups.shortcut]] 单数,必须是复数 shortcuts`;
 
-export default function ImportModal({ onImport, onClose }: Props) {
+export default function ImportModal({ onImport, onClose, selectedGroupName, selectedGroupShortcuts }: Props) {
   const [mode, setMode] = useState<TabMode>('paste');
   const [text, setText] = useState('');
   const [parseResult, setParseResult] = useState<ImportParseResult | null>(null);
@@ -173,6 +179,8 @@ export default function ImportModal({ onImport, onClose }: Props) {
   const [resultSummary, setResultSummary] = useState<ReturnType<typeof onImport> | null>(null);
   const [showFormat, setShowFormat] = useState(false);
   const [copied, setCopied] = useState(false);
+  // AI 增量提示词按钮的「已复制」反馈(独立 state,避免和「复制格式提示词」冲突)
+  const [incrementalCopied, setIncrementalCopied] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const copyTimerRef = useRef<number | null>(null);
 
@@ -195,6 +203,67 @@ export default function ImportModal({ onImport, onClose }: Props) {
       setCopied(true);
       if (copyTimerRef.current) window.clearTimeout(copyTimerRef.current);
       copyTimerRef.current = window.setTimeout(() => setCopied(false), 1800);
+    } catch (err) {
+      alert('复制失败,请手动选择文本');
+      console.error(err);
+    }
+  }
+
+  /**
+   * 拼出"AI 增量生成"提示词:
+   *   - 角色 + 任务:扩展当前组的快捷键合集
+   *   - 原 FORMAT_PROMPT 完整原文(让 LLM 严格遵循 TOML 格式)
+   *   - 当前组已存在 combo 清单(comboKey 序列,显式列出)
+   *   - 避冲突指令:必须避开以上 combo
+   * 用户拿到后贴给任意 LLM,直接产出不冲突的 TOML 文本。
+   */
+  function buildIncrementalPrompt(groupName: string, shortcuts: Shortcut[]): string {
+    const lines: string[] = [];
+    lines.push(`你是一个快捷键扩展助手。当前主题「${groupName}」已经存在以下快捷键,请你按照下面给出的 TOML 格式规范,基于「${groupName}」的语义,扩展出更多快捷键(更多组合、更全的场景覆盖)。`);
+    lines.push('');
+    lines.push('# === 已有快捷键(请严格避开这些 combo,不要输出相同或冲突的条目) ===');
+    if (shortcuts.length === 0) {
+      lines.push('# (当前组为空,可以自由扩展)');
+    } else {
+      for (const s of shortcuts) {
+        const key = comboKey(s.combo);
+        const desc = s.description || '(无描述)';
+        const cond = s.condition ? `,condition="${s.condition}"` : '';
+        lines.push(`# - combo="${key}"  desc="${desc}"${cond}`);
+      }
+    }
+    lines.push('');
+    lines.push('# === 输出要求 ===');
+    lines.push('# - 严格按下面给出的 TOML 格式规范输出');
+    lines.push('# - 不要重复上述「已有快捷键」列表中的任何 combo');
+    lines.push('# - 输出 [[groups]] 时 name 必须为 "${groupName}"');
+    lines.push('# - 只输出 TOML 文本,不要 markdown 代码块包裹,不要写前言/解释');
+    lines.push('');
+    lines.push('# === TOML 格式规范(原样遵循) ===');
+    lines.push('');
+    lines.push(FORMAT_PROMPT);
+    return lines.join('\n');
+  }
+
+  async function handleCopyIncremental() {
+    if (!selectedGroupName) return;
+    const prompt = buildIncrementalPrompt(selectedGroupName, selectedGroupShortcuts ?? []);
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(prompt);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = prompt;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      setIncrementalCopied(true);
+      if (copyTimerRef.current) window.clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = window.setTimeout(() => setIncrementalCopied(false), 1800);
     } catch (err) {
       alert('复制失败,请手动选择文本');
       console.error(err);
@@ -348,6 +417,17 @@ export default function ImportModal({ onImport, onClose }: Props) {
               onClick={() => setShowFormat(!showFormat)}
             >
               {showFormat ? '收起格式说明' : '查看格式说明'}
+            </button>
+            <button
+              type="button"
+              className={`sl-sl-modal__format-copy ${incrementalCopied ? 'is-copied' : ''}`}
+              onClick={handleCopyIncremental}
+              disabled={!selectedGroupName}
+              title={selectedGroupName
+                ? `把当前组「${selectedGroupName}」的扩展提示词(含已有 combo 清单)复制到剪贴板`
+                : '请先在左侧选中一个组'}
+            >
+              {incrementalCopied ? '已复制' : 'AI 增量提示词'}
             </button>
             <button
               type="button"

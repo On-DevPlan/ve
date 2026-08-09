@@ -729,6 +729,8 @@ export default function ShortcutLibrary() {
         <ImportModal
           onImport={handleImport}
           onClose={() => setShowImport(false)}
+          selectedGroupName={store.selectedGroup?.name}
+          selectedGroupShortcuts={store.selectedGroup?.shortcuts ?? []}
         />
       )}
 
