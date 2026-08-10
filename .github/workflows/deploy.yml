@@ -21,94 +21,137 @@ jobs:
       run: |
         docker save ve:latest | gzip > app.tar.gz
 
+    # 仅打印 secret 长度,避免在日志里泄漏实际内容。
     - name: Diagnose secrets (length only)
       if: always()
       env:
-        HOST_LEN:      ${{ secrets.HOST }}
-        USERNAME_LEN:  ${{ secrets.USERNAME }}
-        SSH_KEY_LEN:   ${{ secrets.SSH_KEY }}
-        PORT_LEN:      ${{ secrets.PORT }}
+        HOST_LEN:                  ${{ secrets.HOST }}
+        USERNAME_LEN:              ${{ secrets.USERNAME }}
+        SSH_KEY_LEN:               ${{ secrets.SSH_KEY }}
+        PORT_LEN:                  ${{ secrets.PORT || '22' }}
+        FULLCHAIN_B64_LEN:        ${{ secrets.FULLCHAIN_B64 }}
+        PRIVKEY_B64_LEN:          ${{ secrets.PRIVKEY_B64 }}
       run: |
-        echo "HOST length: ${#HOST_LEN}"
-        echo "USERNAME length: ${#USERNAME_LEN}"
-        echo "SSH_KEY length: ${#SSH_KEY_LEN}"
-        echo "PORT length: ${#PORT_LEN}"
+        echo "HOST length:               ${#HOST_LEN}"
+        echo "USERNAME length:           ${#USERNAME_LEN}"
+        echo "SSH_KEY length:            ${#SSH_KEY_LEN}"
+        echo "PORT length:               ${#PORT_LEN}"
+        echo "FULLCHAIN_B64 length:      ${#FULLCHAIN_B64_LEN}"
+        echo "PRIVKEY_B64 length:        ${#PRIVKEY_B64_LEN}"
 
     - name: Copy files to server
-      uses: appleboy/scp-action@v0.1.7
+      uses: appleboy/scp-action@v1
       with:
         host: ${{ secrets.HOST }}
         username: ${{ secrets.USERNAME }}
         key: ${{ secrets.SSH_KEY }}
-        port: ${{ secrets.PORT || 22 }}
+        port: ${{ secrets.PORT || '22' }}
         source: "app.tar.gz"
         target: "~/app/"
         strip_components: 0
 
     - name: Deploy using Docker
-      uses: appleboy/ssh-action@v1.0.3
+      uses: appleboy/ssh-action@v1
       with:
         host: ${{ secrets.HOST }}
         username: ${{ secrets.USERNAME }}
         key: ${{ secrets.SSH_KEY }}
-        port: ${{ secrets.PORT || 22 }}
+        port: ${{ secrets.PORT || '22' }}
         timeout: 30s
         command_timeout: 10m
+        # 关键:把 secrets 透传给 docker run 的 env。
+        # GH Actions 的 secrets 在 ssh-action 的 env 块里默认会被脱敏
+        # ($***),所以需要把 secret 重新塞进 env,让下方 bash 脚本
+        # 看到明文,再传给 docker run -e。
+        # 注意:set -e 模式下任何子命令失败立即终止。
+        envs: FULLCHAIN_B64,PRIVKEY_B64
         script: |
           bash -c '
-          # 设置变量
+          set -euo pipefail
+
           APP_DIR="$HOME/app"
           CONTAINER_NAME="ve_app"
           IMAGE_NAME="ve"
-          PORT=80
+          PORT_HTTP=80
+          PORT_HTTPS=443
 
-          # 创建应用目录
-          mkdir -p $APP_DIR
-          cd $APP_DIR
+          mkdir -p "$APP_DIR"
+          cd "$APP_DIR"
 
-          # 加载Docker镜像
+          # --- 加载镜像 ---
           echo "Loading Docker image..."
           docker load < app.tar.gz
-
-          # 清理压缩文件
           rm app.tar.gz
 
-          # 停止并删除旧容器
+          # --- 清理旧容器 ---
           echo "Stopping old container..."
-          docker stop $CONTAINER_NAME 2>/dev/null || true
-          docker rm $CONTAINER_NAME 2>/dev/null || true
+          docker stop "$CONTAINER_NAME" 2>/dev/null || true
+          docker rm   "$CONTAINER_NAME" 2>/dev/null || true
 
-          # 启动新容器
+          # --- 决定是否传 TLS env ---
+          # secrets.FULLCHAIN_B64 / PRIVKEY_B64 在 GH Actions 里默认空字符串。
+          # 空 base64 串会让 entrypoint 走到 "HTTPS DISABLED" 分支,容器仍能起;
+          # 不传 / 传合法 base64 都会让 entrypoint 落盘 + 自检证书。
+          TLS_ARGS=""
+          if [ -n "${FULLCHAIN_B64:-}" ] && [ -n "${PRIVKEY_B64:-}" ]; then
+            echo "TLS secrets present → enabling HTTPS"
+            TLS_ARGS="-e FULLCHAIN_B64 -e PRIVKEY_B64"
+          else
+            echo "TLS secrets missing → running HTTP only on :80"
+          fi
+
+          # --- 启动新容器 ---
+          # 注意:-p 80:80 + -p 443:443 必须同时给,且宿主机安全组放通
+          # 443(后者在阿里云控制台 / 等价物里手动配,这一步做不到)。
           echo "Starting new container..."
           docker run -d \
-            --name $CONTAINER_NAME \
+            --name "$CONTAINER_NAME" \
             --restart unless-stopped \
-            -p $PORT:80 \
+            -p "$PORT_HTTP":80 \
+            -p "$PORT_HTTPS":443 \
             -e NODE_ENV=production \
-            $IMAGE_NAME:latest
+            $TLS_ARGS \
+            "$IMAGE_NAME:latest"
 
-          # 等待服务启动
+          # --- 等待服务启动 ---
           echo "Waiting for service to start..."
           sleep 15
 
-          # 显示容器状态
           echo "Container status:"
-          docker ps | grep $CONTAINER_NAME
+          docker ps | grep "$CONTAINER_NAME" || true
 
-          # 健康检查
-          echo "Performing health check..."
-          for i in {1..6}; do
-            if curl -f http://localhost:$PORT/health; then
-              echo "✅ Deployment successful!"
-              echo "🌐 Application is running at: http://your-server-ip:$PORT"
+          # --- 健康检查 ---
+          # 优先级:HTTPS → HTTP 80 → fail。
+          # HTTPS 失败不一定是配置错 —— 也可能是证书还没粘到 secrets
+          # 或没续期 —— 这种情况下 HTTP 80 应该能工作,所以 fallback。
+          echo "Performing health check (HTTPS first)..."
+          for i in 1 2 3 4 5 6; do
+            # -k 容忍自签 / SAN 不全(本地调试用)。生产 Let's Encrypt
+            # 证书不会被 -k 触发,仅当 cert 真的不合法时报警。
+            if curl -fk -o /dev/null "https://localhost:$PORT_HTTPS/health"; then
+              echo "✅ Deployment successful (HTTPS)!"
+              echo "🌐 https://abc.jokelx.xyz is live"
               exit 0
             fi
-            echo "Health check attempt $i/6 failed, retrying in 10s..."
+            echo "HTTPS health check attempt $i/6 failed, retrying in 10s..."
             sleep 10
           done
 
-          # 如果所有健康检查都失败，显示日志并退出
-          echo "❌ Health check failed after 6 attempts!"
-          docker logs $CONTAINER_NAME
+          echo "⚠️  HTTPS not available, falling back to HTTP :80..."
+          for i in 1 2 3; do
+            if curl -f "http://localhost:$PORT_HTTP/health"; then
+              echo "✅ Deployment successful (HTTP only)!"
+              echo "🌐 http://abc.jokelx.xyz is live (HTTPS pending — check TLS secrets)"
+              exit 0
+            fi
+            sleep 5
+          done
+
+          # --- 全失败:贴日志方便诊断 ---
+          echo "❌ Health check failed after all attempts!"
+          echo "--- container logs ---"
+          docker logs "$CONTAINER_NAME" || true
+          echo "--- nginx config test ---"
+          docker exec "$CONTAINER_NAME" nginx -t 2>&1 || true
           exit 1
           '
