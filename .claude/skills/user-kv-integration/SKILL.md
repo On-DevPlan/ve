@@ -17,6 +17,7 @@ description: 把前端组件接到后端 user/kv + user/groups + file 体系(/ap
 | 想查**某个接口的路径 / 方法 / 请求响应字段** —— 字符串 KV(kv/v1)或文件图床(file/v1) | [[api-reference]] |
 | 想判断**「我这种组件」该用哪些接口** —— 个人空间(user-space,显式 groupId)vs 普通组件(single-blob,不传 groupId)、权限门槛、单 blob 决策、同步模式 | [[usage-scope]] |
 | 想给**新组件接入后端** —— registry 注册 API、写 service client、封装 store、接 UI、上线部署 / 405 排查 | [[adding-a-component]] |
+| 用了 file 域要展示图片(缩略图 / `<img>` / 背景图),prod HTTPS 下显示不出来 | [[api-reference]] §B0 — `resolveFileUrl` + nginx 反代三件套 |
 
 ## 快速定位
 

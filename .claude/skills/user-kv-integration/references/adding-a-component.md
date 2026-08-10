@@ -267,6 +267,18 @@ server {
 
 先验可达:`docker exec <容器> wget -qO- http://<target>/api/v1/user/info`
 
+### file url HTTPS 陷阱(文件域组件必读)
+
+`FileInfo.url` / `FileDuplicateResponse.url` 是**后端按请求协议拼接的绝对 url**。prod HTTPS 页面拿到的会是 `https://<后端 host>:8988/files/xxx`,但 8988 没 TLS → TLS 握手失败 + mixed-content 拦截,图片显示不出来。
+
+三件套修复(任何用了 file 域的组件都需要):
+
+1. **前端 `resolveFileUrl`(`apps/showcase/src/api/tools/file-url.ts`)** — 剥前缀成同源 `/files/xxx`
+2. **store `toFileView` 统一调用** — 一处转换,所有用 `FileView.url` 的地方自动正确
+3. **nginx + apiGateway 反代 `/files/`** — 浏览器永远同源请求
+
+完整内容见 [[api-reference]] §B0(含 dev/prop nginx 配置 + 链路图)。**任何写 store / 组件时拿到 `info.url` 的地方,先问一句:这个 url 经 `resolveFileUrl` 了吗?**
+
 ### 上线验证
 
 ```bash
@@ -318,6 +330,7 @@ curl -o /dev/null -w "%{http_code}\n" http://<host>/api/v1/user/info
 | 新 backend 忘了 registry entry | 路由没注册,405 | 先写 service 再回来加 entry,见 Step 1 |
 | `tags` 用了 `.set()` | 只保留最后一个 tag | `URLSearchParams.append()` |
 | file 上传直接传 FormData | 断言/类型错 | 先给 `request.ts` 加非 JSON 通道 |
+| file url 显示不出来 | prod HTTPS 页面图片 404 / mixed-content 拦截 | 见下方「file url HTTPS 陷阱」三件套 |
 
 ## 维护
 
