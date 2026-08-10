@@ -49,6 +49,7 @@ import type {
 import type { DefaultGroupInfo } from '../../services/userV1/types';
 import type { FileInfo } from '../../services/fileV1/types';
 import { ApiError } from '../../services/base';
+import { resolveFileUrl } from '../../tools/file-url';
 
 const VALUE_PREVIEW_MAX = 80;
 
@@ -111,7 +112,7 @@ function toKvVersionView(v: { version_no: number; value_len: number; replaced_at
 function toFileView(info: FileInfo): FileView {
   return {
     fileId: info.fileId,
-    url: info.url,
+    url: resolveFileUrl(info.url),
     displayName: info.fileId.slice(0, 8),
     accessLevel: info.accessLevel,
     size: info.size,

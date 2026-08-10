@@ -26,3 +26,4 @@ export * from './components';
 export * from './types';
 export * from './registry';
 export * from './normalize';
+export * from './tools/file-url';
