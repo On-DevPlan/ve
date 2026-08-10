@@ -52,6 +52,12 @@ jobs:
 
     - name: Deploy using Docker
       uses: appleboy/ssh-action@v1
+      # step-level env: 把 secret export 到 runner 进程的环境变量。
+      # 这是 ssh-action 把变量传给远端 shell 的前置条件 —— with.envs
+      # 只是"列名字",真正把值交给 ssh-action 进程靠这里。
+      env:
+        FULLCHAIN_B64: ${{ secrets.FULLCHAIN_B64 }}
+        PRIVKEY_B64:   ${{ secrets.PRIVKEY_B64 }}
       with:
         host: ${{ secrets.HOST }}
         username: ${{ secrets.USERNAME }}
@@ -59,11 +65,8 @@ jobs:
         port: ${{ secrets.PORT || '22' }}
         timeout: 30s
         command_timeout: 10m
-        # 关键:把 secrets 透传给 docker run 的 env。
-        # GH Actions 的 secrets 在 ssh-action 的 env 块里默认会被脱敏
-        # ($***),所以需要把 secret 重新塞进 env,让下方 bash 脚本
-        # 看到明文,再传给 docker run -e。
-        # 注意:set -e 模式下任何子命令失败立即终止。
+        # with.envs 列出要 export 到远端 shell 的变量名(逗号分隔)。
+        # 变量值来自上面的 step-level env:。
         envs: FULLCHAIN_B64,PRIVKEY_B64
         script: |
           bash -c '
