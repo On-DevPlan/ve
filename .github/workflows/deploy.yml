@@ -68,8 +68,10 @@ jobs:
         # with.envs 列出要 export 到远端 shell 的变量名(逗号分隔)。
         # 变量值来自上面的 step-level env:。
         envs: FULLCHAIN_B64,PRIVKEY_B64
+        # 不再嵌套 bash -c '...' —— drone-ssh 在多行嵌套引号里会触发
+        # 反引号展开,导致语法错误。直接写脚本,ssh-action 通过 sh -c
+        # 在远端执行,不需要外层包装。
         script: |
-          bash -c '
           set -euo pipefail
 
           APP_DIR="$HOME/app"
@@ -81,31 +83,23 @@ jobs:
           mkdir -p "$APP_DIR"
           cd "$APP_DIR"
 
-          # --- 加载镜像 ---
           echo "Loading Docker image..."
           docker load < app.tar.gz
           rm app.tar.gz
 
-          # --- 清理旧容器 ---
           echo "Stopping old container..."
           docker stop "$CONTAINER_NAME" 2>/dev/null || true
           docker rm   "$CONTAINER_NAME" 2>/dev/null || true
 
-          # --- 决定是否传 TLS env ---
-          # secrets.FULLCHAIN_B64 / PRIVKEY_B64 在 GH Actions 里默认空字符串。
-          # 空 base64 串会让 entrypoint 走到 "HTTPS DISABLED" 分支,容器仍能起;
-          # 不传 / 传合法 base64 都会让 entrypoint 落盘 + 自检证书。
-          TLS_ARGS=""
+          # secrets 是否透传?
           if [ -n "${FULLCHAIN_B64:-}" ] && [ -n "${PRIVKEY_B64:-}" ]; then
             echo "TLS secrets present → enabling HTTPS"
             TLS_ARGS="-e FULLCHAIN_B64 -e PRIVKEY_B64"
           else
             echo "TLS secrets missing → running HTTP only on :80"
+            TLS_ARGS=""
           fi
 
-          # --- 启动新容器 ---
-          # 注意:-p 80:80 + -p 443:443 必须同时给,且宿主机安全组放通
-          # 443(后者在阿里云控制台 / 等价物里手动配,这一步做不到)。
           echo "Starting new container..."
           docker run -d \
             --name "$CONTAINER_NAME" \
@@ -116,21 +110,14 @@ jobs:
             $TLS_ARGS \
             "$IMAGE_NAME:latest"
 
-          # --- 等待服务启动 ---
           echo "Waiting for service to start..."
           sleep 15
 
           echo "Container status:"
           docker ps | grep "$CONTAINER_NAME" || true
 
-          # --- 健康检查 ---
-          # 优先级:HTTPS → HTTP 80 → fail。
-          # HTTPS 失败不一定是配置错 —— 也可能是证书还没粘到 secrets
-          # 或没续期 —— 这种情况下 HTTP 80 应该能工作,所以 fallback。
           echo "Performing health check (HTTPS first)..."
           for i in 1 2 3 4 5 6; do
-            # -k 容忍自签 / SAN 不全(本地调试用)。生产 Let's Encrypt
-            # 证书不会被 -k 触发,仅当 cert 真的不合法时报警。
             if curl -fk -o /dev/null "https://localhost:$PORT_HTTPS/health"; then
               echo "✅ Deployment successful (HTTPS)!"
               echo "🌐 https://abc.jokelx.xyz is live"
@@ -150,11 +137,9 @@ jobs:
             sleep 5
           done
 
-          # --- 全失败:贴日志方便诊断 ---
           echo "❌ Health check failed after all attempts!"
           echo "--- container logs ---"
           docker logs "$CONTAINER_NAME" || true
           echo "--- nginx config test ---"
           docker exec "$CONTAINER_NAME" nginx -t 2>&1 || true
           exit 1
-          '
