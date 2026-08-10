@@ -95,11 +95,11 @@ RUN apk add --no-cache openssl \
 # Entrypoint:把 FULLCHAIN_B64 / PRIVKEY_B64 解码成 PEM 文件,覆盖 build
 # 期留下的 dummy 自签证书,然后跑官方 nginx:alpine 自带的 entrypoint。
 #
-# 不覆盖 ENTRYPOINT,而是用一个小 wrapper 在原 entrypoint 之前先落盘
-# 证书。原 entrypoint 是 /docker-entrypoint.d/ 下的脚本链,签名固定为
-# `entrypoint.sh` -> 链式调用 20-envsubst-on-templates.sh 等。
-COPY docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh
+# 关键:不要覆盖 nginx:alpine 自带的 /docker-entrypoint.sh(我们的脚本
+# 放在 /cert-entrypoint.sh)。如果覆盖,exec /docker-entrypoint.sh 会
+# 递归调用自身,导致容器反复重启。
+COPY cert-entrypoint.sh /cert-entrypoint.sh
+RUN chmod +x /cert-entrypoint.sh
 
 # Sanity check — fail fast in the image build if vite didn't emit
 # index.html so the runtime container never serves an empty 404 page.
@@ -117,6 +117,7 @@ RUN nginx -t
 EXPOSE 80 443
 
 # Override the official nginx:alpine ENTRYPOINT so we can decode certs
-# before its own 20-envsubst-on-templates.sh runs.
-ENTRYPOINT ["/docker-entrypoint.sh"]
+# before its own 20-envsubst-on-templates.sh runs. We keep the official
+# /docker-entrypoint.sh untouched and chain to it from /cert-entrypoint.sh.
+ENTRYPOINT ["/cert-entrypoint.sh"]
 CMD ["nginx", "-g", "daemon off;"]
