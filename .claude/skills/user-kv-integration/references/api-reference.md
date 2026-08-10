@@ -212,7 +212,117 @@ qs.append('tags', 'cache');
 > - `file_shares`:`code` 10-hex UNIQUE,`status` 是 **SMALLINT**(1=active / 0=revoked)—— 与 `files.status` VARCHAR(16) **不同类型别混**
 > - `file_access_logs`:出图流水(result ∈ OK / DENIED / NOT_FOUND / EXPIRED),匿名 viewer 存 NULL
 
-## B1. `POST /files` — Upload(multipart)
+## B0. 前端 url 处理:`resolveFileUrl`
+
+> 文件域里所有返回 `FileInfo` / `FileDuplicateResponse` 的接口都会带上 `url` 字段。
+> **这个 url 是后端按请求协议拼接的绝对地址**,在 HTTPS 生产环境会踩坑。
+> 任何要在前端展示图片(`<img src>` / 背景图 / 分享)的地方,都要先经 `resolveFileUrl` 改写。
+
+### 坑是什么
+
+后端读 nginx 发的 `X-Forwarded-Proto` 拼 url:
+
+| 接入方式 | 后端返回的 url |
+|---|---|
+| `https://abc.jokelx.xyz/api/v1/files`(prod) | `https://47.110.80.47:8988/files/xxx` |
+| `http://localhost:5173/api/v1/files`(dev) | `http://47.110.80.47:8988/files/xxx` |
+
+**问题**:后端文件服务在 `47.110.80.47:8988`,只支持 HTTP,没有 TLS 证书。
+
+- **HTTPS URL 加载失败**:8988 端口没 TLS,TLS 握手就崩
+- **即使协议对**(`http://...`),HTTPS 页面加载 HTTP 资源触发 **mixed-content** 拦截
+- **跨主机 + 跨端口**:即便绕过 mixed-content,也违反"同源"约定,带 token(`?token=xxx`)的 protected/private 图容易被浏览器 referrer 策略泄漏
+
+### 解法:前端剥前缀 + nginx/apiGateway 反代
+
+**1. 前端 `resolveFileUrl`(纯函数)**:把绝对 url 剥成同源相对路径
+
+```ts
+// apps/showcase/src/api/tools/file-url.ts
+const FILE_PATH_PREFIX = '/files/';
+
+export function resolveFileUrl(url: string): string {
+  if (!url) return url;
+  if (url.startsWith(FILE_PATH_PREFIX)) return url;          // 幂等
+  try {
+    const base = typeof window !== 'undefined' ? window.location.origin : 'http://localhost';
+    const u = new URL(url, base);
+    if (u.pathname.startsWith(FILE_PATH_PREFIX)) {
+      return u.pathname + u.search + u.hash;                // 保留 ?token=xxx
+    }
+    return url;                                              // 外链 / 非 /files/ 原样
+  } catch {
+    return url;                                              // 解析失败降级
+  }
+}
+```
+
+**2. store 的 `toFileView` 统一调用**(一处转换,所有用 `FileView.url` 的地方自动正确):
+
+```ts
+// apps/showcase/src/api/components/user-space/createUserSpaceStore.ts
+function toFileView(info: FileInfo): FileView {
+  return {
+    fileId: info.fileId,
+    url: resolveFileUrl(info.url),                          // ← 关键一行
+    ...
+  };
+}
+```
+
+**3. nginx 反代 `/files/`**(prod,加在 `nginx/default.conf` 的 443 server 块):
+
+```nginx
+# ^~ 必须加:上面的 `location ~* \.(js|css|png...)$` 是正则,nginx 优先级
+# 正则 > 普通前缀,会把 /files/abc.png 当静态资源命中 → try_files → 404。
+location ^~ /files/ {
+    proxy_pass http://47.110.80.47:8988;
+    proxy_set_header Host $proxy_host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+}
+# 不发 X-Forwarded-Proto:文件服务直接吐二进制,不拼 url(不像 /api/v1
+# 那样后端按 proto 拼 url 字段)。
+```
+
+**4. apiGateway dev 反代**(`apps/showcase/src/api/to-vite-proxy.ts`,target 复用 registry):
+
+```ts
+const fileRule = normalizeApi(registry.fileV1, /* isProd */ false, 'fileV1');
+table.set('/files', { target: fileRule.target, changeOrigin: fileRule.changeOrigin });
+```
+
+### 为什么 `/files/` 不进 registry
+
+- registry 的语义是「`/api/v1/*` 后端代理」;`/files/` 不是 API,无 JSON、无 `/api/v1` 前缀
+- gen-nginx 只生成 `/api/v1/*` 的 location;`/files/` 必须手写
+- apiGateway 的特例也带注释(「非 API,不走 registry」)
+
+### 端到端链路
+
+```
+后端 JSON url: "https://47.110.80.47:8988/files/abc?token=x"
+                │
+                ▼ store.toFileView() → resolveFileUrl()
+  FileView.url: "/files/abc?token=x"            ← 相对路径
+                │
+                ▼ <img src={item.url}>
+  浏览器请求: GET https://abc.jokelx.xyz/files/abc?token=x
+                │
+                ▼ nginx location ^~ /files/   (或 dev apiGateway)
+  实际转发:   GET http://47.110.80.47:8988/files/abc?token=x
+```
+
+### 边界
+
+- ✅ 已是相对路径(`/files/xxx`)→ 幂等返回
+- ✅ 带 query(`?token=xxx`,protected/private 鉴权)→ 保留
+- ✅ 非 `/files/` 路径(外链 / 未来 CDN)→ 原样返回,不破坏
+- ✅ 解析失败(非法 url)→ 降级返回原串,不崩
+- ❌ `<a href={item.url}>` 给用户复制链接 → 也是 `/files/xxx` 同源路径,正确(别人打开 `https://abc.jokelx.xyz/files/xxx` 就是合法访问)
+- ❌ `<a href={info.url}>` 用的是**没经 resolveFileUrl** 的原始 url → 回到踩坑路径。**任何展示 url 的地方都走 `FileView.url`**
+
+---
 
 请求:`multipart/form-data`
 

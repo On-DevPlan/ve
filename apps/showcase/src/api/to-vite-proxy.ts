@@ -38,6 +38,14 @@ export function apiGateway(): Plugin {
     }
     table.set(rule.context, { target: rule.target, changeOrigin: rule.changeOrigin });
   }
+
+  // /files/<fileId> —— 后端文件直链(非 API,不走 registry)。
+  // resolveFileUrl 把前端 url 剥成 /files/...,这里反代到后端文件服务,
+  // 与 prod nginx 的 `location ^~ /files/` 对齐。target 复用 fileV1 后端,
+  // 后端地址变了只改 registry,这里自动跟随。
+  const fileRule = normalizeApi(registry.fileV1, /* isProd */ false, 'fileV1');
+  table.set('/files', { target: fileRule.target, changeOrigin: fileRule.changeOrigin });
+
   // 长前缀优先 —— '/api/v1/kv/tags' 应赢过 '/api/v1/kv'(若两者都注册)
   const contexts = [...table.keys()].sort((a, b) => b.length - a.length);
 
