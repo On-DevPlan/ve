@@ -57,11 +57,13 @@ FROM nginx:alpine
 # wins against the bundled /etc/nginx/nginx.conf.
 #
 # TLS 说明:443 server 块里 ssl_certificate / ssl_certificate_key 写死
-# 指向 /etc/nginx/certs/fullchain.cer / privkey.key。这两个文件由我们
-# 自定义的 docker-entrypoint.sh 在容器启动时从 TLS_FULLCHAIN_B64 /
-# TLS_PRIVKEY_B64 环境变量解码落盘。即使 secrets 暂时没传(本地开发),
-# entrypoint 也会创建空文件,nginx 启动仅报 warning 而非拒启 —— 这样
-# HTTP-only 回退路径仍然能跑。
+# 指向 /etc/nginx/certs/fullchain.cer / privkey.key。这两个文件路径
+# 必须真实存在 —— 不是只检查语法,而是 nginx -t 会真的打开证书文件
+# 验证 SSL 配置。
+#
+# 因此 build 阶段先落一份 dummy 自签证书让 nginx -t 通过;runtime 由
+# docker-entrypoint.sh 用 FULLCHAIN_B64 / PRIVKEY_B64 解码的真实证书
+# 覆盖这两个文件。
 COPY nginx/default.conf /etc/nginx/conf.d/default.conf
 
 # Generated API location blocks, included from inside default.conf's server{}.
@@ -73,8 +75,25 @@ COPY --from=builder /app/nginx/api-locations/ /etc/nginx/api-locations/
 # apps/showcase/dist, not /app/dist, because the root is a workspace.
 COPY --from=builder /app/apps/showcase/dist /usr/share/nginx/html
 
-# Entrypoint:把 TLS_FULLCHAIN_B64 / TLS_PRIVKEY_B64 解码成 PEM 文件,
-# 然后跑官方 nginx:alpine 自带的 entrypoint(envsubst + nginx -g)。
+# 生成 build 期 dummy 自签证书,让 nginx -t 通过。
+# 为什么 build 期就需要:ssl_certificate 路径在 build 时被 nginx -t 真
+# 实打开;没有证书文件 → "BIO_new_file() failed" → build 失败。
+# runtime 时 entrypoint 会用真实证书覆盖这两个文件,dummy cert 不会被
+# 任何客户端看到。
+#
+# openssl 用 -nodes(无密码)+ -subj 跳过交互;127.0.0.1 SAN 让浏览器
+# / nginx 任何验证逻辑都能跑通(虽然没人会用它)。
+RUN apk add --no-cache openssl \
+ && mkdir -p /etc/nginx/certs \
+ && openssl req -x509 -nodes -newkey rsa:2048 \
+      -keyout /etc/nginx/certs/privkey.key \
+      -out    /etc/nginx/certs/fullchain.cer \
+      -days 36500 -subj "/CN=dummy" \
+      -addext "subjectAltName=IP:127.0.0.1" 2>/dev/null \
+ && chmod 600 /etc/nginx/certs/privkey.key
+
+# Entrypoint:把 FULLCHAIN_B64 / PRIVKEY_B64 解码成 PEM 文件,覆盖 build
+# 期留下的 dummy 自签证书,然后跑官方 nginx:alpine 自带的 entrypoint。
 #
 # 不覆盖 ENTRYPOINT,而是用一个小 wrapper 在原 entrypoint 之前先落盘
 # 证书。原 entrypoint 是 /docker-entrypoint.d/ 下的脚本链,签名固定为
@@ -82,19 +101,17 @@ COPY --from=builder /app/apps/showcase/dist /usr/share/nginx/html
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
 
-# 自检:index.html 必须存在(避免运行时 404)。同时单独验一次 default.conf
-# 的占位符配置解析合法 —— envsubst 之前 nginx -t 看不到 placeholder,
-# 仍然能通过(占位符串是合法路径)。
-RUN ls -la /usr/share/nginx/html/ \
- && if [ ! -f /usr/share/nginx/html/index.html ]; then \
+# Sanity check — fail fast in the image build if vite didn't emit
+# index.html so the runtime container never serves an empty 404 page.
+RUN if [ ! -f /usr/share/nginx/html/index.html ]; then \
       echo "Error: index.html not found!"; \
       exit 1; \
     fi
 
-# Validate the hand-written default.conf at build time. TLS certs aren't
-# present during build (they're delivered via CI secrets + decoded by the
-# entrypoint), so ssl_certificate paths point to files the entrypoint
-# creates at runtime — nginx -t only checks syntax, not file existence.
+# Validate default.conf + the dummy cert at build time. nginx -t actually
+# opens ssl_certificate files (it doesn't only check syntax), so the dummy
+# cert generated above is what makes this pass. At runtime the entrypoint
+# overwrites those two files with the real FULLCHAIN_B64 / PRIVKEY_B64.
 RUN nginx -t
 
 EXPOSE 80 443

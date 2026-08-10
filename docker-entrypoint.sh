@@ -64,11 +64,24 @@ else
   echo "[entrypoint] ⚠️  FULLCHAIN_B64 / PRIVKEY_B64 not set"
   echo "[entrypoint]    HTTPS will be DISABLED; only :80 will serve."
   # 不 exit 1 —— 留 http-only 回退路径,方便本地开发 / 证书未到位时
-  # 仍然能跑起来。443 server 块会因为找不到证书文件报警告,但 nginx
-  # 启动不会失败;80 仍可服务。
+  # 仍然能跑起来。
+  #
+  # Build 期为了 nginx -t 通过,Dockerfile 在 /etc/nginx/certs/ 放了一份
+  # dummy 自签证书。如果不干预,nginx 会拿着 dummy cert 监听 443 →
+  # 浏览器 / curl 会因为证书不受信任报错,而且 dummy cert 是 100 年
+  # 有效,容易让人误以为是真实部署生效了 —— 危险。
+  #
+  # 所以 secrets 缺失时,把 default.conf 改名让 nginx 不加载,只跑
+  # 官方自带的那个干净的 default.conf(只 listen 80)。80 仍然能服务。
+  if [ -f /etc/nginx/conf.d/default.conf ]; then
+    mv /etc/nginx/conf.d/default.conf /etc/nginx/conf.d/default.conf.disabled
+    echo "[entrypoint]    moved default.conf → default.conf.disabled (443 off)"
+  fi
 fi
 
 # 把原始 default.conf 拷一份 .bak(给运维留现场)。
+# 如果走 HTTP-only 分支,default.conf 已经被 mv 走,这里拷贝会失败但
+# 无关紧要(2>/dev/null + || true 兜住)。
 cp /etc/nginx/conf.d/default.conf /etc/nginx/conf.d/default.conf.bak 2>/dev/null || true
 
 # exec 到官方 entrypoint.sh,保持 nginx 作为 PID 1。
