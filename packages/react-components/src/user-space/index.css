@@ -61,9 +61,50 @@
   overflow: hidden;
 }
 .sl-us-root * { box-sizing: border-box; }
-.sl-us-root button { font: inherit; cursor: pointer; background: none; border: none; padding: 0; color: inherit; }
+/* Exclude .sl-us-btn (and modifiers like --primary / --ghost / --sm / --icon /
+   --icon-sm / --danger-ghost) from the global button reset so their layout rules
+   (padding 0 10px, border, background) actually apply. Specificity of this
+   selector matches the original reset (0,1,1) so order is sufficient and no
+   bump to .sl-us-btn is needed. */
+.sl-us-root button:not([class*="sl-us-btn"]) { font: inherit; cursor: pointer; background: none; border: none; padding: 0; color: inherit; }
 .sl-us-root input, .sl-us-root select, .sl-us-root textarea { font: inherit; }
 .sl-us-root h1, .sl-us-root h2, .sl-us-root h3, .sl-us-root h4, .sl-us-root p { margin: 0; }
+
+/* ── unauthenticated gate ────────────────────────
+   Showed naked text before these rules existed: padded / bordered card with
+   title (larger) + description (muted), centered in the main pane. */
+.sl-us-gate {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 320px;
+  padding: 40px 20px;
+}
+.sl-us-gate__card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 28px 32px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 6px);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  max-width: 360px;
+  text-align: center;
+}
+.sl-us-gate__title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--fg);
+  margin: 0;
+}
+.sl-us-gate__desc {
+  font-size: 13px;
+  color: var(--fg-2);
+  line-height: 1.6;
+  margin: 0;
+}
 
 /* ── sidebar ───────────────────────────────────── */
 .sl-us-side {
