@@ -666,6 +666,25 @@
   padding: 10px 16px;
   border-top: 1px solid var(--border);
 }
+/* 看图 modal:大图自适应 + 底部下载区 */
+.sl-us-image-viewer__body {
+  align-items: center;
+  padding: 12px;
+}
+.sl-us-image-viewer__img {
+  max-width: 100%;
+  max-height: 62vh;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+}
+.sl-us-image-viewer__foot {
+  justify-content: flex-start;
+  align-items: center;
+  gap: 8px;
+}
+.sl-us-image-viewer__foot a {
+  text-decoration: none;
+}
 .sl-us-field { display: flex; flex-direction: column; gap: 4px; }
 .sl-us-field__label { font-size: 11px; font-weight: 500; color: var(--fg-2); }
 .sl-us-field__hint { font-size: 11px; color: var(--fg-3); }
@@ -701,7 +720,7 @@
 
 /* ── 文件 tab 样式 ─────────────────────────────── */
 /* 缩略图:48×48,object-fit:cover 吃任意比例;低彩边框 + 圆角微芯片感。
-   cursor:zoom-in 提示可点;点击切到原图后切到 zoom-out 提示可缩回。 */
+   cursor:zoom-in 提示可点;点击由 Files.tsx 打开看图 modal。 */
 .sl-us-file-thumb {
   width: 48px; height: 48px;
   object-fit: cover;
@@ -710,9 +729,6 @@
   background: var(--bg);
   display: block;
   cursor: zoom-in;
-}
-.sl-us-file-thumb[data-state="full"] {
-  cursor: zoom-out;
 }
 /* 非预览文件的图标占位:同样 48×48,emoji 居中 + 边框 + 圆角。 */
 .sl-us-file-icon {

@@ -14,6 +14,8 @@ import type { FileAccessLevel, FileListResult, FileThumbnail, FileView, GroupSum
 import { hasMinRole } from '@api/components/user-space';
 import { ApiError } from '@api/services/base';
 
+import ImageViewerModal from './ImageViewerModal';
+
 export interface FilesProps {
   group: GroupSummary;
   files: FileListResult | null;
@@ -92,46 +94,30 @@ function fileErrorMessage(
   }
 }
 
-/** 缩略图单元格:默认显示 sm 档缩略图(后端返回的 thumbnails 列表中
- *  level==='sm' 的 URL);sm 缺失则退到原图 url。点击在 thumb ↔ full 之间切换,
- *  通过本地 state 走 React 渲染而不是直写 DOM src,避免与 React 渲染冲突。
- *  data-src = 缩略图 URL(懒加载初始目标),data-full = 原图 URL(点击切换目标),
- *  data-state = "thumb" | "full" 给 CSS cursor 切换用。 */
+/** 缩略图单元格:默认显示 sm 档缩略图(后端 thumbnails 里 level==='sm' 的 URL);
+ *  sm 缺失则退到原图 url。点击不就地切换,而是通知父级打开看图 modal。 */
 interface ThumbImgProps {
-  url: string;             // 原图(兜底)
+  url: string;             // 原图(兜底 / 高清源)
   thumbnails?: FileThumbnail[];
   alt: string;
+  /** 点击缩略图 → 打开看图 modal(父级管 state)。 */
+  onPreview: () => void;
 }
 
-function ThumbImg({ url, thumbnails, alt }: ThumbImgProps) {
+function ThumbImg({ url, thumbnails, alt, onPreview }: ThumbImgProps) {
   const sm = thumbnails?.find((t) => t.level === 'sm');
   // 默认显示 sm 缩略图;sm 缺失则退到原图
-  const defaultSrc = sm?.url ?? url;
-  const [src, setSrc] = useState(defaultSrc);
-  const [isFull, setIsFull] = useState(false);
-
-  function handleClick(): void {
-    if (isFull) {
-      // 切回 sm(不存在则保持原图)
-      setSrc(defaultSrc);
-      setIsFull(false);
-    } else {
-      setSrc(url);
-      setIsFull(true);
-    }
-  }
-
+  const src = sm?.url ?? url;
   return (
     <img
       className="sl-us-file-thumb"
       src={src}
-      data-src={defaultSrc}    // 缩略图 URL(懒加载初始目标)
-      data-full={url}          // 原图 URL(点击切换目标)
-      data-state={isFull ? 'full' : 'thumb'}
+      data-src={src}
+      data-full={url}
       alt={alt}
       loading="lazy"
-      onClick={handleClick}
-      title={isFull ? '点击切回缩略图' : '点击查看原图'}
+      onClick={onPreview}
+      title="点击放大"
     />
   );
 }
@@ -140,6 +126,9 @@ export default function Files(props: FilesProps) {
   const { group, files, loading, error, errorAction, saving, page, pageSize, selectedTag, onPageChange, onTagChange, onUpload, onAccessLevelChange, onDuplicate, onDelete, onReload } = props;
   const canWrite = hasMinRole(group.myRole, 'writer');
   const canDelete = hasMinRole(group.myRole, 'admin');
+
+  // 当前放大预览的文件(null = 关闭)。
+  const [previewFile, setPreviewFile] = useState<FileView | null>(null);
 
   // tag facet 后端未提供,从列表内 items 收集 + 去重 + 排序(频次降序,名称升序)。
   const tags = useMemo(() => {
@@ -221,6 +210,7 @@ export default function Files(props: FilesProps) {
                         url={item.url}
                         thumbnails={item.thumbnails}
                         alt={item.displayName}
+                        onPreview={() => setPreviewFile(item)}
                       />
                     ) : (
                       <span className="sl-us-file-icon" aria-hidden="true">
@@ -308,6 +298,8 @@ export default function Files(props: FilesProps) {
           )}
         </div>
       )}
+
+      <ImageViewerModal file={previewFile} onClose={() => setPreviewFile(null)} />
     </div>
   );
 }
