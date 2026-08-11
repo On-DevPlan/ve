@@ -53,6 +53,10 @@ const FILE_FULL = {
   sha256: 'sha256hex',
   createdAt: '2026-08-01T12:00:00+08:00',
   expireAt: '',
+  thumbnails: [
+    { level: 'sm', width: 300, height: 200, size: 1234, contentType: 'image/jpeg', url: 'https://cdn.example.com/abc12345?level=sm' },
+    { level: 'md', width: 800, height: 533, size: 5678, contentType: 'image/jpeg', url: 'https://cdn.example.com/abc12345?level=md' },
+  ],
 };
 
 describe('user-space store file CRUD', () => {
@@ -195,5 +199,26 @@ describe('user-space store file CRUD', () => {
     const store = createUserSpaceStore();
 
     await expect(store.deleteFile(42, 'abc12345')).rejects.toMatchObject({ code: 31 });
+  });
+
+  it('listFiles preserves thumbnails in FileView', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      okBody({ items: [FILE_FULL], total: 1 }),
+    );
+    const store = createUserSpaceStore();
+    const result = await store.listFiles(42, { page: 1, pageSize: 10 });
+    expect(result.items[0].thumbnails).toEqual(FILE_FULL.thumbnails);
+    expect(result.items[0].thumbnails?.[0].level).toBe('sm');
+  });
+
+  it('listFiles tolerates thumbnails undefined (old files / non-image)', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { thumbnails: _omit, ...noThumbs } = FILE_FULL;
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      okBody({ items: [noThumbs], total: 1 }),
+    );
+    const store = createUserSpaceStore();
+    const result = await store.listFiles(42, { page: 1, pageSize: 10 });
+    expect(result.items[0].thumbnails).toBeUndefined();
   });
 });
