@@ -653,7 +653,8 @@
 .sl-us-versions__row .sl-us-input--compact { flex: 1 1 auto; min-width: 180px; }
 
 /* ── 文件 tab 样式 ─────────────────────────────── */
-/* 缩略图:48×48,object-fit:cover 吃任意比例;低彩边框 + 圆角微芯片感。 */
+/* 缩略图:48×48,object-fit:cover 吃任意比例;低彩边框 + 圆角微芯片感。
+   cursor:zoom-in 提示可点;点击切到原图后切到 zoom-out 提示可缩回。 */
 .sl-us-file-thumb {
   width: 48px; height: 48px;
   object-fit: cover;
@@ -661,6 +662,10 @@
   border: 1px solid var(--border);
   background: var(--bg);
   display: block;
+  cursor: zoom-in;
+}
+.sl-us-file-thumb[data-state="full"] {
+  cursor: zoom-out;
 }
 /* 非预览文件的图标占位:同样 48×48,emoji 居中 + 边框 + 圆角。 */
 .sl-us-file-icon {

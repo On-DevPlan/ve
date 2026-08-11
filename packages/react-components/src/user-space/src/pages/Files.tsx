@@ -9,8 +9,8 @@
 // accessLevel 行内 select:onChange → onAccessLevelChange(item, value);
 // 复制按钮永远显示给 canWrite(reader 看不到);删除按钮仅 owner/admin 显示。
 
-import { useMemo } from 'react';
-import type { FileAccessLevel, FileListResult, FileView, GroupSummary } from '@api/components/user-space';
+import { useMemo, useState } from 'react';
+import type { FileAccessLevel, FileListResult, FileThumbnail, FileView, GroupSummary } from '@api/components/user-space';
 import { hasMinRole } from '@api/components/user-space';
 import { ApiError } from '@api/services/base';
 
@@ -90,6 +90,50 @@ function fileErrorMessage(
     case 'delete':
       return `只有 owner/admin 才能删除文件。当前角色:${role}`;
   }
+}
+
+/** 缩略图单元格:默认显示 sm 档缩略图(后端返回的 thumbnails 列表中
+ *  level==='sm' 的 URL);sm 缺失则退到原图 url。点击在 thumb ↔ full 之间切换,
+ *  通过本地 state 走 React 渲染而不是直写 DOM src,避免与 React 渲染冲突。
+ *  data-src = 缩略图 URL(懒加载初始目标),data-full = 原图 URL(点击切换目标),
+ *  data-state = "thumb" | "full" 给 CSS cursor 切换用。 */
+interface ThumbImgProps {
+  url: string;             // 原图(兜底)
+  thumbnails?: FileThumbnail[];
+  alt: string;
+}
+
+function ThumbImg({ url, thumbnails, alt }: ThumbImgProps) {
+  const sm = thumbnails?.find((t) => t.level === 'sm');
+  // 默认显示 sm 缩略图;sm 缺失则退到原图
+  const defaultSrc = sm?.url ?? url;
+  const [src, setSrc] = useState(defaultSrc);
+  const [isFull, setIsFull] = useState(false);
+
+  function handleClick(): void {
+    if (isFull) {
+      // 切回 sm(不存在则保持原图)
+      setSrc(defaultSrc);
+      setIsFull(false);
+    } else {
+      setSrc(url);
+      setIsFull(true);
+    }
+  }
+
+  return (
+    <img
+      className="sl-us-file-thumb"
+      src={src}
+      data-src={defaultSrc}    // 缩略图 URL(懒加载初始目标)
+      data-full={url}          // 原图 URL(点击切换目标)
+      data-state={isFull ? 'full' : 'thumb'}
+      alt={alt}
+      loading="lazy"
+      onClick={handleClick}
+      title={isFull ? '点击切回缩略图' : '点击查看原图'}
+    />
+  );
 }
 
 export default function Files(props: FilesProps) {
@@ -173,11 +217,10 @@ export default function Files(props: FilesProps) {
                 <tr key={item.fileId}>
                   <td>
                     {item.isPreviewable ? (
-                      <img
-                        className="sl-us-file-thumb"
-                        src={item.url}
+                      <ThumbImg
+                        url={item.url}
+                        thumbnails={item.thumbnails}
                         alt={item.displayName}
-                        loading="lazy"
                       />
                     ) : (
                       <span className="sl-us-file-icon" aria-hidden="true">
