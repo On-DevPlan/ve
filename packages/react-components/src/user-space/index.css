@@ -35,9 +35,10 @@
 }
 
 /* 弹窗(portal 出 root 之外)也需要同样的 reset,否则按钮 / input
-   会带浏览器默认 chrome(灰底 + 凸起边框),和 root 内样式不一致。 */
+   会带浏览器默认 chrome(灰底 + 凸起边框),和 root 内样式不一致。
+   同样的 carve-out:放过 .sl-us-btn,否则弹窗内按钮也会被擦掉。 */
 .sl-us-modal-backdrop * { box-sizing: border-box; }
-.sl-us-modal-backdrop button { font: inherit; cursor: pointer; background: none; border: none; padding: 0; color: inherit; }
+.sl-us-modal-backdrop button:not([class*="sl-us-btn"]) { font: inherit; cursor: pointer; background: none; border: none; padding: 0; color: inherit; }
 .sl-us-modal-backdrop input, .sl-us-modal-backdrop select, .sl-us-modal-backdrop textarea { font: inherit; }
 .sl-us-modal-backdrop h1, .sl-us-modal-backdrop h2, .sl-us-modal-backdrop h3, .sl-us-modal-backdrop h4, .sl-us-modal-backdrop p { margin: 0; }
 
@@ -61,18 +62,19 @@
   overflow: hidden;
 }
 .sl-us-root * { box-sizing: border-box; }
-/* Exclude .sl-us-btn (and modifiers like --primary / --ghost / --sm / --icon /
-   --icon-sm / --danger-ghost) from the global button reset so their layout rules
-   (padding 0 10px, border, background) actually apply. Specificity of this
-   selector matches the original reset (0,1,1) so order is sufficient and no
-   bump to .sl-us-btn is needed. */
+/* 把 .sl-us-btn(包括 --primary / --ghost / --sm / --icon / --icon-sm /
+   --danger-ghost 等修饰类)从全局 button reset 里排除,否则它们的 padding /
+   border / background 会被 .sl-us-root button 这条规则全擦掉(P1 的根因)。 */
 .sl-us-root button:not([class*="sl-us-btn"]) { font: inherit; cursor: pointer; background: none; border: none; padding: 0; color: inherit; }
 .sl-us-root input, .sl-us-root select, .sl-us-root textarea { font: inherit; }
 .sl-us-root h1, .sl-us-root h2, .sl-us-root h3, .sl-us-root h4, .sl-us-root p { margin: 0; }
 
 /* ── unauthenticated gate ────────────────────────
    Showed naked text before these rules existed: padded / bordered card with
-   title (larger) + description (muted), centered in the main pane. */
+   title (larger) + description (muted), centered in the main pane.
+   注:index.tsx 里 .sl-us-gate 和 .sl-us-root 是同一个 div,这里的
+   display: flex 同优先级下靠源码顺序覆盖 .sl-us-root 的 display: grid,
+   别把这块挪到 sidebar 之前,会破坏网格布局。 */
 .sl-us-gate {
   display: flex;
   align-items: center;
@@ -100,7 +102,7 @@
   margin: 0;
 }
 .sl-us-gate__desc {
-  font-size: 13px;
+  /* font-size 继承 .sl-us-root 的 13px,这里不重复声明 */
   color: var(--fg-2);
   line-height: 1.6;
   margin: 0;
