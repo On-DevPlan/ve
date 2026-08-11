@@ -132,7 +132,10 @@ function toFileView(info: FileInfo): FileView {
         ? 'text'
         : 'other',
     // 后端 2026-08-10 起的缩略图档位;老文件 / 非图片 / md5 dedup 命中 → undefined
-    thumbnails: info.thumbnails,
+    thumbnails: info.thumbnails?.map((t) => ({
+      ...t,
+      url: resolveFileUrl(t.url),
+    })),
   };
 }
 

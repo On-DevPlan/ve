@@ -54,8 +54,8 @@ const FILE_FULL = {
   createdAt: '2026-08-01T12:00:00+08:00',
   expireAt: '',
   thumbnails: [
-    { level: 'sm', width: 300, height: 200, size: 1234, contentType: 'image/jpeg', url: 'https://cdn.example.com/abc12345?level=sm' },
-    { level: 'md', width: 800, height: 533, size: 5678, contentType: 'image/jpeg', url: 'https://cdn.example.com/abc12345?level=md' },
+    { level: 'sm', width: 300, height: 200, size: 1234, contentType: 'image/jpeg', url: 'https://cdn.example.com/files/abc12345?level=sm' },
+    { level: 'md', width: 800, height: 533, size: 5678, contentType: 'image/jpeg', url: 'https://cdn.example.com/files/abc12345?level=md' },
   ],
 };
 
@@ -207,8 +207,24 @@ describe('user-space store file CRUD', () => {
     );
     const store = createUserSpaceStore();
     const result = await store.listFiles(42, { page: 1, pageSize: 10 });
-    expect(result.items[0].thumbnails).toEqual(FILE_FULL.thumbnails);
+    // Each thumbnail's metadata passes through; only `url` is rewritten
+    // by resolveFileUrl (so we check shape rather than full deep-equal).
+    expect(result.items[0].thumbnails).toHaveLength(FILE_FULL.thumbnails.length);
     expect(result.items[0].thumbnails?.[0].level).toBe('sm');
+    expect(result.items[0].thumbnails?.[0].width).toBe(300);
+    expect(result.items[0].thumbnails?.[0].height).toBe(200);
+    expect(result.items[0].thumbnails?.[0].contentType).toBe('image/jpeg');
+    expect(result.items[0].thumbnails?.[0].url).toMatch(/level=sm/);
+  });
+
+  it('listFiles routes each thumbnail url through resolveFileUrl (strip backend origin)', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(okBody({ items: [FILE_FULL], total: 1 }));
+    const store = createUserSpaceStore();
+    const result = await store.listFiles(42, { page: 1, pageSize: 10 });
+    for (const t of result.items[0].thumbnails ?? []) {
+      expect(t.url).not.toContain('cdn.example.com');
+      expect(t.url).toMatch(/level=/);
+    }
   });
 
   it('listFiles tolerates thumbnails undefined (old files / non-image)', async () => {
