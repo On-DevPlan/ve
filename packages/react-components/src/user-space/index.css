@@ -816,7 +816,7 @@
     transform: translateX(0);
   }
   /* 抽屉打开时的暗色遮罩(点击关闭) —— z-index < sidebar 但 > main */
-  .sl-us-side-backdrop {
+  .sl-us-side-backdrop.is-open {
     display: block;
     position: fixed; inset: 0;
     background: rgba(0, 0, 0, 0.4);
