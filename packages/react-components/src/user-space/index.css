@@ -36,7 +36,9 @@
 
 /* 弹窗(portal 出 root 之外)也需要同样的 reset,否则按钮 / input
    会带浏览器默认 chrome(灰底 + 凸起边框),和 root 内样式不一致。
-   同样的 carve-out:放过 .sl-us-btn,否则弹窗内按钮也会被擦掉。 */
+   同样的 carve-out:放过 .sl-us-btn,否则弹窗内按钮也会被擦掉。
+   特异性说明:.sl-us-btn 及其修饰类 (0,1,0),本选择器 (0,2,1) 但不匹配
+   .sl-us-btn,所以 .sl-us-btn 的 layout 规则能正常生效。 */
 .sl-us-modal-backdrop * { box-sizing: border-box; }
 .sl-us-modal-backdrop button:not([class*="sl-us-btn"]) { font: inherit; cursor: pointer; background: none; border: none; padding: 0; color: inherit; }
 .sl-us-modal-backdrop input, .sl-us-modal-backdrop select, .sl-us-modal-backdrop textarea { font: inherit; }
@@ -64,7 +66,9 @@
 .sl-us-root * { box-sizing: border-box; }
 /* 把 .sl-us-btn(包括 --primary / --ghost / --sm / --icon / --icon-sm /
    --danger-ghost 等修饰类)从全局 button reset 里排除,否则它们的 padding /
-   border / background 会被 .sl-us-root button 这条规则全擦掉(P1 的根因)。 */
+   border / background 会被 .sl-us-root button 这条规则全擦掉(P1 的根因)。
+   注:实际选择器特异性 (0,2,1) (class + element + :not([attr])),
+   因为不再匹配 .sl-us-btn,其 (0,1,0) 的 layout 规则可以正常生效。 */
 .sl-us-root button:not([class*="sl-us-btn"]) { font: inherit; cursor: pointer; background: none; border: none; padding: 0; color: inherit; }
 .sl-us-root input, .sl-us-root select, .sl-us-root textarea { font: inherit; }
 .sl-us-root h1, .sl-us-root h2, .sl-us-root h3, .sl-us-root h4, .sl-us-root p { margin: 0; }
