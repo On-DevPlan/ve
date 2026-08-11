@@ -41,7 +41,7 @@ function okBody(data: unknown): Response {
 
 const FILE_FULL = {
   fileId: 'abc12345deadbeef',
-  url: 'https://cdn.example.com/abc12345',
+  url: 'https://cdn.example.com/files/abc12345',
   accessLevel: 'public',
   size: 1024,
   contentType: 'image/png',
@@ -84,6 +84,9 @@ describe('user-space store file CRUD', () => {
     expect(view.fileKind).toBe('image');
     expect(view.fileId).toBe('abc12345deadbeef');
     expect(view.tags).toEqual(['prod', 'banner']);
+    // 父 url 经过 resolveFileUrl 改写为同源相对路径(后端返回的是绝对 url,
+    // 带 /files/ 前缀 → 剥成 /files/abc12345,无 mixed-content 风险)
+    expect(view.url).toBe('/files/abc12345');
   });
 
   it('uploadFile marks isPreviewable=false for non-image contentType even when public', async () => {
