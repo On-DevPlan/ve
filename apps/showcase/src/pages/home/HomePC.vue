@@ -1,451 +1,64 @@
 <script setup lang="ts">
-// HomePC.vue —— 桌面端首页布局(原始 sidebar + CardGrid 虚拟滚动)。
+// HomePC.vue —— 桌面端首页 shell(平台分流 PC 端)。
 //
-// 职责:
-//   1) 左 sidebar:品牌 + 搜索 + 分组/框架筛选 + 平台切换
-//   2) 主区:衬线标题 + 卡片网格(走 CardGrid 虚拟滚动)
-//   3) 卡片"open"事件映射到 router.push
+// 只负责两件事:
+//   1) 根据 (登录态, store.mode) 决定渲染哪个模式组件
+//   2) 用 <Transition> + <KeepAlive> 让切换有动画 + 缓存状态
 //
-// 2026-08:新增 nav 折叠。navCollapsed 状态在 260px ↔ 0 间切换,
-// 主区随之变宽,CardGrid 的 ResizeObserver 自动重算列数(响应式)。
+// 文件结构:
+//   HomePage.vue   → 平台分流(PC → HomePC, Mobile → HomeMobile)
+//   HomePC.vue     → 模式 shell(本文件,纯切换逻辑)
+//   ClassicMode.vue → 杂志式模式(sidebar + CardGrid + Mode 行)
+//   PinMode.vue    → 桌面式模式(已收藏的 tile + folder + 主题切换)
+//
+// 登录/登出边界:
+//   - 登出时若 store.mode === 'pin',shell 强制 classic(无 pin 可看)
+//   - store.mode 本身保留 → 重新登录后自动回到 pin 视图
 
-import { computed, ref } from 'vue';
-import { useRouter } from 'vue-router';
-import CardGrid from '../../components/CardGrid.vue';
-import SearchBar from '../../components/SearchBar.vue';
-import { useRegistry } from '../../composables/useRegistry';
-import { useSearch } from '../../composables/useSearch';
-import { usePlatform } from '../../composables/usePlatform';
+import { computed } from 'vue';
+import ClassicMode from './ClassicMode.vue';
+import PinMode from './PinMode.vue';
+import { useDesktopStore, type DisplayMode } from '../../composables/useDesktopStore';
 import { jwtAuth } from '@/api/http/auth-store';
-import { useLoginModalState } from '@/shared/useLoginModal';
 
-const router = useRouter();
-const registry = useRegistry();
-const { group } = useSearch();
-const { platform } = usePlatform();
-const { open: openLogin } = useLoginModalState();
-// jwtAuth.state getter 读内部 Vue ref,computed 会跟踪 → 登录态变化时重渲染
+const store = useDesktopStore();
 const jwtState = computed(() => jwtAuth.state);
 
-// nav 折叠:true = sidebar 收回(0 宽),主区占满
-const navCollapsed = ref(false);
-function toggleNav() {
-  navCollapsed.value = !navCollapsed.value;
-}
-
-const groups = computed(() => {
-  const set = new Set<string>();
-  for (const e of registry.entries.value) set.add(e.group);
-  return [...set];
-});
-const groupCounts = computed(() => {
-  const m = new Map<string, number>();
-  for (const e of registry.entries.value) m.set(e.group, (m.get(e.group) ?? 0) + 1);
-  return m;
-});
-const vueCount = computed(() => registry.entries.value.filter(e => e.framework === 'vue').length);
-const reactCount = computed(() => registry.entries.value.filter(e => e.framework === 'react').length);
-const totalCount = computed(() => registry.entries.value.length);
-const filteredCount = computed(() => group.value ? (groupCounts.value.get(group.value) ?? 0) : totalCount.value);
-
-function open(id: string) {
-  const entry = registry.get(id);
-  if (entry) router.push(entry.route.path);
-}
-function selectGroup(g: string | undefined) {
-  group.value = g;
-}
-function togglePlatform(p: 'pc' | 'mobile') {
-  platform.value = p;
-}
+const currentMode = computed<DisplayMode>(() =>
+  jwtState.value.token ? store.mode.value : 'classic',
+);
 </script>
 
 <template>
-  <div
-    class="home-pc"
-    :class="{ 'is-nav-collapsed': navCollapsed }"
+  <Transition
+    name="mode-fade"
+    mode="out-in"
   >
-    <aside class="sidebar">
-      <div class="brand">
-        wb / showcase
-        <small>Style Library — 2026</small>
-      </div>
-
-      <div class="search">
-        <SearchBar />
-      </div>
-
-      <div class="nav-group">
-        <div class="nav-title">
-          Groups
-        </div>
-        <div
-          class="nav-item"
-          :class="{ 'is-active': !group }"
-          @click="selectGroup(undefined)"
-        >
-          <span>All</span><span class="count">{{ totalCount }}</span>
-        </div>
-        <div
-          v-for="g in groups"
-          :key="g"
-          class="nav-item"
-          :class="{ 'is-active': group === g }"
-          @click="selectGroup(g)"
-        >
-          <span>{{ g }}</span><span class="count">{{ groupCounts.get(g) ?? 0 }}</span>
-        </div>
-      </div>
-
-      <div class="nav-group">
-        <div class="nav-title">
-          Framework
-        </div>
-        <div class="nav-item">
-          <span>Vue</span><span class="count">{{ vueCount }}</span>
-        </div>
-        <div class="nav-item">
-          <span>React</span><span class="count">{{ reactCount }}</span>
-        </div>
-      </div>
-
-      <div class="nav-group">
-        <div class="nav-title">
-          Platform
-        </div>
-        <div
-          class="nav-item"
-          :class="{ 'is-active': platform === 'pc' }"
-          @click="togglePlatform('pc')"
-        >
-          <span>PC</span>
-        </div>
-        <div
-          class="nav-item"
-          :class="{ 'is-active': platform === 'mobile' }"
-          @click="togglePlatform('mobile')"
-        >
-          <span>Mobile</span>
-        </div>
-      </div>
-
-      <div class="sidebar__foot">
-        v0.1 · main · <span :class="'platform--' + platform">{{ platform }}</span>
-      </div>
-    </aside>
-
-    <section class="main">
-      <header class="page-head">
-        <div class="page-head__title">
-          <button
-            class="nav-toggle"
-            type="button"
-            :aria-label="navCollapsed ? '展开导航' : '收回导航'"
-            :title="navCollapsed ? '展开导航' : '收回导航'"
-            @click="toggleNav"
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.8"
-              stroke-linecap="round"
-            >
-              <path d="M3 6h18M3 12h18M3 18h18" />
-            </svg>
-          </button>
-          <h1>组件<em>展示</em></h1>
-        </div>
-        <div class="page-head__meta">
-          <div class="crumb">
-            Home · {{ group ?? 'All' }} · {{ filteredCount }}
-            <span :class="'crumb__platform crumb__platform--' + platform">{{ platform }}</span>
-          </div>
-          <div class="crumb-auth">
-            <template v-if="jwtState.token">
-              <span
-                class="crumb-user"
-                :title="jwtState.jwtUser?.email ?? ''"
-              >{{ jwtState.jwtUser?.email }}</span>
-              <button
-                class="crumb-login crumb-login--ghost"
-                @click="jwtAuth.logout()"
-              >
-                退出
-              </button>
-            </template>
-            <button
-              v-else
-              class="crumb-login"
-              @click="openLogin"
-            >
-              登录
-            </button>
-          </div>
-        </div>
-      </header>
-      <CardGrid @open="open" />
-    </section>
-  </div>
+    <KeepAlive>
+      <component
+        :is="currentMode === 'pin' ? PinMode : ClassicMode"
+        :key="currentMode"
+      />
+    </KeepAlive>
+  </Transition>
 </template>
 
-<style scoped>
-/* === 字体分工 ===
-     display : Cormorant Garamond → Songti SC(衬线)
-     body    : Inter Tight → PingFang SC(无衬线)
-     mono    : JetBrains Mono(等宽) */
-
-.home-pc {
-  --paper:       rgba(255, 255, 255, 0.65);
-  --ink:         #111;
-  --ink-soft:    #555;
-  --ink-mute:    #999;
-  --line:        #e8e8e8;
-
-  display: grid;
-  grid-template-columns: 260px 1fr;
-  min-height: 100vh;
-  background: #ffffff;
-  color: var(--ink);
-  font-family: "Inter Tight", "PingFang SC", "Helvetica Neue", sans-serif;
-  -webkit-font-smoothing: antialiased;
-  transition: grid-template-columns .3s ease;
+<!--
+  过渡样式必须用 <style>(非 scoped),否则不进 <head>,Vue Transition 失效。
+-->
+<style>
+.mode-fade-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
 }
-
-/* nav 折叠:sidebar 收成 0,主区占满;CardGrid ResizeObserver 自动重算列数 */
-.home-pc.is-nav-collapsed {
-  grid-template-columns: 0 1fr;
+.mode-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
 }
-
-/* === 左侧栏 === */
-.sidebar {
-  position: sticky; top: 0; align-self: start;
-  height: 100vh;
-  background: var(--paper);
-  backdrop-filter: blur(22px) saturate(160%);
-  -webkit-backdrop-filter: blur(22px) saturate(160%);
-  border-right: 1px solid var(--line);
-  padding: 40px 28px;
-  display: flex; flex-direction: column; gap: 28px;
-  overflow: hidden;
-  transition: padding .3s ease, border-width .3s ease;
-}
-/* 折叠时 sidebar 内容整体隐藏(宽度已由 grid 收为 0,这里保证不溢出) */
-.home-pc.is-nav-collapsed .sidebar {
-  padding-left: 0; padding-right: 0;
-  border-right-width: 0;
-}
-.brand {
-  font-family: "Cormorant Garamond", "Songti SC", serif;
-  font-size: 30px; font-weight: 500; letter-spacing: -0.01em;
-  border-bottom: 1px solid var(--ink); padding-bottom: 10px;
-}
-.brand small {
-  display: block; font-family: "JetBrains Mono", monospace;
-  font-size: 10px; letter-spacing: 0.22em; color: var(--ink-mute); margin-top: 4px;
-}
-.search { position: relative; padding: 12px 0; border-bottom: 1px solid var(--line); }
-.search :deep(.search) {
-  width: 100%; padding: 0; border: none; border-radius: 0;
-  background: transparent; font-family: inherit; font-size: 14px; outline: none;
-}
-.search :deep(.search:focus) { outline: none; }
-
-.nav-group { display: flex; flex-direction: column; gap: 4px; }
-.nav-title {
-  font-family: "JetBrains Mono", monospace; font-size: 10px;
-  letter-spacing: 0.22em; text-transform: uppercase; color: var(--ink-mute); margin-bottom: 8px;
-}
-.nav-item {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 8px 10px; margin: 0 -10px; font-size: 14px; color: var(--ink-soft);
-  cursor: pointer; border-radius: 1px;
-}
-.nav-item:hover { background: rgba(255, 255, 255, 0.6); color: var(--ink); }
-.nav-item.is-active { background: var(--ink); color: #fff; }
-.nav-item .count {
-  font-family: "JetBrains Mono", monospace; font-size: 10px; color: inherit; opacity: 0.55;
-}
-.sidebar__foot {
-  margin-top: auto; font-family: "JetBrains Mono", monospace;
-  font-size: 10px; letter-spacing: 0.2em; color: var(--ink-mute);
-}
-.sidebar__foot .platform--pc { color: #2563eb; }
-.sidebar__foot .platform--mobile { color: #7c3aed; }
-
-/* 鉴权态 chip:与 sidebar__foot 分两行,样式紧凑 */
-.auth-chip {
-  display: flex; align-items: center; gap: 6px;
-  font-family: "JetBrains Mono", monospace;
-  font-size: 11px; color: var(--ink-mute);
-  padding: 6px 0;
-  border-top: 1px dashed var(--line);
-}
-.auth-chip__dot {
-  width: 6px; height: 6px; border-radius: 50%;
-  background: var(--ink-mute); display: inline-block;
-}
-.auth-chip__dot--mute { background: #d4d4d8; }
-.auth-chip__dot--err { background: #ef4444; }
-.auth-chip--authenticated .auth-chip__dot { background: #22c55e; }
-.auth-chip--restoring .auth-chip__dot { background: #f59e0b; animation: pulse 1.4s ease-in-out infinite; }
-.auth-chip__avatar {
-  width: 18px; height: 18px; border-radius: 50%; object-fit: cover;
-  border: 1px solid var(--line);
-}
-.auth-chip__name { color: var(--ink); }
-.auth-chip__btn {
-  margin-left: auto;
-  background: transparent; border: 1px solid var(--line); border-radius: 2px;
-  padding: 2px 8px; font-family: inherit; font-size: 10px; color: var(--ink-soft);
-  cursor: pointer;
-}
-.auth-chip__btn:hover { background: var(--ink); color: #fff; border-color: var(--ink); }
-.auth-chip a { color: var(--ink); text-decoration: underline; }
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
-}
-
-/* === 主体 === */
-.main { padding: 5px 72px 96px; transition: padding .3s ease; }
-/* 折叠后主区变宽,收缩侧留白让卡片网格用满 */
-.home-pc.is-nav-collapsed .main { padding-left: 40px; padding-right: 40px; }
-.page-head {
-  display: flex; align-items: center; justify-content: space-between;
-  padding-bottom: 18px; border-bottom: 1px solid var(--line); margin-bottom: 40px;
-}
-.page-head__title {
-  display: flex; align-items: center; gap: 14px;
-}
-/* 主区汉堡 —— 始终可见,展开/收起 nav */
-.nav-toggle {
-  flex-shrink: 0;
-  width: 32px; height: 32px;
-  display: flex; align-items: center; justify-content: center;
-  background: none; border: 1px solid var(--line); border-radius: 2px;
-  color: var(--ink-soft); cursor: pointer;
-  transition: color .15s, border-color .15s, background .15s;
-}
-.nav-toggle:hover { color: var(--ink); border-color: var(--ink); background: rgba(255,255,255,.5); }
-.page-head h1 {
-  font-family: "Cormorant Garamond", "Songti SC", serif; font-size: 42px; font-weight: 500;
-}
-.page-head h1 em { font-style: italic; color: var(--ink-soft); }
-.page-head .crumb {
-  font-family: "JetBrains Mono", monospace; font-size: 11px; letter-spacing: 0.18em;
-  color: var(--ink-mute); text-transform: uppercase; display: flex; align-items: center; gap: 8px;
-}
-.crumb__platform { font-size: 9px; padding: 2px 6px; border-radius: 2px; letter-spacing: 0.12em; }
-.crumb__platform--pc { background: #2563eb; color: #fff; }
-.crumb__platform--mobile { background: #7c3aed; color: #fff; }
-.page-head__meta { display: flex; align-items: center; gap: 16px; }
-.crumb-auth {
-  display: flex; align-items: center; gap: 8px;
-  font-family: "JetBrains Mono", monospace; font-size: 11px;
-}
-.crumb-user {
-  color: var(--ink-mute); max-width: 160px; overflow: hidden;
-  text-overflow: ellipsis; white-space: nowrap;
-}
-.crumb-login {
-  font-family: "JetBrains Mono", monospace; font-size: 11px;
-  letter-spacing: 0.12em; text-transform: uppercase;
-  padding: 4px 12px; border: 1px solid var(--line); border-radius: 2px;
-  background: transparent; color: var(--ink-soft); cursor: pointer;
-  transition: border-color .15s, color .15s;
-}
-.crumb-login:hover { border-color: var(--ink); color: var(--ink); }
-.crumb-login--ghost { border-color: transparent; padding-left: 0; padding-right: 0; }
-
-.main :deep(.card-grid__viewport) { min-height: 0; }
-/* 不覆盖列数 —— CardGrid 虚拟滚动用 ResizeObserver 量容器宽,内联注入
-   repeat(N, 280px)。这里只加间距,列数交给子组件自适应。 */
-.main :deep(.card-grid) {
-  padding-top: 24px;
-}
-.main :deep(.card) {
-  background: var(--paper);
-  backdrop-filter: blur(16px) saturate(140%);
-  -webkit-backdrop-filter: blur(16px) saturate(140%);
-  border: 1px solid var(--line); border-radius: 0;
-  padding: 28px; display: flex; flex-direction: column; gap: 18px;
-  height: auto; min-height: 280px; cursor: pointer;
-  transition: transform 0.25s, border-color 0.25s, box-shadow 0.25s;
-}
-.main :deep(.card:hover),
-.main :deep(.card:focus) {
-  transform: translateY(-2px);
-  border-color: var(--ink);
-  box-shadow: 0 18px 40px -28px rgba(0, 0, 0, 0.18);
-  outline: none;
-}
-.main :deep(.card__header) {
-  display: flex; justify-content: space-between;
-  font-family: "JetBrains Mono", monospace; font-size: 10px;
-  letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-mute); margin: 0;
-}
-.main :deep(.card__title) {
-  font-family: "Cormorant Garamond", "Songti SC", serif;
-  font-size: 24px; font-weight: 500; color: var(--ink); margin: 0;
-}
-.main :deep(.card__framework) {
-  font-family: "JetBrains Mono", monospace; font-size: 10px;
-  letter-spacing: 0.18em; text-transform: uppercase;
-  color: var(--ink-mute); background: transparent; padding: 0; border-radius: 0;
-}
-.main :deep(.card__desc) {
-  font-size: 13px; color: var(--ink-soft); line-height: 1.55; margin: 0;
-  flex: 1; min-height: 0;
-  display: block; -webkit-line-clamp: unset; line-clamp: unset;
-  -webkit-box-orient: unset; overflow: visible;
-}
-.main :deep(.card__meta) {
-  display: flex; justify-content: space-between; padding-top: 14px;
-  border-top: 1px dashed var(--line);
-  font-family: "JetBrains Mono", monospace; font-size: 10px;
-  letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-mute);
-}
-.main :deep(.tag) {
-  padding: 0; border-radius: 0; background: transparent;
-  font-family: "JetBrains Mono", monospace; font-size: 10px;
-  letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-mute);
-}
-.main :deep(.card__version) {
-  color: var(--ink-mute);
-  font-family: "JetBrains Mono", monospace; font-size: 10px;
-  letter-spacing: 0.16em; text-transform: uppercase;
-}
-.main :deep(.card-grid__empty) {
-  padding: 32px; color: var(--ink-mute); text-align: center;
-  font-family: "Inter Tight", "PingFang SC", sans-serif;
-}
-
-/* === 响应式 === */
-/* 中等宽度(1024 以下):主区左右留白减半,多给卡片网格空间 */
-@media (max-width: 1024px) {
-  .main { padding-left: 32px; padding-right: 32px; }
-}
-
-/* 窄屏(760 以下):nav 默认收回,侧栏以覆盖层出现;主区占满 */
-@media (max-width: 760px) {
-  .home-pc { grid-template-columns: 1fr; }
-  .home-pc.is-nav-collapsed { grid-template-columns: 1fr; }
-  .sidebar {
-    position: fixed; left: 0; top: 0; bottom: 0; z-index: 40;
-    width: 240px;
-    transform: translateX(0);
-    transition: transform .3s ease;
-    padding: 32px 24px;
-  }
-  .home-pc.is-nav-collapsed .sidebar {
-    transform: translateX(-100%);
-    padding-left: 24px; padding-right: 24px;
-    border-right-width: 1px;
-  }
-  .main { padding-left: 20px; padding-right: 20px; }
-  .home-pc.is-nav-collapsed .main { padding-left: 20px; padding-right: 20px; }
+.mode-fade-enter-active,
+.mode-fade-leave-active {
+  transition:
+    opacity 220ms ease,
+    transform 220ms cubic-bezier(0.2, 1.2, 0.4, 1);
 }
 </style>
