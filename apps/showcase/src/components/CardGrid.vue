@@ -28,9 +28,16 @@ import {
   OVERSCAN_ROWS,
 } from './virtual-grid';
 
-const emit = defineEmits<{ open: [id: string] }>();
+const emit = defineEmits<{ open: [id: string]; 'toggle-pin': [id: string] }>();
 // 解构出顶层 computed —— results 是当前过滤后的全部条目
 const { results } = useSearch();
+
+// 父级传:是否渲染 ★ 按钮 + 当前 entry 是否已 pin(回调,由父级查 store)
+// CardGrid 不直接 import useDesktopStore —— 它是通用组件,不该耦合桌面存储
+defineProps<{
+  showPin?: boolean;
+  isPinned?: (id: string) => boolean;
+}>();
 
 // viewport DOM 引用 —— 用于测量与读取 scrollTop
 const viewport = ref<HTMLElement | null>(null);
@@ -123,7 +130,10 @@ onBeforeUnmount(() => {
           v-for="entry in visible"
           :key="entry.id"
           :entry="entry"
+          :show-pin="showPin"
+          :pinned="isPinned ? isPinned(entry.id) : false"
           @open="(id) => emit('open', id)"
+          @toggle-pin="(id) => emit('toggle-pin', id)"
         />
       </div>
     </div>

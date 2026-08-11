@@ -593,7 +593,7 @@ export default function UserSpace() {
     <div className="sl-us-root">
       {/* drawer backdrop —— 仅 mobile 显(mobile @media 才 display: block),桌面 no-op */}
       <div
-        className="sl-us-side-backdrop"
+        className={sidebarOpen ? 'sl-us-side-backdrop is-open' : 'sl-us-side-backdrop'}
         onClick={() => setSidebarOpen(false)}
         aria-hidden="true"
       />

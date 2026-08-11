@@ -9,10 +9,12 @@
 // accessLevel 行内 select:onChange → onAccessLevelChange(item, value);
 // 复制按钮永远显示给 canWrite(reader 看不到);删除按钮仅 owner/admin 显示。
 
-import { useMemo } from 'react';
-import type { FileAccessLevel, FileListResult, FileView, GroupSummary } from '@api/components/user-space';
+import { useMemo, useState } from 'react';
+import type { FileAccessLevel, FileListResult, FileThumbnail, FileView, GroupSummary } from '@api/components/user-space';
 import { hasMinRole } from '@api/components/user-space';
 import { ApiError } from '@api/services/base';
+
+import ImageViewerModal from './ImageViewerModal';
 
 export interface FilesProps {
   group: GroupSummary;
@@ -92,10 +94,41 @@ function fileErrorMessage(
   }
 }
 
+/** 缩略图单元格:默认显示 sm 档缩略图(后端 thumbnails 里 level==='sm' 的 URL);
+ *  sm 缺失则退到原图 url。点击不就地切换,而是通知父级打开看图 modal。 */
+interface ThumbImgProps {
+  url: string;             // 原图(兜底 / 高清源)
+  thumbnails?: FileThumbnail[];
+  alt: string;
+  /** 点击缩略图 → 打开看图 modal(父级管 state)。 */
+  onPreview: () => void;
+}
+
+function ThumbImg({ url, thumbnails, alt, onPreview }: ThumbImgProps) {
+  const sm = thumbnails?.find((t) => t.level === 'sm');
+  // 默认显示 sm 缩略图;sm 缺失则退到原图
+  const src = sm?.url ?? url;
+  return (
+    <img
+      className="sl-us-file-thumb"
+      src={src}
+      data-src={src}
+      data-full={url}
+      alt={alt}
+      loading="lazy"
+      onClick={onPreview}
+      title="点击放大"
+    />
+  );
+}
+
 export default function Files(props: FilesProps) {
   const { group, files, loading, error, errorAction, saving, page, pageSize, selectedTag, onPageChange, onTagChange, onUpload, onAccessLevelChange, onDuplicate, onDelete, onReload } = props;
   const canWrite = hasMinRole(group.myRole, 'writer');
   const canDelete = hasMinRole(group.myRole, 'admin');
+
+  // 当前放大预览的文件(null = 关闭)。
+  const [previewFile, setPreviewFile] = useState<FileView | null>(null);
 
   // tag facet 后端未提供,从列表内 items 收集 + 去重 + 排序(频次降序,名称升序)。
   const tags = useMemo(() => {
@@ -173,11 +206,11 @@ export default function Files(props: FilesProps) {
                 <tr key={item.fileId}>
                   <td>
                     {item.isPreviewable ? (
-                      <img
-                        className="sl-us-file-thumb"
-                        src={item.url}
+                      <ThumbImg
+                        url={item.url}
+                        thumbnails={item.thumbnails}
                         alt={item.displayName}
-                        loading="lazy"
+                        onPreview={() => setPreviewFile(item)}
                       />
                     ) : (
                       <span className="sl-us-file-icon" aria-hidden="true">
@@ -265,6 +298,8 @@ export default function Files(props: FilesProps) {
           )}
         </div>
       )}
+
+      <ImageViewerModal file={previewFile} onClose={() => setPreviewFile(null)} />
     </div>
   );
 }

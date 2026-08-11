@@ -36,6 +36,7 @@ export type {
   FileUploadArgs,
   FileDuplicateArgs,
   FileDuplicateResponse,
+  FileThumbnail,
 } from './types';
 
 export class FileV1Service extends HttpService {

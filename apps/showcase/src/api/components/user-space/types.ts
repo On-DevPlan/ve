@@ -10,12 +10,12 @@
 import type { GroupRole } from '../../services/groupV1/types';
 import type { DefaultGroupInfo } from '../../services/userV1/types';
 import type { KvDuplicateArgs, KvDuplicateResponse, KvTagCount } from '../../services/kvV1/types';
-import type { FileAccessLevel, FileDuplicateArgs, FileDuplicateResponse } from '../../services/fileV1/types';
+import type { FileAccessLevel, FileDuplicateArgs, FileDuplicateResponse, FileThumbnail } from '../../services/fileV1/types';
 
 export type { GroupRole };
 export type { DefaultGroupInfo };
 export type { KvDuplicateArgs, KvDuplicateResponse, KvTagCount };
-export type { FileAccessLevel, FileDuplicateArgs, FileDuplicateResponse };
+export type { FileAccessLevel, FileDuplicateArgs, FileDuplicateResponse, FileThumbnail };
 
 export interface GroupSummary {
   id: number;
@@ -74,7 +74,9 @@ export interface KvListResult {
  *  displayName:后端未补 originalName,前端临时用 fileId 前 8 hex 作展示名;
  *              调用方应将 displayName 用于 UI 唯一识别 + confirm 提示。
  *  isPreviewable:public + image MIME 才能在表格里出缩略图;其余类型只出图标。
- *  fileKind:image/text/other —— UI 按此决定缩略图 / 类型图标 / 文案。 */
+ *  fileKind:image/text/other —— UI 按此决定缩略图 / 类型图标 / 文案。
+ *  thumbnails:后端 2026-08-10 起返回的缩略图档位元数据;老文件 / 非图片 / md5
+ *             dedup 命中 → undefined。UI 可据此选择 sm/md/lg 渲染。 */
 export interface FileView {
   fileId: string;
   url: string;
@@ -92,6 +94,7 @@ export interface FileView {
   expireAt: string;
   isPreviewable: boolean;
   fileKind: 'image' | 'text' | 'other';
+  thumbnails?: FileThumbnail[];
 }
 
 export interface FileListResult {

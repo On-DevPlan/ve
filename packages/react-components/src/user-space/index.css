@@ -35,9 +35,12 @@
 }
 
 /* 弹窗(portal 出 root 之外)也需要同样的 reset,否则按钮 / input
-   会带浏览器默认 chrome(灰底 + 凸起边框),和 root 内样式不一致。 */
+   会带浏览器默认 chrome(灰底 + 凸起边框),和 root 内样式不一致。
+   同样的 carve-out:放过 .sl-us-btn,否则弹窗内按钮也会被擦掉。
+   特异性说明:.sl-us-btn 及其修饰类 (0,1,0),本选择器 (0,2,1) 但不匹配
+   .sl-us-btn,所以 .sl-us-btn 的 layout 规则能正常生效。 */
 .sl-us-modal-backdrop * { box-sizing: border-box; }
-.sl-us-modal-backdrop button { font: inherit; cursor: pointer; background: none; border: none; padding: 0; color: inherit; }
+.sl-us-modal-backdrop button:not([class*="sl-us-btn"]) { font: inherit; cursor: pointer; background: none; border: none; padding: 0; color: inherit; }
 .sl-us-modal-backdrop input, .sl-us-modal-backdrop select, .sl-us-modal-backdrop textarea { font: inherit; }
 .sl-us-modal-backdrop h1, .sl-us-modal-backdrop h2, .sl-us-modal-backdrop h3, .sl-us-modal-backdrop h4, .sl-us-modal-backdrop p { margin: 0; }
 
@@ -61,9 +64,53 @@
   overflow: hidden;
 }
 .sl-us-root * { box-sizing: border-box; }
-.sl-us-root button { font: inherit; cursor: pointer; background: none; border: none; padding: 0; color: inherit; }
+/* 把 .sl-us-btn(包括 --primary / --ghost / --sm / --icon / --icon-sm /
+   --danger-ghost 等修饰类)从全局 button reset 里排除,否则它们的 padding /
+   border / background 会被 .sl-us-root button 这条规则全擦掉(P1 的根因)。
+   注:实际选择器特异性 (0,2,1) (class + element + :not([attr])),
+   因为不再匹配 .sl-us-btn,其 (0,1,0) 的 layout 规则可以正常生效。 */
+.sl-us-root button:not([class*="sl-us-btn"]) { font: inherit; cursor: pointer; background: none; border: none; padding: 0; color: inherit; }
 .sl-us-root input, .sl-us-root select, .sl-us-root textarea { font: inherit; }
 .sl-us-root h1, .sl-us-root h2, .sl-us-root h3, .sl-us-root h4, .sl-us-root p { margin: 0; }
+
+/* ── unauthenticated gate ────────────────────────
+   Showed naked text before these rules existed: padded / bordered card with
+   title (larger) + description (muted), centered in the main pane.
+   注:index.tsx 里 .sl-us-gate 和 .sl-us-root 是同一个 div,这里的
+   display: flex 同优先级下靠源码顺序覆盖 .sl-us-root 的 display: grid,
+   别把这块挪到 sidebar 之前,会破坏网格布局。 */
+.sl-us-gate {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 320px;
+  padding: 40px 20px;
+}
+.sl-us-gate__card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 28px 32px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 6px);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  max-width: 360px;
+  text-align: center;
+}
+.sl-us-gate__title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--fg);
+  margin: 0;
+}
+.sl-us-gate__desc {
+  /* font-size 继承 .sl-us-root 的 13px,这里不重复声明 */
+  color: var(--fg-2);
+  line-height: 1.6;
+  margin: 0;
+}
 
 /* ── sidebar ───────────────────────────────────── */
 .sl-us-side {
@@ -619,6 +666,26 @@
   padding: 10px 16px;
   border-top: 1px solid var(--border);
 }
+/* 看图 modal:大图自适应 + 底部下载区 */
+.sl-us-image-viewer__body {
+  align-items: center;
+  padding: 12px;
+}
+.sl-us-image-viewer__img {
+  max-width: 100%;
+  max-height: 62vh;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+}
+.sl-us-image-viewer__foot {
+  justify-content: flex-start;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.sl-us-image-viewer__foot a {
+  text-decoration: none;
+}
 .sl-us-field { display: flex; flex-direction: column; gap: 4px; }
 .sl-us-field__label { font-size: 11px; font-weight: 500; color: var(--fg-2); }
 .sl-us-field__hint { font-size: 11px; color: var(--fg-3); }
@@ -653,7 +720,8 @@
 .sl-us-versions__row .sl-us-input--compact { flex: 1 1 auto; min-width: 180px; }
 
 /* ── 文件 tab 样式 ─────────────────────────────── */
-/* 缩略图:48×48,object-fit:cover 吃任意比例;低彩边框 + 圆角微芯片感。 */
+/* 缩略图:48×48,object-fit:cover 吃任意比例;低彩边框 + 圆角微芯片感。
+   cursor:zoom-in 提示可点;点击由 Files.tsx 打开看图 modal。 */
 .sl-us-file-thumb {
   width: 48px; height: 48px;
   object-fit: cover;
@@ -661,6 +729,7 @@
   border: 1px solid var(--border);
   background: var(--bg);
   display: block;
+  cursor: zoom-in;
 }
 /* 非预览文件的图标占位:同样 48×48,emoji 居中 + 边框 + 圆角。 */
 .sl-us-file-icon {
@@ -764,7 +833,7 @@
     transform: translateX(0);
   }
   /* 抽屉打开时的暗色遮罩(点击关闭) —— z-index < sidebar 但 > main */
-  .sl-us-side-backdrop {
+  .sl-us-side-backdrop.is-open {
     display: block;
     position: fixed; inset: 0;
     background: rgba(0, 0, 0, 0.4);

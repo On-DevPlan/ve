@@ -7,6 +7,18 @@
 
 export type FileAccessLevel = 'public' | 'private' | 'protected';
 
+/** dev_ctr_hello 后端 2026-08-10 起的缩略图档位元数据。
+ *  见 dev_ctr_hello user-file-invitecode [[client-api]] §3.1。 */
+export interface FileThumbnail {
+  level: 'sm' | 'md' | 'lg';
+  width: number;
+  height: number;
+  size: number;
+  contentType: string;
+  /** 已拼好的绝对 URL;前端 <img src> 直接用;`?level=<level>` 复用父文件路由。 */
+  url: string;
+}
+
 /** GET /files?groupId=...&tags=... 接口的单条文件元数据。 */
 export interface FileInfo {
   fileId: string;
@@ -26,6 +38,9 @@ export interface FileInfo {
   md5: string;
   sha256: string;
   createdAt: string;
+  /** 后端 2026-08-10 起返回的缩略图档位列表。
+   *  老文件 / 非图片 / md5 dedup 命中 → undefined。 */
+  thumbnails?: FileThumbnail[];
 }
 
 export interface FileListResponse {

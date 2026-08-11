@@ -41,7 +41,7 @@ function okBody(data: unknown): Response {
 
 const FILE_FULL = {
   fileId: 'abc12345deadbeef',
-  url: 'https://cdn.example.com/abc12345',
+  url: 'https://cdn.example.com/files/abc12345',
   accessLevel: 'public',
   size: 1024,
   contentType: 'image/png',
@@ -53,6 +53,10 @@ const FILE_FULL = {
   sha256: 'sha256hex',
   createdAt: '2026-08-01T12:00:00+08:00',
   expireAt: '',
+  thumbnails: [
+    { level: 'sm', width: 300, height: 200, size: 1234, contentType: 'image/jpeg', url: 'https://cdn.example.com/files/abc12345?level=sm' },
+    { level: 'md', width: 800, height: 533, size: 5678, contentType: 'image/jpeg', url: 'https://cdn.example.com/files/abc12345?level=md' },
+  ],
 };
 
 describe('user-space store file CRUD', () => {
@@ -80,6 +84,9 @@ describe('user-space store file CRUD', () => {
     expect(view.fileKind).toBe('image');
     expect(view.fileId).toBe('abc12345deadbeef');
     expect(view.tags).toEqual(['prod', 'banner']);
+    // 父 url 经过 resolveFileUrl 改写为同源相对路径(后端返回的是绝对 url,
+    // 带 /files/ 前缀 → 剥成 /files/abc12345,无 mixed-content 风险)
+    expect(view.url).toBe('/files/abc12345');
   });
 
   it('uploadFile marks isPreviewable=false for non-image contentType even when public', async () => {
@@ -195,5 +202,42 @@ describe('user-space store file CRUD', () => {
     const store = createUserSpaceStore();
 
     await expect(store.deleteFile(42, 'abc12345')).rejects.toMatchObject({ code: 31 });
+  });
+
+  it('listFiles preserves thumbnails in FileView', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      okBody({ items: [FILE_FULL], total: 1 }),
+    );
+    const store = createUserSpaceStore();
+    const result = await store.listFiles(42, { page: 1, pageSize: 10 });
+    // Each thumbnail's metadata passes through; only `url` is rewritten
+    // by resolveFileUrl (so we check shape rather than full deep-equal).
+    expect(result.items[0].thumbnails).toHaveLength(FILE_FULL.thumbnails.length);
+    expect(result.items[0].thumbnails?.[0].level).toBe('sm');
+    expect(result.items[0].thumbnails?.[0].width).toBe(300);
+    expect(result.items[0].thumbnails?.[0].height).toBe(200);
+    expect(result.items[0].thumbnails?.[0].contentType).toBe('image/jpeg');
+    expect(result.items[0].thumbnails?.[0].url).toMatch(/level=sm/);
+  });
+
+  it('listFiles routes each thumbnail url through resolveFileUrl (strip backend origin)', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(okBody({ items: [FILE_FULL], total: 1 }));
+    const store = createUserSpaceStore();
+    const result = await store.listFiles(42, { page: 1, pageSize: 10 });
+    for (const t of result.items[0].thumbnails ?? []) {
+      expect(t.url).not.toContain('cdn.example.com');
+      expect(t.url).toMatch(/level=/);
+    }
+  });
+
+  it('listFiles tolerates thumbnails undefined (old files / non-image)', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { thumbnails: _omit, ...noThumbs } = FILE_FULL;
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      okBody({ items: [noThumbs], total: 1 }),
+    );
+    const store = createUserSpaceStore();
+    const result = await store.listFiles(42, { page: 1, pageSize: 10 });
+    expect(result.items[0].thumbnails).toBeUndefined();
   });
 });

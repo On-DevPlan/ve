@@ -26,8 +26,11 @@ import {
 } from '@style-library/mount-adapters';
 import { collectCss, cssMaps } from '../registry/css-maps';
 import { defaultTokens } from '../theme/tokens';
-import { createLoadingSkeleton, type LoadingSkeletonHandle } from '../shared/LoadingSkeleton/skeleton';
-import '../shared/LoadingSkeleton/skeleton.css';
+import { createLoadingSkeleton } from '../shared/LoadingSkeleton/skeleton';
+// Vite `?raw` 把 CSS 当字符串打包,运行时由 injectCss() adopt 进 ShadowRoot。
+// 不能再走全局 import '...skeleton.css' —— Shadow DOM 样式隔离会把全局规则挡在外面,
+// 骨架元素无样式生效(只剩默认浏览器样式的"加载中…"裸文字)。
+import skeletonCssRaw from '../shared/LoadingSkeleton/skeleton.css?raw';
 
 const route = useRoute();
 const registry = useRegistry();
@@ -99,25 +102,39 @@ async function mount(componentId: string) {
   const session = new MountSession(componentId, containerEl, defaultTokens);
   currentSession = session;
 
-  // 首次会话显骨架(spec §首屏体验);后续路由跳变不显。
-  // 标记写 sessionStorage 不挂在 try/catch 内 —— 即使 mount 之后抛错,visited
-  // 仍生效,刷新/二次进入同一会话不重复闪一次骨架。
-  const SKELETON_VISITED_KEY = 'sl-skel:visited';
-  const isFirstVisit = !sessionStorage.getItem(SKELETON_VISITED_KEY);
-  sessionStorage.setItem(SKELETON_VISITED_KEY, '1');
+  // 把骨架样式 adopt 进 ShadowRoot(必须早于骨架出现)。
+  // 注意:这次 injectCss 会顺带把 cssReady resolve 掉 —— 这是可接受的,因为:
+  //   - injectCss 是同步调用,在 await loader() 之前完成
+  //   - 后续的 injectCss(cssTexts) 仍会通过 adoptCssTexts 把组件样式塞进
+  //     shadowRoot(只是 cssReady 不再 settle,被首次 settle 短路)
+  //   - adapter.mount 仍在 injectCss(cssTexts) 之后才 await cssReady,
+  //     组件 CSS 仍在组件 DOM 之前落地(spec §8 时序不变)
+  // 150ms 防抖兜底:即便 injectCss 失败(几乎不可能,纯本地 CSS),骨架
+  // 也只在 150ms 后才显形,留出补救窗口。
+  session.host.injectCss([skeletonCssRaw]);
 
-  const skel: LoadingSkeletonHandle | null = isFirstVisit
-    ? createLoadingSkeleton(session.host.portalTarget, {
-        themeTokens: {
-          '--sl-color-border':
-            getComputedStyle(document.documentElement)
-              .getPropertyValue('--sl-color-border')
-              .trim() || '#d1d5db',
-          '--sl-radius-md': '6px',
-        },
-      })
-    : null;
-  if (skel) await skel.appear();
+  // 骨架屏:每次都创建,但 150ms 防抖后才显。
+  //   - 快加载(<150ms,常见于已缓存或本地包):debounce 计时器被 clearTimeout
+  //     取消并立即 destroy(),用户看不到骨架,避免"一帧闪烁"
+  //   - 慢加载(≥150ms):appear() 触发 opacity 0→1,受 MIN_VISIBLE_MS=500 保护,
+  //     至少展示 500ms;组件 ready 后再 fadeOut(600ms)
+  // 路由级淡入淡出由 App.vue 的 page-fade transition 负责,这里只管 mount 期间的内容占位。
+  const SKELETON_DEBOUNCE_MS = 150;
+  const earlySkel = createLoadingSkeleton(session.host.portalTarget, {
+    themeTokens: {
+      '--sl-color-border':
+        getComputedStyle(document.documentElement)
+          .getPropertyValue('--sl-color-border')
+          .trim() || '#d1d5db',
+      '--sl-radius-md': '6px',
+    },
+  });
+  let showSkel = false;
+  let appearPromise: Promise<void> | null = null;
+  const debounceTimer = setTimeout(() => {
+    showSkel = true;
+    appearPromise = earlySkel.appear();
+  }, SKELETON_DEBOUNCE_MS);
 
   try {
     const loader = loaders[entry.loaderKey];
@@ -165,12 +182,19 @@ async function mount(componentId: string) {
     error.value = err instanceof Error ? err.message : String(err);
     session.cleanup();
     currentSession = null;
-  }
-
-  // 组件 mount 后启动骨架 fade(并行,不 await,组件 ready 后 < 350ms 骨架消失)。
-  // 放在 try/catch 之后:mount 失败 → 没有 fade,让 session.cleanup 把整个 portal 拆掉。
-  if (skel) {
-    void skel.fadeOut(() => skel.destroy());
+  } finally {
+    // 骨架清理(无论 mount 成功/失败/被顶替都要执行,finally 兜住所有早退路径):
+    //   - 慢路径(showSkel=true):等 appear 完成(opacity 已到 1)再 fadeOut,
+    //     避免在 opacity 上升途中突然切到 fadeOut 造成闪烁
+    //   - 快路径(showSkel=false):mount 在 150ms 内完成,骨架从未显形,
+    //     直接 destroy() 即可(earlySkel 还在 opacity:0)
+    clearTimeout(debounceTimer);
+    if (showSkel) {
+      if (appearPromise) await appearPromise.catch(() => undefined);
+      void earlySkel.fadeOut(() => earlySkel.destroy());
+    } else {
+      earlySkel.destroy();
+    }
   }
 }
 
