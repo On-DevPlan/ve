@@ -32,8 +32,19 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+      # 上传 showcase build 产物给 test job —— 每个 job 是独立 runner,
+      # `needs: build` 仅控制执行顺序,不共享文件系统,必须走 artifact。
+      - uses: actions/upload-artifact@v4
+        with:
+          name: showcase-dist
+          path: apps/showcase/dist
+          if-no-files-found: error
+          retention-days: 1
 
   test:
+    # 依赖 build 先跑完 —— e2e-perf.test.ts 需要 dist/component-manifest.json,
+    # 由 vite build 产出。test / build / lint 默认并行,test 经常在 build 写完之前就跑了。
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -43,4 +54,9 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # 拉回 build 写的 dist,放到 test job 期望的位置
+      - uses: actions/download-artifact@v4
+        with:
+          name: showcase-dist
+          path: apps/showcase/dist
       - run: pnpm test
