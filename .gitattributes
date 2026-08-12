@@ -2,3 +2,14 @@
 # CRLF breaks them under `sh` on Windows (the trailing \r causes
 # "command not found" when git invokes the hook).
 .husky/* text eol=lf
+
+# Force LF line endings for all text files. CI runs on Linux and GitHub
+# Actions' default checkout preserves whatever bytes are in git's object
+# store. Files Windows contributors may have committed with CRLF would
+# cause byte-for-byte source differences between Windows checkout (CRLF)
+# and Linux CI checkout (LF), which breaks sha256-based tests such as
+# scoped-id.test.ts (the algorithm hashes the file content; CRLF vs LF
+# → different hash on the two platforms). `text=auto` lets git pick text
+# vs binary via heuristic; `eol=lf` normalizes text files to LF on the
+# next commit that touches them.
+* text=auto eol=lf
