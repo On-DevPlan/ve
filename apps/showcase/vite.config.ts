@@ -88,6 +88,18 @@ export default defineConfig(() => ({
     target: 'esnext',
     // 生成 source map 便于调试
     sourcemap: true,
+    // modulePreload 过滤:
+    //   Vite 默认会把 import.meta.glob 拆出的所有 chunk 都加 <link rel="modulepreload">,
+    //   导致首页(npm run build 后 dist/index.html)预加载了所有 react-vendor + rc-* 组件,
+    //   即使首页根本用不到。
+    //   这里按 chunk 名过滤掉 React 相关 preload —— 详情页 dynamic import 时浏览器按需再拉,
+    //   代价是首次点进 React 组件多 ~100ms 网络,换来首页 ~250 KB 节省 + Speed Index 改善。
+    modulePreload: {
+      resolveDependencies: (_filename, deps) =>
+        deps.filter(
+          (dep) => !dep.includes('react-vendor') && !dep.includes('/rc-'),
+        ),
+    },
     rollupOptions: {
       // 手动分包策略(spec §8.1)
       output: {
