@@ -65,6 +65,22 @@ export default defineConfig(() => ({
         console.log(`[gen-nginx] wrote ${out}`);
       },
     } satisfies Plugin,
+    // 首页 CSS preload 过滤:build.modulePreload 只处理 JS preload,
+    // 不动 <link rel="stylesheet">。React 组件的 .css 走 Vite CSS plugin emit,
+    // 仍然会在首页 HTML 顶部出现(详情页 dynamic import 时才需要)。
+    // 这里 transformIndexHtml 在 post 阶段把这些 CSS link 删掉。
+    // 详情页 dynamic import 触发时,CSS 仍会按需加载,不影响功能。
+    {
+      name: 'strip-react-css-preload',
+      enforce: 'post',
+      apply: 'build',
+      transformIndexHtml(html) {
+        return html.replace(
+          /<link\s+rel="stylesheet"[^>]+href="\/assets\/rc-[^"]+\.css"[^>]*>/g,
+          '',
+        );
+      },
+    } satisfies Plugin,
   ],
   // dev server:0.0.0.0 让局域网设备也能访问
   // 注意:server.proxy 已被 apiGateway 完全取代 —— 所有 /api/* 由 registry 集中处理,
