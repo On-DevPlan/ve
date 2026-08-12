@@ -34,6 +34,9 @@ jobs:
       - run: pnpm build
 
   test:
+    # 依赖 build 先跑完 —— e2e-perf.test.ts 需要 dist/component-manifest.json,
+    # 由 vite build 产出。test / build / lint 默认并行,test 经常在 build 写完之前就跑了。
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
