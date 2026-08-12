@@ -35,31 +35,41 @@ describe('scoped-id', () => {
   it('locks prod scopedId for 5 real-world SFCs (algorithm + current file contents)', () => {
     // 5 个 fixture:覆盖不同的目录深度与文件名形态(index.vue / *.vue)。
     // 文件用仓库内绝对路径解析;hash 的 root 引用用 apps/showcase(与 vite 一致)。
+    //
+    // ⚠️ 跨平台 fix:fixture 在 Windows 上首次捕获时文件是 CRLF,linux CI 是 LF。
+    //   sha256 包含 raw bytes,直接读盘导致 hash 在两平台不一致。
+    //   这里把 source 内容 normalize 到 LF(\r\n → \n)再喂给 computeScopedId:
+    //   - 不改生产算法(computeScopedId 仍 byte-faithful 复刻 plugin-vue;
+    //     CI 上 plugin-vue 收到的就是 LF,所以 normalize 等价于 plugin-vue 的输入)
+    //   - 测试跨平台一致;fixture 锁住"LF 内容"对应的 hash
+    //   - 本地 Windows 开发仍按 core.autocrlf 默认(CRLF checkout);
+    //     normalize 在测试层把差异抹平,避免开发机 OS 影响 CI 锁值
     const fixtures = [
       {
         rel: 'packages/vue-components/src/china-map/index.vue',
-        expected: 'aed2660f',
+        expected: '56d2f1e2',
       },
       {
         rel: 'packages/vue-components/src/bottom-nav-capsule-v3/index.vue',
-        expected: 'b3e18dfd',
+        expected: '703dbc6e',
       },
       {
         rel: 'packages/vue-components/src/mobile-nav-v5/index.vue',
-        expected: '492642e2',
+        expected: '63f19fc5',
       },
       {
         rel: 'packages/vue-components/src/parallax-gallery/ParallaxCard.vue',
-        expected: '442c4847',
+        expected: '36c878e2',
       },
       {
         rel: 'packages/vue-components/src/gis/ControlPanel.vue',
-        expected: 'a89c26d1',
+        expected: '3e275245',
       },
     ];
     for (const fx of fixtures) {
       const abs = path.resolve(repoRoot, fx.rel);
-      const source = fs.readFileSync(abs, 'utf-8');
+      const raw = fs.readFileSync(abs, 'utf-8');
+      const source = raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
       const actual = computeScopedId(showcaseRoot, abs, source, true);
       expect(actual, fx.rel).toBe(fx.expected);
     }
@@ -67,7 +77,8 @@ describe('scoped-id', () => {
 
   it('algorithm sanity: same input → same output (deterministic)', () => {
     const abs = path.resolve(repoRoot, 'packages/vue-components/src/china-map/index.vue');
-    const source = fs.readFileSync(abs, 'utf-8');
+    const raw = fs.readFileSync(abs, 'utf-8');
+    const source = raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
     const a = computeScopedId(showcaseRoot, abs, source, true);
     const b = computeScopedId(showcaseRoot, abs, source, true);
     expect(a).toBe(b);
@@ -76,7 +87,8 @@ describe('scoped-id', () => {
 
   it('isProduction flag changes the output (prod hashes source, dev does not)', () => {
     const abs = path.resolve(repoRoot, 'packages/vue-components/src/china-map/index.vue');
-    const source = fs.readFileSync(abs, 'utf-8');
+    const raw = fs.readFileSync(abs, 'utf-8');
+    const source = raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
     const devId = computeScopedId(showcaseRoot, abs, source, false);
     const prodId = computeScopedId(showcaseRoot, abs, source, true);
     expect(devId).not.toBe(prodId);
