@@ -309,11 +309,18 @@ function loadLS(): Partial<DesktopStoreState> | null {
   try {
     const raw = localStorage.getItem(LS_KEY);
     if (raw) return JSON.parse(raw);
-  } catch {}
+  } catch {
+    // LS parse failure (corrupted JSON / quota exceeded / privacy mode): fall back to defaults.
+    // No way to recover, intentionally swallow so startup never crashes on bad state.
+  }
   return null;
 }
 function saveLS(s: Partial<DesktopStoreState>) {
-  try { localStorage.setItem(LS_KEY, JSON.stringify(s)); } catch {}
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify(s));
+  } catch {
+    // Quota exceeded / private mode / storage disabled: in-memory only. Safe to drop.
+  }
 }
 
 /* ============================================================
@@ -487,14 +494,18 @@ export function useDesktopStore(): UseDesktopStore {
         try {
           const arr = JSON.parse(pinsV);
           if (Array.isArray(arr)) pinned.value = new Set(arr.filter((x): x is string => typeof x === 'string'));
-        } catch {}
+        } catch {
+          // Corrupted KV value: drop it and let the user re-pin. Swallow parse error.
+        }
       }
       if (layoutV) {
         // 防御:desktop_layout 是 PinnedNode[] 树;过滤掉不在 pinned 里的 icon(避免显示未收藏的)
         try {
           const parsed = JSON.parse(layoutV);
           if (Array.isArray(parsed)) pinnedNodes.value = sanitizeLayout(parsed, pinned.value);
-        } catch {}
+        } catch {
+          // Corrupted KV value: drop it and fall back to default layout.
+        }
       }
       if (themeV && THEMES.some(t => t.id === themeV)) applyTheme(themeV as ThemeId);
       if (modeV === 'classic' || modeV === 'pin') mode.value = modeV;
