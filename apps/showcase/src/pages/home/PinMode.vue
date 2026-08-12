@@ -1,4 +1,8 @@
 <script setup lang="ts">
+/* eslint-disable vue/no-v-html -- 3 处 v-html 都调用 iconSvgOf(),
+ * 该函数返回的 SVG 来自内部 STROKE_ICONS map 或硬编码 fallback,
+ * 完全不拼接用户输入,XSS 风险为 0。逐处加 disable-next-line
+ * 会让模板缩进被 Vue parser 当作 attribute 拆掉,所以走块级禁用。 */
 // PinMode.vue —— Pin 模式(完全对齐 desktop-preview.html 的 icon 桌面风 + 完整拖拽)
 //
 // 职责(对齐 preview):
@@ -22,7 +26,6 @@ import { useDesktopStore, THEMES, type ThemeId, type DisplayMode, type PinnedNod
 import { jwtAuth } from '@/api/http/auth-store';
 import { useLoginModalState } from '@/shared/useLoginModal';
 
-const TILE = 168;
 const ANIM_MS = 180;
 const ANIM_EASE = 'cubic-bezier(.2, 1.2, .4, 1)';
 const MERGE_RATIO = 0.35;
@@ -306,7 +309,12 @@ function onDragStart(e: DragEvent) {
   document.body.classList.add('is-dragging');
   e.dataTransfer!.effectAllowed = 'move';
   e.dataTransfer!.setData('text/plain', nodeIdOf(node));
-  try { e.dataTransfer!.setDragImage(ghost, 0, 0); } catch {}
+  try {
+    e.dataTransfer!.setDragImage(ghost, 0, 0);
+  } catch {
+    // setDragImage can throw on Safari with detached DOM; ghost is optional,
+    // drag still works without a custom image, so swallow.
+  }
   drag = { el, nodeId: nodeIdOf(node), lastTarget: null };
 }
 
@@ -328,8 +336,6 @@ function onDragOver(e: DragEvent) {
     // FLIP:insertBefore 到 beforeId 之前 + animateAll
     if (grid.value) {
       const fromRects = captureRects(grid.value);
-      const refId = el.dataset.id!;
-      const idx = visibleNodes.value.findIndex(n => nodeIdOf(n) === refId);
       const after = dx > 0;
       const afterNode = after ? el.nextSibling : null;
       grid.value.insertBefore(drag.el, afterNode || el);
@@ -338,7 +344,7 @@ function onDragOver(e: DragEvent) {
   }
 }
 
-function onDragLeave(e: DragEvent) {
+function onDragLeave() {
   // 不立即清(子元素切换会触发)
 }
 
@@ -398,7 +404,12 @@ function onModalDragStart(e: DragEvent) {
   document.body.classList.add('is-dragging');
   e.dataTransfer!.effectAllowed = 'move';
   e.dataTransfer!.setData('text/plain', nodeIdOf(node));
-  try { e.dataTransfer!.setDragImage(ghost, 0, 0); } catch {}
+  try {
+    e.dataTransfer!.setDragImage(ghost, 0, 0);
+  } catch {
+    // setDragImage can throw on Safari with detached DOM; ghost is optional,
+    // drag still works without a custom image, so swallow.
+  }
   drag = { el, nodeId: nodeIdOf(node), lastTarget: null };
 }
 
@@ -498,6 +509,10 @@ function animateAll(scope: HTMLElement, fromRects: Map<HTMLElement, DOMRect>) {
     if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
     el.style.transition = 'none';
     el.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
+    // Force a synchronous layout flush so the transform above is committed
+    // before we transition back. Reading offsetWidth blocks until the next
+    // style/layout pass; this is the standard FLIP technique.
+    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
     el.offsetWidth;
     el.style.transition = `transform ${ANIM_MS}ms ${ANIM_EASE}`;
     el.style.transform = 'translate3d(0,0,0)';
@@ -515,7 +530,10 @@ onMounted(() => {
 </script>
 
 <template>
-  <div ref="rootEl" class="pin-mode">
+  <div
+    ref="rootEl"
+    class="pin-mode"
+  >
     <!-- 顶栏 -->
     <header class="topbar">
       <div class="brand">
@@ -525,16 +543,36 @@ onMounted(() => {
 
       <div class="search-wrap">
         <label class="search">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
-            <circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+          >
+            <circle
+              cx="11"
+              cy="11"
+              r="7"
+            /><path d="m20 20-3.5-3.5" />
           </svg>
-          <input v-model="q" type="text" placeholder="搜索已 pin 的组件…" autocomplete="off" />
+          <input
+            v-model="q"
+            type="text"
+            placeholder="搜索已 pin 的组件…"
+            autocomplete="off"
+          >
           <kbd>⌘ K</kbd>
         </label>
       </div>
 
       <div class="topbar__right">
-        <div class="theme-picker" title="切换主题色">
+        <div
+          class="theme-picker"
+          title="切换主题色"
+        >
           <div
             v-for="t in THEMES"
             :key="t.id"
@@ -543,33 +581,91 @@ onMounted(() => {
             :style="{ background: t.border }"
             :title="t.name"
             @click="setTheme(t.id)"
-          ></div>
+          />
         </div>
-        <button class="bg-btn" :class="{ 'has-bg': !!store.bgFile.value }" @click="pickBg">
+        <button
+          class="bg-btn"
+          :class="{ 'has-bg': !!store.bgFile.value }"
+          @click="pickBg"
+        >
           {{ store.bgFile.value ? '清除背景' : '背景' }}
         </button>
-        <input ref="bgInput" type="file" accept="image/*" hidden @change="onBgFile" />
-        <button class="mode-btn" @click="setMode('classic')" title="切回经典(sidebar)模式">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
-            <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
-            <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
+        <input
+          ref="bgInput"
+          type="file"
+          accept="image/*"
+          hidden
+          @change="onBgFile"
+        >
+        <button
+          class="mode-btn"
+          title="切回经典(sidebar)模式"
+          @click="setMode('classic')"
+        >
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+          >
+            <rect
+              x="3"
+              y="3"
+              width="7"
+              height="7"
+            /><rect
+              x="14"
+              y="3"
+              width="7"
+              height="7"
+            />
+            <rect
+              x="3"
+              y="14"
+              width="7"
+              height="7"
+            /><rect
+              x="14"
+              y="14"
+              width="7"
+              height="7"
+            />
           </svg>
           经典
         </button>
         <div class="auth">
           <template v-if="jwtState.token">
             <span class="auth__user">{{ jwtState.jwtUser?.email }}</span>
-            <button class="auth__btn" @click="logout">退出</button>
+            <button
+              class="auth__btn"
+              @click="logout"
+            >
+              退出
+            </button>
           </template>
-          <button v-else class="auth__btn" @click="openLogin">登录</button>
+          <button
+            v-else
+            class="auth__btn"
+            @click="openLogin"
+          >
+            登录
+          </button>
         </div>
       </div>
     </header>
 
     <!-- 主区 -->
     <main class="desktop">
-      <div class="section-tag">Workspace · Pinned</div>
-      <section ref="grid" class="grid">
+      <div class="section-tag">
+        Workspace · Pinned
+      </div>
+      <section
+        ref="grid"
+        class="grid"
+      >
         <div
           v-for="n in visibleNodes"
           :key="nodeIdOf(n)"
@@ -593,21 +689,36 @@ onMounted(() => {
                 :key="i"
                 class="piece"
                 v-html="iconSvgOf(child)"
-              ></div>
-              <div v-if="n.children.length > 4" class="piece is-overflow">+{{ n.children.length - 4 }}</div>
+              />
+              <div
+                v-if="n.children.length > 4"
+                class="piece is-overflow"
+              >
+                +{{ n.children.length - 4 }}
+              </div>
             </template>
             <!-- solo icon:用 entry 名作为 SVG key(用 name 字段而非 title) -->
             <template v-else>
-              <component :is="'div'" v-html="iconSvgOf(n)" />
+              <!-- v-html 由 script 顶部 eslint-disable vue/no-v-html 统一禁用,
+                   见 iconSvgOf() 注释:返回的 SVG 来自内部 STROKE_ICONS,
+                   不拼接用户输入。 -->
+              <div v-html="iconSvgOf(n)" />
             </template>
 
             <!-- ★ 取消 pin 按钮:Pin 模式不提供此入口(请到 Classic 模式 ★ 取消) -->
           </div>
-          <div class="icon__label">{{ nameOf(n) }}</div>
-          <div class="icon__sub">{{ subOf(n) }}</div>
+          <div class="icon__label">
+            {{ nameOf(n) }}
+          </div>
+          <div class="icon__sub">
+            {{ subOf(n) }}
+          </div>
         </div>
 
-        <div v-if="!visibleNodes.length" class="empty">
+        <div
+          v-if="!visibleNodes.length"
+          class="empty"
+        >
           <template v-if="!store.pinnedNodes.value.length">
             还没有 pin 的组件 — 切到 <b>经典</b> 模式,点击卡片右下角 ★ 收藏
           </template>
@@ -632,7 +743,11 @@ onMounted(() => {
       >
         <div class="folder-modal">
           <header class="folder-modal__head">
-            <h3 class="folder-modal__title" :title="'双击重命名'" @dblclick="startRename(openFolder)">
+            <h3
+              class="folder-modal__title"
+              :title="'双击重命名'"
+              @dblclick="startRename(openFolder)"
+            >
               <template v-if="renamingId === openFolder.id">
                 <input
                   ref="renameInput"
@@ -645,14 +760,25 @@ onMounted(() => {
                   @keydown.enter.stop.prevent="commitRename()"
                   @keydown.esc.stop.prevent="cancelRename()"
                   @blur="commitRename()"
-                />
+                >
               </template>
-              <template v-else>{{ openFolder.name }}</template>
+              <template v-else>
+                {{ openFolder.name }}
+              </template>
             </h3>
             <span class="folder-modal__count">{{ openFolder.children.length }} APPS</span>
-            <button class="folder-modal__close" title="关闭 (Esc)" @click="closeFolder">×</button>
+            <button
+              class="folder-modal__close"
+              title="关闭 (Esc)"
+              @click="closeFolder"
+            >
+              ×
+            </button>
           </header>
-          <section ref="modalGrid" class="folder-modal__grid">
+          <section
+            ref="modalGrid"
+            class="folder-modal__grid"
+          >
             <div
               v-for="c in openFolder.children"
               :key="nodeIdOf(c)"
@@ -665,11 +791,23 @@ onMounted(() => {
               @drop="onModalDrop"
               @dragend="cleanupDrag"
             >
-              <div class="icon__art" v-html="iconSvgOf(c)"></div>
-              <div class="icon__label">{{ nameOf(c) }}</div>
-              <div class="icon__sub">{{ subOf(c) }}</div>
+              <div
+                class="icon__art"
+                v-html="iconSvgOf(c)"
+              />
+              <div class="icon__label">
+                {{ nameOf(c) }}
+              </div>
+              <div class="icon__sub">
+                {{ subOf(c) }}
+              </div>
             </div>
-            <p v-if="!openFolder.children.length" class="folder-modal__empty">文件夹是空的</p>
+            <p
+              v-if="!openFolder.children.length"
+              class="folder-modal__empty"
+            >
+              文件夹是空的
+            </p>
           </section>
           <footer class="folder-modal__foot">
             拖动排序 · 拖到窗外移出到桌面
@@ -678,7 +816,12 @@ onMounted(() => {
       </div>
     </Transition>
 
-    <div class="hint" :class="{ 'is-on': !!hintText }">{{ hintText }}</div>
+    <div
+      class="hint"
+      :class="{ 'is-on': !!hintText }"
+    >
+      {{ hintText }}
+    </div>
   </div>
 </template>
 

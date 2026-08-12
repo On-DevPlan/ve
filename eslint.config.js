@@ -32,6 +32,7 @@ export default [
       '**/.claude/repo/**', // 克隆的参考仓库(嵌套 git 仓库,已 gitignore,见 git-repo-cleanup skill)
       '**/eslint/__tests__/fixtures/**', // 自定义规则测试夹具(不保证 lint 干净)
       'apps/showcase/public/**', // showcase 静态资源目录(包含大量闭源第三方资产)
+      'apps/showcase/vite.config.ts.timestamp-*.mjs', // Vite dev server 重启时生成的 timestamp 临时产物(.gitignore 也排除)
     ],
   },
   js.configs.recommended, // 通用 ES 推荐规则集
