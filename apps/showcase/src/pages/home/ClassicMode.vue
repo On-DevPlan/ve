@@ -166,6 +166,13 @@ function flash(msg: string) {
       <div class="sidebar__foot">
         v0.1 · main · <span :class="'platform--' + platform">{{ platform }}</span>
       </div>
+      <a
+        class="sidebar__github"
+        href="https://github.com/On-DevPlan/ve"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="项目 GitHub 仓库(在新标签页打开)"
+      >GitHub ↗</a>
     </aside>
 
     <section class="main">
@@ -375,6 +382,20 @@ function flash(msg: string) {
 }
 .sidebar__foot .platform--pc { color: #2563eb; }
 .sidebar__foot .platform--mobile { color: #7c3aed; }
+
+.sidebar__github {
+  display: inline-block;
+  margin-top: 4px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: var(--ink-mute);
+  text-decoration: none;
+}
+.sidebar__github:hover {
+  text-decoration: underline;
+  color: var(--ink);
+}
 
 /* 鉴权态 chip:与 sidebar__foot 分两行,样式紧凑 */
 .auth-chip {
