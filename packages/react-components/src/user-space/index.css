@@ -454,6 +454,12 @@
 }
 .sl-us-table tbody tr:hover .sl-us-table__row-actions { opacity: 1; }
 .sl-us-table__row-actions--always { opacity: 1; }
+/* 行下载是 <a download>,但 .sl-us-btn 不重置 text-decoration,会被浏览器默认
+   加下划线(只有 hover 显出 .row-actions 时才看到)。作用域限定在 row-actions
+   内的 <a>,不动全局 .sl-us-btn 契约,blast radius 最小。 */
+.sl-us-table__row-actions a {
+  text-decoration: none;
+}
 
 .sl-us-table-foot {
   display: flex; align-items: center; gap: 10px;
