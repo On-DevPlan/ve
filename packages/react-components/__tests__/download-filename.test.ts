@@ -84,4 +84,17 @@ describe('downloadFilename', () => {
     // 没列出的 image 子类(如 image/heic)兜底不加扩展;避免错贴 .img 这种错名
     expect(downloadFilename({ displayName: 'raw', contentType: 'image/heic' })).toBe('raw');
   });
+
+  it('handles uppercase MIME via .toLowerCase()', () => {
+    expect(downloadFilename({ displayName: 'cap', contentType: 'IMAGE/PNG' })).toBe('cap.png');
+  });
+
+  it('handles null contentType via ?? ""', () => {
+    // Mimic what FileView passes when contentType is undefined; we type it as string but the helper tolerates undefined via ??
+    expect(downloadFilename({ displayName: 'absent', contentType: undefined as unknown as string })).toBe('absent');
+  });
+
+  it('handles multi-parameter content type with boundary', () => {
+    expect(downloadFilename({ displayName: 'pkg', contentType: 'application/json; charset=utf-8; boundary=---' })).toBe('pkg.json');
+  });
 });
