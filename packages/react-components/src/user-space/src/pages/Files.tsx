@@ -15,6 +15,7 @@ import { hasMinRole } from '@api/components/user-space';
 import { ApiError } from '@api/services/base';
 
 import ImageViewerModal from './ImageViewerModal';
+import { downloadFilename } from './downloadFilename';
 
 export interface FilesProps {
   group: GroupSummary;
@@ -255,6 +256,19 @@ export default function Files(props: FilesProps) {
                   </td>
                   <td>
                     <div className="sl-us-table__row-actions">
+                      {/* 原文件下载:所有 fileKind 都支持。FileView.url 已被 resolveFileUrl
+                          改写成同源 /files/<id>(protected/private 保留 ?token=)。
+                          文件名由 contentType 派生扩展;未知 mime 走 downloadFilename 兜底
+                          (不加扩展,交给浏览器按 MIME 推断)。 */}
+                      <a
+                        className="sl-us-btn sl-us-btn--ghost sl-us-btn--icon-sm"
+                        href={item.url}
+                        download={downloadFilename(item)}
+                        title="下载原文件"
+                        aria-label={`下载 ${item.displayName}`}
+                      >
+                        ⬇
+                      </a>
                       {canWrite && (
                         <button
                           className="sl-us-btn sl-us-btn--ghost sl-us-btn--icon-sm"
