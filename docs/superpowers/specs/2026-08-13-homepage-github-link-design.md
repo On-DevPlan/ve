@@ -87,7 +87,7 @@
 - [ ] `pnpm exec eslint --max-warnings=0 apps/showcase/src/pages/home/ClassicMode.vue` 0 error / 0 warning。
 - [ ] 桌面端 ClassicMode 视图下:
   - sidebar 底部「v0.1 · main · pc」一行未变。
-  - 其下出现 `GitHub ↗` 文本,与上一行间距 4px,字号/字距/色与上一行一致。
+  - 其下出现 `GitHub ↗` 文本,与上一行间距 ≈28-32px(`.sidebar` 父级 `display:flex; gap:28px` 与本元素 `margin-top:4px` 叠加;spec 初版估 ~4px 未计 flex gap,已修正),字号/字距/色与上一行一致。
   - hover → 出现下划线 + 字色由 `ink-mute` 变 `ink`。
   - 点击 → 新标签打开 `https://github.com/On-DevPlan/ve`。
 - [ ] PinMode / HomeMobile / HomePC 无任何变化。
