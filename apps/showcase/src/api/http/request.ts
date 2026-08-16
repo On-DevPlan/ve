@@ -139,7 +139,9 @@ async function call<T>(
     body:
       body !== undefined
         ? isFormData || isBinary
-          ? body
+          // isBinary 是布尔常量,TS 无法借它收窄 unknown —— 运行时已由
+          // instanceof / isView / toStringTag 保证是 BodyInit,显式断言
+          ? (body as BodyInit)
           : JSON.stringify(body)
         : undefined,
     signal,
