@@ -107,3 +107,75 @@ export interface FileDuplicateResponse {
   targetGroupId: number;
   url: string;
 }
+
+// ── 分片上传(2026-08-15 后端)─────────────────────────────────
+// 契约见 dev_ctr_hello user-file-invitecode skill 的 [[chunked-upload]]:
+//   POST /files/uploads init 返回 instant(秒传)|new|resume(断点续传)
+//   → 逐片 PUT raw body(服务端逐片 sha256 校验,幂等,可乱序)
+//   → POST complete 合并(整体 sha256+size 校验,CAS 抢占)
+// 客户端必须先算整文件 sha256 + 每片 sha256 manifest(init 就要提交)。
+// fileMd5 可选 —— WebCrypto 无 MD5,前端不发,complete 走 sha256+size 校验。
+
+/** init 三态:new=全新会话;resume=同 (uploader,group,sha256) 有 uploading 会话(断点续传);instant=秒传命中 */
+export type FileUploadSessionStatus = 'new' | 'resume' | 'instant';
+
+/** POST /files/uploads —— 分片上传初始化(同时做秒传预检 + 续传定位)。 */
+export interface FileUploadInitArgs {
+  /** 0/不传 → caller default group(与单发 upload 一致) */
+  groupId?: number;
+  originalName: string;
+  contentType: string;
+  fileSize: number;
+  /** 整文件 SHA-256(64 hex)—— 秒传/续传定位指纹 */
+  fileSha256: string;
+  /** 可选,complete 时校验;前端不发(WebCrypto 无 MD5) */
+  fileMd5?: string;
+  /** 64KB ~ 64MB(服务端校验越界拒) */
+  chunkSize: number;
+  /** 各片 SHA-256(64 hex),长度必须 == ceil(fileSize / chunkSize) */
+  chunkHashes: string[];
+  accessLevel?: FileAccessLevel;
+  tags?: string[];
+  expireSeconds?: number;
+}
+
+export interface FileUploadInitResponse {
+  status: FileUploadSessionStatus;
+  /** instant 时为空串(无会话) */
+  uploadId: string;
+  chunkSize: number;
+  chunkCount: number;
+  /** resume 时非空 —— 已落盘分片 index,客户端跳过 */
+  receivedChunks: number[];
+  uploadedBytes: number;
+  fileSize: number;
+  progress: number;
+  /** 仅 status=instant 时存在;与 POST /files 响应同构 */
+  file?: FileInfo;
+}
+
+/** PUT /files/uploads/:uploadId/chunks/:index —— 单片。 */
+export interface FilePutChunkArgs {
+  uploadId: string;
+  index: number;
+  /** 单片字节;服务端 raw body 读取并校验该片 sha256 == init manifest[index] */
+  data: Blob;
+}
+
+/** GET /files/uploads/:uploadId —— 进度查询。 */
+export interface FileUploadProgressInfo {
+  uploadId: string;
+  status: 'uploading' | 'completed' | 'expired' | 'aborted';
+  chunkSize: number;
+  chunkCount: number;
+  receivedCount: number;
+  receivedChunks: number[];
+  uploadedBytes: number;
+  fileSize: number;
+  progress: number;
+}
+
+/** POST /files/uploads/:uploadId/complete —— 合并收尾响应。 */
+export interface FileUploadCompleteResponse {
+  file: FileInfo;
+}
