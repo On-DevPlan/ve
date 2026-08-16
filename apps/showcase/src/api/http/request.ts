@@ -26,7 +26,8 @@
 //   - 不暴露 fetch。所有 service 必须走 api / api.raw,杜绝 raw fetch 直通。
 //   - 401 仅发信号,不动路由。Bearer 请求 401 → 注入的 handler(auth 侧清 JWT
 //     态);skipUnauthorized 端点(login/register/sendCode)跳过。
-//   - body 默认 JSON.stringify,不要传 FormData/Blob 自处理。
+//   - body 默认 JSON.stringify;FormData(multipart)与二进制 raw body
+//     (Blob / ArrayBuffer / TypedArray,分片上传单片)透传,不 stringify。
 //
 // **不通过 api/index.ts 导出**。组件不该直接碰 api.get —— 必须走 service 层
 // (services/*/index.ts),那里有 BASE 锁定与类型。想裸发请求的唯一方式是
@@ -112,17 +113,37 @@ async function call<T>(
   } = options;
 
   const isFormData = body instanceof FormData;
+  // 二进制 raw body 通道(分片上传 PUT 单片用):Blob / ArrayBuffer / TypedArray
+  // 原样透传,不 JSON.stringify;content-type 显式 octet-stream(后端分片契约,
+  // 不依赖 blob.type —— File 切片会带原文件 MIME)。
+  // ArrayBuffer 用 toStringTag 判而不是 instanceof:测试环境(jsdom + Node
+  // TextEncoder)里 body 可能来自另一个 realm,跨 realm instanceof 为 false。
+  const isBinary =
+    !isFormData &&
+    (body instanceof Blob ||
+      ArrayBuffer.isView(body) ||
+      (body !== null && Object.prototype.toString.call(body) === '[object ArrayBuffer]'));
   const init: RequestInit = {
     method,
     credentials: 'include', // 自有后端:httpOnly cookie 由浏览器自动带
     headers: {
       Accept: 'application/json',
-      // FormData 时不设 content-type,浏览器自动加 multipart boundary
-      ...(body !== undefined && !isFormData ? { 'content-type': 'application/json' } : {}),
+      // FormData 时不设 content-type,浏览器自动加 multipart boundary;
+      // 二进制 raw body 显式 octet-stream,JSON 默认
+      ...(body !== undefined && !isFormData
+        ? { 'content-type': isBinary ? 'application/octet-stream' : 'application/json' }
+        : {}),
       ...bearerHeader(),
       ...headers,
     },
-    body: body !== undefined ? (isFormData ? body : JSON.stringify(body)) : undefined,
+    body:
+      body !== undefined
+        ? isFormData || isBinary
+          // isBinary 是布尔常量,TS 无法借它收窄 unknown —— 运行时已由
+          // instanceof / isView / toStringTag 保证是 BodyInit,显式断言
+          ? (body as BodyInit)
+          : JSON.stringify(body)
+        : undefined,
     signal,
     ...rest,
   };

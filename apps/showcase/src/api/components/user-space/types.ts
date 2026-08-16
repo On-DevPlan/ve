@@ -104,6 +104,34 @@ export interface FileListResult {
   pageSize: number;
 }
 
+/**
+ * 分片上传进度(组件侧语义;由 chunked-upload 编排器回报,UploadFileModal 渲染)。
+ * phase:hashing=本地算指纹 / uploading=分片传输(含秒传瞬完)/ completing=服务端合并。
+ */
+export interface FileUploadProgress {
+  phase: 'hashing' | 'uploading' | 'completing';
+  /** 0..1;completing 固定 1(合并没有比例信息,UI 转 indeterminate) */
+  ratio: number;
+  fileSize: number;
+  /** phase=uploading 时的近似已传字节(末片不满,封顶 fileSize) */
+  uploadedBytes?: number;
+  chunkCount?: number;
+  /** 已确认片数(含 resume 跳过基线) */
+  receivedChunks?: number;
+  /** 秒传命中(init instant,零字节传输) */
+  instant?: boolean;
+  /** 断点续传(init resume,跳过部分片) */
+  resumed?: boolean;
+}
+
+/** uploadFileChunked 结果;instant/skippedChunks 供 UI 出差异化 toast。 */
+export interface FileUploadChunkedResult {
+  file: FileView;
+  instant: boolean;
+  uploadedChunks: number;
+  skippedChunks: number;
+}
+
 /** 历史版本摘要(组件侧语义,由 kvV1 的 version_no/value_len/replaced_at 映射)。 */
 export interface KvVersionView {
   versionNo: number;
@@ -171,6 +199,16 @@ export interface UserSpaceStore {
   // upload 固定 accessLevel='public';tags replace 语义。displayName 由后端
   // fileId[:8] 派生,见 FileView.comment 解释。
   uploadFile(groupId: number, args: { file: Blob; tags?: string[] }): Promise<FileView>;
+  /**
+   * 大文件分片上传(秒传 + 断点续传 + 进度回调)。
+   * 是否走分片由调用方按 CHUNKED_UPLOAD_MIN_SIZE 决定(>10MB 才值得分片)。
+   * signal 触发 = 软取消:停止传片但保留服务端会话,重传同文件 init 即 resume。
+   */
+  uploadFileChunked(
+    groupId: number,
+    args: { file: File; tags?: string[] },
+    opts?: { onProgress?: (p: FileUploadProgress) => void; signal?: AbortSignal },
+  ): Promise<FileUploadChunkedResult>;
   listFiles(
     groupId: number,
     opts: { page: number; pageSize: number; tags?: string[] },

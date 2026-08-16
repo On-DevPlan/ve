@@ -542,6 +542,75 @@ curl /files/by-key/avatar?groupId=42                                         # �
 
 > **路由注册顺序敏感**:`/files/by-key/:key` → `/files/share/:code` → `/files/:fileId`(先长后短)。by-key / share 子路径若晚于 `:fileId` 注册会被通配吞掉(后端 cmd.go 已处理)。
 
+## B14. `POST /files/uploads` — 分片上传 init(秒传 + 续传定位)
+
+> 📌 **2026-08-15 起的分片上传**。建议 >10MB 走本套接,小文件继续 B1 单发直传。
+> 完整设计看 dev_ctr_hello `user-file-invitecode` skill 的 `[[chunked-upload]]` ref。
+
+同时做两件事:**秒传预检**(同组同 sha256 命中 active 且无 key → 直接返回 file,0 字节传输)+ **续传定位**(同 `(uploader,group,sha256)` 有 uploading 会话 → 跳过已传片)。所以同一新文件反复 init 幂等无副作用;前端无需持久 uploadId,重传同文件天然 resume。
+
+```bash
+curl -X POST /api/v1/files/uploads -H 'Content-Type: application/json' -d '{
+  "groupId": 42,
+  "originalName": "demo.bin",
+  "contentType": "application/octet-stream",
+  "fileSize": 5242880,
+  "fileSha256": "<64 hex>",
+  "chunkSize": 524288,
+  "chunkHashes": ["<64hex>", ...],
+  "accessLevel": "public",
+  "tags": ["demo"],
+  "expireSeconds": 0
+}'
+→ data:
+{ "status": "new", "uploadId": "abc123...", "chunkSize": 524288, "chunkCount": 10,
+  "receivedChunks": [], "uploadedBytes": 0, "fileSize": 5242880, "progress": 0 }
+# status=instant 时另有 file: FileInfo(与 B1 响应同构,0 字节传输)
+# status=resume 时 receivedChunks 非空,客户端跳过这些片
+```
+
+**约束**:chunkSize 64KB~64MB(服务端校验越界拒);chunkHashes 长度必须 == `ceil(fileSize / chunkSize)`;fileSha256 必须来自客户端正本(不重算);fileMd5 可选(complete 时校验,前端可不发);带 `key` 上传跳过秒传(覆盖语义)。
+
+## B15. `PUT /files/uploads/:uploadId/chunks/:index` — 单片上传
+
+```bash
+curl -X PUT /api/v1/files/uploads/<uploadId>/chunks/0 \
+  -H 'Content-Type: application/octet-stream' \
+  --data-binary @chunk-0.bin
+```
+
+**raw body**(非 multipart)。服务端用 `TeeReader` 流式算该片 sha256,**必须 == init 时 manifest[index]**;不符当场 `DeleteChunk` + 拒(客户端可重传该片)。**幂等** —— 重传同一片不产生副作用。前端断点续传天然依赖此性质。
+
+可乱序、可并发(后端不依赖顺序,前端 3~5 并发常见)。
+
+## B16. `GET /files/uploads/:uploadId` — 进度查询
+
+```bash
+curl /api/v1/files/uploads/<uploadId>
+→ { "uploadId": "...", "status": "uploading", "chunkSize": 524288,
+    "chunkCount": 10, "receivedCount": 3, "receivedChunks": [0,1,2],
+    "uploadedBytes": 1572864, "fileSize": 5242880, "progress": 0.3 }
+```
+
+**仅 uploader 本人**可查(比 RequireWrite 严)。前端一般用 init 响应里的 `receivedChunks` 做本地进度真源,本端点主要用于**会话恢复验证**或第三方观察。
+
+## B17. `POST /files/uploads/:uploadId/complete` — 合并收尾
+
+```bash
+curl -X POST /api/v1/files/uploads/<uploadId>/complete -H 'Content-Type: application/json' -d '{}'
+→ data: { "file": { ...FileInfo... } }
+```
+
+服务端 **CAS 抢占**(`UPDATE ... WHERE status='uploading'`,并发只赢一次)→ 顺序拼接 + 流式双 hash(sha256 + md5)→ 整体校验 → 原子 rename → 复用 B1 Upload 尾段(md5 dedup / thumbnails / 落库 / tags)。校验失败回滚 uploading 让客户端可补传;**缺片** → 错误信封 message 携带 `missing chunks: [4,5]`,会话保留待补。
+
+## B18. `DELETE /files/uploads/:uploadId` — 放弃会话
+
+```bash
+curl -X DELETE /api/v1/files/uploads/<uploadId>
+```
+
+**仅 uploader 本人**。会话标记 `aborted` + 清分片目录。会话 TTL `fileServer.uploadSessionTtlHours`(默认 24h),GC goroutine 启动时跑一次 + 每小时 ticker 清理超时 uploading / expired / aborted 残留。
+
 ---
 
 # 错误码表(完整)
@@ -561,6 +630,11 @@ curl /files/by-key/avatar?groupId=42                                         # �
 | delete file 非 owner/admin | 50 | 200 | `permission denied` |
 | 重复组 key 写入 | 52 | 200 | duplicate key(已由 OnConflict upsert 走通) |
 | 无默认组 | 50 | 200 | `user has no default group, set default_group_id first` |
+| 分片 init 参数错(片数/hash 长度/chunkSize 越界) | 51 | 200 | `InvalidRules: ...` |
+| 分片 sha256 != manifest[index] | 51 | 200 | `chunk sha256 mismatch` |
+| complete 缺片 | 51 | 200 | `chunks incomplete: missing chunks: [4,5]` |
+| complete 整体 hash 校验失败 | 51 | 200 | `file checksum mismatch`(会话回滚 uploading) |
+| 会话非本人 / 非 active / 不存在 | 50 | 200 | `permission denied` / `upload session not active` / `upload session not found` |
 
 ---
 

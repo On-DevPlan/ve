@@ -45,11 +45,14 @@ import type {
   FileAccessLevel,
   FileDuplicateArgs,
   FileDuplicateResponse,
+  FileUploadChunkedResult,
+  FileUploadProgress,
 } from './types';
 import type { DefaultGroupInfo } from '../../services/userV1/types';
 import type { FileInfo } from '../../services/fileV1/types';
 import { ApiError } from '../../services/base';
 import { resolveFileUrl } from '../../tools/file-url';
+import { uploadFileInChunks } from './chunked-upload';
 
 const VALUE_PREVIEW_MAX = 80;
 
@@ -406,6 +409,23 @@ export function createUserSpaceStore(): UserSpaceStore {
     return toFileView(await fileV1Service.upload({ file: args.file, groupId, tags: args.tags }));
   }
 
+  // 大文件分片路径:编排逻辑在 ./chunked-upload.ts(hash 遍 → init 三态 →
+  // 并发 PUT → complete),这里只做 auth 闸门 + FileInfo → FileView 映射。
+  async function uploadFileChunked(
+    groupId: number,
+    args: { file: File; tags?: string[] },
+    opts?: { onProgress?: (p: FileUploadProgress) => void; signal?: AbortSignal },
+  ): Promise<FileUploadChunkedResult> {
+    requireAuth();
+    const res = await uploadFileInChunks({ file: args.file, groupId, tags: args.tags }, opts);
+    return {
+      file: toFileView(res.file),
+      instant: res.instant,
+      uploadedChunks: res.uploadedChunks,
+      skippedChunks: res.skippedChunks,
+    };
+  }
+
   async function listFiles(
     groupId: number,
     opts: { page: number; pageSize: number; tags?: string[] },
@@ -604,6 +624,7 @@ export function createUserSpaceStore(): UserSpaceStore {
     restoreKv,
     duplicateKv,
     uploadFile,
+    uploadFileChunked,
     listFiles,
     updateFileMeta,
     deleteFile,

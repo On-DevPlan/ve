@@ -9,3 +9,5 @@
 export { hasMinRole, ROLE_RANK } from '../../services/groupV1';
 export * from './types';
 export * from './createUserSpaceStore';
+// 分片上传阈值/片大小常量:UI 判断「该不该走分片」+ 提示文案用。
+export { CHUNKED_UPLOAD_MIN_SIZE, DEFAULT_CHUNK_SIZE } from './chunked-upload';

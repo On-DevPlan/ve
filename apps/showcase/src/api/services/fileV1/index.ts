@@ -22,7 +22,12 @@ import type {
   FileListArgs,
   FileListResponse,
   FilePatchArgs,
+  FilePutChunkArgs,
   FileUploadArgs,
+  FileUploadCompleteResponse,
+  FileUploadInitArgs,
+  FileUploadInitResponse,
+  FileUploadProgressInfo,
 } from './types';
 
 export { ApiError } from '../base';
@@ -37,6 +42,12 @@ export type {
   FileDuplicateArgs,
   FileDuplicateResponse,
   FileThumbnail,
+  FileUploadSessionStatus,
+  FileUploadInitArgs,
+  FileUploadInitResponse,
+  FilePutChunkArgs,
+  FileUploadProgressInfo,
+  FileUploadCompleteResponse,
 } from './types';
 
 export class FileV1Service extends HttpService {
@@ -108,6 +119,67 @@ export class FileV1Service extends HttpService {
       `/${encodeURIComponent(args.fileId)}/duplicate`,
       body,
     );
+  }
+
+  // ── 分片上传(大文件;协议见 types.ts 分片段注释)────────────────
+  // 单发 upload 继续服务小文件;分片 5 端点由 components/user-space 的
+  // chunked-upload 编排器驱动,组件不单独调用。
+
+  /**
+   * POST /files/uploads —— 分片初始化(秒传预检 + 续传定位)。
+   * 同 (uploader,group,sha256) 的 uploading 会话 → resume;同组同 sha256
+   * 命中 active 文件且无 key → instant(响应带 file,零字节传输)。
+   */
+  async initUpload(args: FileUploadInitArgs): Promise<FileUploadInitResponse> {
+    const body: Record<string, unknown> = {
+      originalName: args.originalName,
+      contentType: args.contentType,
+      fileSize: args.fileSize,
+      fileSha256: args.fileSha256,
+      chunkSize: args.chunkSize,
+      chunkHashes: args.chunkHashes,
+      accessLevel: args.accessLevel ?? 'public',
+    };
+    if (args.fileMd5) body.fileMd5 = args.fileMd5;
+    if (args.tags !== undefined) body.tags = args.tags;
+    if (args.expireSeconds !== undefined) body.expireSeconds = args.expireSeconds;
+    if (args.groupId !== undefined && args.groupId > 0) body.groupId = args.groupId;
+    return this.reqPost<FileUploadInitResponse>('/uploads', body);
+  }
+
+  /**
+   * PUT /files/uploads/:uploadId/chunks/:index —— 传单片。
+   * raw body octet-stream(非 multipart);服务端逐片 sha256 校验,幂等可重发;
+   * 分片可乱序。body 在这里统一包 octet-stream Blob(File 切片带原文件 MIME)。
+   */
+  async putChunk(args: FilePutChunkArgs, opts?: { signal?: AbortSignal }): Promise<void> {
+    const data =
+      args.data.type === 'application/octet-stream'
+        ? args.data
+        : new Blob([args.data], { type: 'application/octet-stream' });
+    await this.reqPut(
+      `/uploads/${encodeURIComponent(args.uploadId)}/chunks/${args.index}`,
+      data,
+      opts,
+    );
+  }
+
+  /** GET /files/uploads/:uploadId —— 会话进度(receivedChunks/uploadedBytes)。 */
+  async getUploadProgress(uploadId: string): Promise<FileUploadProgressInfo> {
+    return this.reqGet<FileUploadProgressInfo>(`/uploads/${encodeURIComponent(uploadId)}`);
+  }
+
+  /** POST /files/uploads/:uploadId/complete —— 全片到齐后合并收尾(CAS + 整体校验)。 */
+  async completeUpload(uploadId: string): Promise<FileUploadCompleteResponse> {
+    return this.reqPost<FileUploadCompleteResponse>(
+      `/uploads/${encodeURIComponent(uploadId)}/complete`,
+      {},
+    );
+  }
+
+  /** DELETE /files/uploads/:uploadId —— 放弃会话(aborted + 清分片目录;仅 uploader 本人)。 */
+  async abortUpload(uploadId: string): Promise<void> {
+    await this.reqDelete(`/uploads/${encodeURIComponent(uploadId)}`);
   }
 }
 

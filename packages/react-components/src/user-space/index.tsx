@@ -3,7 +3,7 @@
 // 登录态读 host jwtAuth;未登录展示 "登录后查看" 引导
 // 一切副作用(创建/修改/删除)走 host createUserSpaceStore()
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './index.css';
 import { useUserSpaceStore } from './src/hooks/useUserSpaceStore';
 import { useJwtAuth } from './src/hooks/useAuth';
@@ -19,7 +19,7 @@ import DuplicateKvModal from './src/pages/DuplicateKvModal';
 import UploadFileModal from './src/pages/UploadFileModal';
 import DuplicateFileModal from './src/pages/DuplicateFileModal';
 import SettingsPanel from './src/pages/SettingsPanel';
-import { hasMinRole } from '@api/components/user-space';
+import { CHUNKED_UPLOAD_MIN_SIZE, hasMinRole } from '@api/components/user-space';
 import type {
   DefaultGroupInfo,
   GroupInvitationView,
@@ -31,6 +31,7 @@ import type {
   KvView,
   FileAccessLevel,
   FileListResult,
+  FileUploadProgress,
   FileView,
   ViewMode,
 } from './src/types';
@@ -111,6 +112,9 @@ export default function UserSpace() {
   const [filesPage, setFilesPage] = useState(1);
   const [filesTag, setFilesTag] = useState<string | null>(null);
   const [uploadOpen, setUploadOpen] = useState(false);
+  // 分片上传:进度(null = 直传/未开始)+ 取消句柄(软取消,见 handleUploadFileChunked)
+  const [uploadProgress, setUploadProgress] = useState<FileUploadProgress | null>(null);
+  const uploadAbortRef = useRef<AbortController | null>(null);
   const [duplicateFileOpen, setDuplicateFileOpen] = useState(false);
   const [duplicateFileSource, setDuplicateFileSource] = useState<FileView | null>(null);
   // 复制文件成功时的瞬时 banner(顶部提示,8s 后自动消失,与 KV 复制一致)。
@@ -172,6 +176,8 @@ export default function UserSpace() {
     setFilesPage(1);
     setFilesTag(null);
     setUploadOpen(false);
+    setUploadProgress(null);
+    uploadAbortRef.current?.abort();
     setDuplicateFileOpen(false);
     setDuplicateFileSource(null);
     setFilesError(null);
@@ -463,8 +469,17 @@ export default function UserSpace() {
   // ── 文件 CRUD handlers ────────────────────────
   // accessLevel 永远发完整值(行内 select 总是发完整对象;后端 PATCH pointer 字段)。
   // delete 确认文案用 displayName (= fileId[:8] 截断)。
+  //
+  // 上传双路径:≥ CHUNKED_UPLOAD_MIN_SIZE(10MB)走分片(进度 + 断点续传 +
+  // 秒传),小文件保持单发直传。分片路径不用 withError:取消(AbortError)要
+  // 静默处理(toast 提示可续传),不能落进全局 error banner;错误 rethrow 给
+  // UploadFileModal 在弹窗内联展示(submitError),因为全局 banner 被弹窗遮罩挡住。
   async function handleUploadFile(args: { file: File; tags: string[] }): Promise<void> {
     if (!currentSelected) return;
+    if (args.file.size >= CHUNKED_UPLOAD_MIN_SIZE) {
+      await handleUploadFileChunked(currentSelected, args);
+      return;
+    }
     await withError(async () => {
       await store.uploadFile(currentSelected, { file: args.file, tags: args.tags });
       setUploadOpen(false);
@@ -473,6 +488,51 @@ export default function UserSpace() {
       setFilesPage(1); // 新建后回到第一页,新文件出现在前
       await loadFiles(1, filesTag);
     }).catch((e) => { setFilesError(e); setFilesErrorAction('upload'); });
+  }
+
+  async function handleUploadFileChunked(groupId: number, args: { file: File; tags: string[] }): Promise<void> {
+    const controller = new AbortController();
+    uploadAbortRef.current = controller;
+    setUploadProgress(null);
+    setActionError(null);
+    setSaving(true);
+    try {
+      const res = await store.uploadFileChunked(groupId, { file: args.file, tags: args.tags }, {
+        onProgress: setUploadProgress,
+        signal: controller.signal,
+      });
+      setUploadOpen(false);
+      setFileToast(
+        res.instant
+          ? '秒传完成:文件已存在,直接引用'
+          : res.skippedChunks > 0
+            ? `已续传完成(跳过 ${res.skippedChunks} 片)`
+            : '上传成功',
+      );
+      setFilesError(null);
+      setFilesErrorAction(null);
+      setFilesPage(1);
+      await loadFiles(1, filesTag);
+    } catch (e) {
+      if (e instanceof Error && e.name === 'AbortError') {
+        // 软取消:服务端会话保留(uploading),重传同文件 init 即 resume 续传
+        setUploadOpen(false);
+        setFileToast('已取消;重新上传同一文件可断点续传');
+        return;
+      }
+      setFilesError(e);
+      setFilesErrorAction('upload');
+      throw e; // UploadFileModal catch 后在弹窗内联展示(全局 banner 被遮罩挡住)
+    } finally {
+      setSaving(false);
+      setUploadProgress(null);
+      uploadAbortRef.current = null;
+    }
+  }
+
+  /** 分片上传「停止上传」:abort 当前 controller(编排器抛 AbortError 软取消)。 */
+  function handleCancelUpload(): void {
+    uploadAbortRef.current?.abort();
   }
 
   async function handleAccessLevelChange(item: FileView, accessLevel: FileAccessLevel): Promise<void> {
@@ -775,6 +835,8 @@ export default function UserSpace() {
                 <UploadFileModal
                   open={uploadOpen}
                   saving={saving}
+                  progress={uploadProgress}
+                  onCancelUpload={handleCancelUpload}
                   onUpload={handleUploadFile}
                   onClose={() => setUploadOpen(false)}
                 />

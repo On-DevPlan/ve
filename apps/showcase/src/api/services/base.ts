@@ -9,7 +9,7 @@
 //   }
 //   export const userV1Service = new UserV1Service();
 //
-// 基类只承担三件事:BASE 派路径、reqGet/reqPost/reqDelete 转发到
+// 基类只承担三件事:BASE 派路径、reqGet/reqPost/reqPut/reqDelete 转发到
 // api/http/request、ApiError 透传。端点定义(endpoint path / body 形态 /
 // skipUnauthorized)保留在子类 —— 业务语义不同,模板化反而模糊责任。
 
@@ -35,7 +35,7 @@ export interface RequestOptions {
  *     (BASE 字段),继承让每个端点定义只写一次 BASE。
  *   - BASE 用 `ApiPathLiteral` 约束(来自 registry.apiPaths):registry 路径
  *     字面量才能赋,加新 backend 后编译期就提醒。
- *   - protected 方法:子类用 `this.reqGet/reqPost/reqDelete` 调,不允许外部
+ *   - protected 方法:子类用 `this.reqGet/reqPost/reqPut/reqDelete` 调,不允许外部
  *     直接 new 后调(服务必须先 `new XxxService()` 暴露一个实例给消费者)。
  */
 export abstract class HttpService {
@@ -48,6 +48,10 @@ export abstract class HttpService {
 
   protected reqPost<T>(path: string, body?: unknown, opts?: RequestOptions): Promise<T> {
     return api.post<T>(`${this.BASE}${path}`, body, opts);
+  }
+
+  protected reqPut<T>(path: string, body?: unknown, opts?: RequestOptions): Promise<T> {
+    return api.put<T>(`${this.BASE}${path}`, body, opts);
   }
 
   protected reqPatch<T>(path: string, body?: unknown, opts?: RequestOptions): Promise<T> {
