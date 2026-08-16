@@ -6,7 +6,8 @@
 //   3) Bearer 请求 401 → 调用注入的 unauthorized handler + 抛 ApiError(不动路由)
 //   4) 形态不对的 JSON(nginx 5xx HTML、第三方混入)宽容回退原值
 //   5) credentials:'include' 必须出现在 fetch init 里
-//   6) body JSON.stringify 默认生效
+//   6) body JSON.stringify 默认生效;FormData / 二进制 raw body(Blob /
+//      ArrayBuffer / TypedArray)透传 + octet-stream(分片上传单片通道)
 //   7) skipUnauthorized:true 时不触发 401 信号
 //   8) 无 Bearer 的 401 不触发 handler(只抛 ApiError)
 //   9) SSR(Node 环境):模块顶层 import 不崩,call() 在 fetch 失败时抛 0-code ApiError
@@ -219,6 +220,45 @@ describe('request — fetch / 网络', () => {
     const [, init] = mockFetch.mock.calls[0];
     // FormData 必须不带 content-type —— 浏览器会附 multipart boundary;手动设会丢失
     expect(init.headers['content-type']).toBeUndefined();
+  });
+
+  it('Blob body 透传不 JSON.stringify,并显式 octet-stream(分片上传单片通道)', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify(envelope({ ok: true })), { status: 200 }),
+    );
+
+    const { api } = await importFreshApi();
+    // 故意带 text/plain type:证明 content-type 由传输层钉死 octet-stream,不受 blob.type 影响
+    const chunk = new Blob(['raw-bytes'], { type: 'text/plain' });
+    await api.put('/api/v1/files/uploads/u1/chunks/0', chunk);
+    const [url, init] = mockFetch.mock.calls[0];
+    expect(url).toBe('/api/v1/files/uploads/u1/chunks/0');
+    expect(init.method).toBe('PUT');
+    expect(init.body).toBe(chunk);
+    expect(typeof init.body).not.toBe('string');
+    expect(init.headers['content-type']).toBe('application/octet-stream');
+  });
+
+  it('ArrayBuffer / Uint8Array body 同样走二进制通道(octet-stream + 透传)', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify(envelope({ ok: 1 })), { status: 200 }),
+    );
+
+    const { api } = await importFreshApi();
+    const buf = new TextEncoder().encode('abc');
+    await api.put('/api/v1/files/uploads/u1/chunks/1', buf);
+    const [, init] = mockFetch.mock.calls[0];
+    expect(init.body).toBe(buf);
+    expect(init.headers['content-type']).toBe('application/octet-stream');
+
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify(envelope({ ok: 2 })), { status: 200 }),
+    );
+    const ab = new TextEncoder().encode('xyz').buffer;
+    await api.put('/api/v1/files/uploads/u1/chunks/2', ab);
+    const [, init2] = mockFetch.mock.calls[1];
+    expect(init2.body).toBe(ab);
+    expect(init2.headers['content-type']).toBe('application/octet-stream');
   });
 
   it('fetch 抛 TypeError(断网)被包装成 code=0 ApiError', async () => {
