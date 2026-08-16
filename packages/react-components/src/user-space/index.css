@@ -697,6 +697,31 @@
 .sl-us-field__hint { font-size: 11px; color: var(--fg-3); }
 .sl-us-field__row { display: flex; gap: 6px; }
 
+/* ── 分片上传进度(UploadFileModal 内) ────────── */
+.sl-us-progress { display: flex; flex-direction: column; gap: 6px; }
+.sl-us-progress__label { font-size: 11px; color: var(--fg-2); }
+.sl-us-progress__bar {
+  height: 8px;
+  background: var(--hover);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.sl-us-progress__fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 999px;
+  transition: width 0.15s ease;
+}
+/* 服务器合并阶段无比例信息 → 30% 宽滑块循环动画 */
+.sl-us-progress__fill--indeterminate {
+  width: 30%;
+  animation: sl-us-progress-slide 1.1s ease-in-out infinite;
+}
+@keyframes sl-us-progress-slide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(233%); }
+}
+
 /* 设置面板:chip 式选项组(如每页条数 10/20/50) */
 .sl-us-settings-options {
   display: inline-flex; gap: 4px;
