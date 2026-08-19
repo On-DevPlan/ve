@@ -7,7 +7,7 @@
 //   - active 时:图标上移到 indicator 中心变白;label 淡入
 //
 // 注意事项:
-//   - Tabler icons 字体走 CDN @import,在 ShadowRoot 内被 style-adoption 克隆
+//   - Tabler icons 使用 @tabler/icons-vue 的 SVG 组件,无字体加载也无外部依赖
 //   - 颜色为组件内硬编码(原 design 就是这套配色),不消费 sl-token
 //   - 复用 import.meta.glob 自动发现,无需声明 loaderUrl
 

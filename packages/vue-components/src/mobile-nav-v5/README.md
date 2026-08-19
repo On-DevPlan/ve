@@ -18,5 +18,5 @@ import MobileNavV5 from '@style-library/vue-components/mobile-nav-v5/index.vue';
 
 ## 约束
 
-- Tabler Icons 字体从 jsdelivr CDN `@import` 加载(ShadowRoot 内,style-adoption 会克隆进 root)
+- Tabler Icons 使用 [`@tabler/icons-vue`](https://www.npmjs.com/package/@tabler/icons-vue) 的 SVG 组件(`IconHome` / `IconSearch` / `IconBell` / `IconHeart` / `IconUser`),零字体依赖、零外部请求
 - 颜色硬编码,未消费 `sl-*` token —— 与原 design 保持一致;若需要主题适配,把 `TABS[i].color` 与 indicator 颜色改成 `var(--sl-color-*)`

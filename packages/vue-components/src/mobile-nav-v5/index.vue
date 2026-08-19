@@ -1,18 +1,26 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
+import type { Component } from 'vue';
+import {
+  IconHome,
+  IconSearch,
+  IconBell,
+  IconHeart,
+  IconUser,
+} from '@tabler/icons-vue';
 
 interface Tab {
-  icon: string;
+  icon: Component;
   label: string;
   color: string;
 }
 
 const TABS: readonly Tab[] = [
-  { icon: 'ti-home', label: '首页', color: '#6c63ff' },
-  { icon: 'ti-search', label: '搜索', color: '#f472b6' },
-  { icon: 'ti-bell', label: '通知', color: '#fb923c' },
-  { icon: 'ti-heart', label: '收藏', color: '#34d399' },
-  { icon: 'ti-user', label: '我的', color: '#60a5fa' },
+  { icon: IconHome, label: '首页', color: '#6c63ff' },
+  { icon: IconSearch, label: '搜索', color: '#f472b6' },
+  { icon: IconBell, label: '通知', color: '#fb923c' },
+  { icon: IconHeart, label: '收藏', color: '#34d399' },
+  { icon: IconUser, label: '我的', color: '#60a5fa' },
 ] as const;
 
 const active = ref(0);
@@ -72,8 +80,9 @@ onBeforeUnmount(() => {
   <div class="sl-mn5-phone">
     <!-- 当前页面区域:展示 active tab 的图标 + 标签,色调同步 -->
     <div class="sl-mn5-page">
-      <i
-        :class="['ti', activeTab.icon, 'sl-mn5-page-icon']"
+      <component
+        :is="activeTab.icon"
+        class="sl-mn5-page-icon"
         :style="{ color: activeTab.color }"
         aria-hidden="true"
       />
@@ -111,8 +120,9 @@ onBeforeUnmount(() => {
           @keydown.enter.prevent="go(i)"
           @keydown.space.prevent="go(i)"
         >
-          <i
-            :class="['ti', tab.icon, 'sl-mn5-nav-icon']"
+          <component
+            :is="tab.icon"
+            class="sl-mn5-nav-icon"
             aria-hidden="true"
           />
           <span class="sl-mn5-nav-label">{{ tab.label }}</span>
@@ -123,10 +133,6 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-/* Tabler Icons 字体 —— ShadowRoot 内 @import 会被 Vite 打包,style-adoption
-   会把生成的 <style> 节点克隆进 ShadowRoot,保证 icon 字符正常渲染 */
-@import url('https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3/dist/tabler-icons.min.css');
-
 .sl-mn5-phone {
   width: 360px;
   height: 520px;
@@ -150,7 +156,8 @@ onBeforeUnmount(() => {
 }
 
 .sl-mn5-page-icon {
-  font-size: 52px;
+  width: 52px;
+  height: 52px;
   transition: color 0.3s;
 }
 
@@ -197,7 +204,8 @@ onBeforeUnmount(() => {
 
 .sl-mn5-nav-icon {
   position: absolute;
-  font-size: 22px;
+  width: 22px;
+  height: 22px;
   color: #bbb;
   top: 50%;
   left: 50%;
@@ -207,7 +215,6 @@ onBeforeUnmount(() => {
     top 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
     transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
   z-index: 10;
-  line-height: 1;
 }
 
 .sl-mn5-nav-label {

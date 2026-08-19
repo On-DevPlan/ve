@@ -43,7 +43,7 @@ for (const link of linkEls) {
 | dev (`vite`) | `<style>` 内联 | `adoptStylesInto` 扫 style 标签 |
 | build (`vite build`) | `<link rel="stylesheet">` 外置 | `adoptStylesInto` 扫 link 标签 |
 | 组件 scoped CSS | `[data-v-xxx]` 选择器 | Shadow DOM 自身继承无需额外处理 |
-| 外部 CSS (如 tabler-icons) | `@import` 在组件 CSS 内 | `adoptStylesInto` 扫 link 标签即可 |
+| 运行时外部 CSS (如 CDN `@import`) | `@import url(...)` 在组件 scoped CSS 内 | 进 build CSS chunk 后由 `adoptStylesInto` 扫 link 标签即可 |
 
 ## Docker 构建注意事项
 

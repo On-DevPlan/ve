@@ -1,15 +1,21 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
+import type { Component } from 'vue';
+import {
+  IconLayoutList,
+  IconSteeringWheel,
+  IconPackage,
+} from '@tabler/icons-vue';
 
 interface Tab {
-  icon: string;
+  icon: Component;
   label: string;
 }
 
 const TABS: readonly Tab[] = [
-  { icon: 'ti-layout-list', label: '列表' },
-  { icon: 'ti-steering-wheel', label: '驾驶' },
-  { icon: 'ti-package', label: '包裹' },
+  { icon: IconLayoutList, label: '列表' },
+  { icon: IconSteeringWheel, label: '驾驶' },
+  { icon: IconPackage, label: '包裹' },
 ] as const;
 
 const active = ref(0);
@@ -87,8 +93,9 @@ onBeforeUnmount(() => {
         @keydown.enter.prevent="go(i)"
         @keydown.space.prevent="go(i)"
       >
-        <i
-          :class="['ti', tab.icon]"
+        <component
+          :is="tab.icon"
+          class="sl-bnc-icon"
           aria-hidden="true"
         />
       </div>
@@ -97,10 +104,6 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-/* Tabler Icons 字体 —— ShadowRoot 内 @import 会被 Vite 打包,style-adoption
-   会把生成的 <style> 节点克隆进 ShadowRoot,保证 icon 字符正常渲染 */
-@import url('https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3/dist/tabler-icons.min.css');
-
 .sl-bnc-phone {
   width: 360px;
   margin: 24px auto;
@@ -155,15 +158,15 @@ onBeforeUnmount(() => {
   user-select: none;
 }
 
-.sl-bnc-item i {
-  font-size: 22px;
+.sl-bnc-item .sl-bnc-icon {
+  width: 22px;
+  height: 22px;
   color: #8e8e93;
   transition: color 0.2s;
-  line-height: 1;
   display: block;
 }
 
-.sl-bnc-item.is-active i {
+.sl-bnc-item.is-active .sl-bnc-icon {
   color: #1c1c1e;
 }
 </style>
