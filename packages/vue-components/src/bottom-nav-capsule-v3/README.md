@@ -17,5 +17,5 @@ import BottomNavCapsuleV3 from '@style-library/vue-components/bottom-nav-capsule
 
 ## 约束
 
-- Tabler Icons 字体从 jsdelivr CDN `@import` 加载
+- Tabler Icons 使用 [`@tabler/icons-vue`](https://www.npmjs.com/package/@tabler/icons-vue) 的 SVG 组件(`IconLayoutList` / `IconSteeringWheel` / `IconPackage`),零字体依赖、零外部请求
 - 颜色硬编码为 iOS 浅灰系;若需主题适配,把 `.sl-bnc-capsule` 背景与 `.sl-bnc-item i` 颜色改为 `var(--sl-*)`

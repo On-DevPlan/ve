@@ -51,11 +51,11 @@ describe('scoped-id', () => {
       },
       {
         rel: 'packages/vue-components/src/bottom-nav-capsule-v3/index.vue',
-        expected: '703dbc6e',
+        expected: '03e87072',
       },
       {
         rel: 'packages/vue-components/src/mobile-nav-v5/index.vue',
-        expected: '63f19fc5',
+        expected: '9cb8b630',
       },
       {
         rel: 'packages/vue-components/src/parallax-gallery/ParallaxCard.vue',

@@ -10,6 +10,7 @@
   "dependencies": {
     "@chenglou/pretext": "0.0.8",
     "@style-library/component-contract": "workspace:*",
+    "@tabler/icons-vue": "^3.46.0",
     "echarts": "^5.5.0",
     "ol": "^9.2.4",
     "vue": "^3.4.0"
