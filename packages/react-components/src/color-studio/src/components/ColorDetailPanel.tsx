@@ -1,25 +1,42 @@
 // packages/react-components/src/color-studio/src/components/ColorDetailPanel.tsx
 //
-// 当前 anchor 色 6 格式并列,每格式可编辑实时联动。
-// 显示 WCAG contrast 对黑/对白 + copy 按钮。
+// 当前 anchor 色:大色块 + 单一"格式选择器 + 复制"组合。
+// 显示格式 = 复制格式(所见即所复制),存 prefs.preferredCopyFormat 云同步。
+// 附 WCAG 对黑/对白等级。
 
 import { useMemo, useState } from 'react';
 import { useColorStudio } from '../state/useColorStudio';
-import { fromHex, parseUserInput } from '../engine/colorMath';
+import { formatHexAs, parseUserInput, type CopyableFormat } from '../engine/colorMath';
 import { contrastRatio, wcagGrade } from '../engine/contrast';
 import { writeClipboard } from '../utils/clipboard';
 import { Btn } from './ui/Btn';
+import { COPY_FORMATS } from '../hooks/useShortcutPrefs';
 
-export function ColorDetailPanel() {
+const FORMAT_LABELS: Record<CopyableFormat, string> = {
+  hex: 'HEX',
+  rgb: 'RGB',
+  hsl: 'HSL',
+  lab: 'LAB',
+  lch: 'LCH',
+  oklch: 'OKLCH',
+};
+
+interface Props {
+  preferredFormat: CopyableFormat;
+  onPreferredFormatChange: (f: CopyableFormat) => void;
+}
+
+export function ColorDetailPanel({ preferredFormat, onPreferredFormatChange }: Props) {
   const { doc, setDoc } = useColorStudio();
   const palette = doc.palettes.find((p) => p.id === doc.activePaletteId);
   const anchorId = palette?.colorIds[0];
   const entry = doc.colorEntries.find((c) => c.id === anchorId);
   const hex = entry?.hex ?? '#000000';
-  const fmts = useMemo(() => fromHex(hex), [hex]);
+  const value = useMemo(() => formatHexAs(hex, preferredFormat), [hex, preferredFormat]);
 
-  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
+  const [copied, setCopied] = useState(false);
 
   const commit = (candidate: string) => {
     const parsed = parseUserInput(candidate);
@@ -33,57 +50,60 @@ export function ColorDetailPanel() {
     }));
   };
 
-  const fields = [
-    { key: 'hex',   label: 'HEX',    value: hex },
-    { key: 'rgb',   label: 'RGB',    value: `rgb(${Math.round(fmts.rgb.r * 255)}, ${Math.round(fmts.rgb.g * 255)}, ${Math.round(fmts.rgb.b * 255)})` },
-    { key: 'hsl',   label: 'HSL',    value: `hsl(${Math.round(fmts.hsl.h ?? 0)}, ${Math.round((fmts.hsl.s ?? 0) * 100)}%, ${Math.round((fmts.hsl.l ?? 0) * 100)}%)` },
-    { key: 'lab',   label: 'LAB',    value: `lab(${(fmts.lab.l ?? 0).toFixed(2)} ${(fmts.lab.a ?? 0).toFixed(2)} ${(fmts.lab.b ?? 0).toFixed(2)})` },
-    { key: 'lch',   label: 'LCH',    value: `lch(${(fmts.lch.l ?? 0).toFixed(2)} ${(fmts.lch.c ?? 0).toFixed(2)} ${(fmts.lch.h ?? 0).toFixed(2)})` },
-    { key: 'oklch', label: 'OKLCH',  value: `oklch(${(fmts.oklch.l ?? 0).toFixed(3)} ${(fmts.oklch.c ?? 0).toFixed(3)} ${(fmts.oklch.h ?? 0).toFixed(2)})` },
-  ];
+  const copy = async () => {
+    await writeClipboard(value).catch(() => undefined);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
 
   const onBlack = wcagGrade(contrastRatio(hex, '#000000'));
   const onWhite = wcagGrade(contrastRatio(hex, '#FFFFFF'));
 
   return (
     <div className="sl-cs-detail">
-      <div className="sl-cs-detail__swatch" style={{ backgroundColor: hex }} />
-      <div className="sl-cs-detail__fields">
-        {fields.map((f) => (
-          <div key={f.key} className="sl-cs-detail__field">
-            <span className="sl-cs-detail__label">{f.label}</span>
-            {editingKey === f.key ? (
-              <input
-                autoFocus
-                className="sl-cs-input"
-                defaultValue={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                onBlur={() => { commit(draft); setEditingKey(null); }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') { commit(draft); setEditingKey(null); }
-                  if (e.key === 'Escape') setEditingKey(null);
-                }}
-              />
-            ) : (
-              <code
-                className="sl-cs-detail__value"
-                onClick={() => { setDraft(f.value); setEditingKey(f.key); }}
-                title="点击编辑"
-              >
-                {f.value}
-              </code>
-            )}
-            <Btn
-              variant="ghost"
-              size="sm"
-              iconOnly
-              icon="copy"
-              onClick={() => writeClipboard(f.value).catch(() => undefined)}
-              aria-label={`复制 ${f.label}`}
-              title="复制"
-            />
-          </div>
-        ))}
+      <div className="sl-cs-detail__swatch" style={{ backgroundColor: hex }}>
+        <span className="sl-cs-detail__hexbig">{hex}</span>
+      </div>
+      <div className="sl-cs-detail__copyrow">
+        <div className="sl-cs-detail__format" role="radiogroup" aria-label="颜色格式">
+          {COPY_FORMATS.map((f) => (
+            <button
+              key={f}
+              type="button"
+              role="radio"
+              aria-checked={preferredFormat === f}
+              className={`sl-cs-detail__fmtbtn ${preferredFormat === f ? 'is-active' : ''}`}
+              onClick={() => onPreferredFormatChange(f)}
+              title={`以 ${FORMAT_LABELS[f]} 显示与复制`}
+            >
+              {FORMAT_LABELS[f]}
+            </button>
+          ))}
+        </div>
+        {editing ? (
+          <input
+            autoFocus
+            className="sl-cs-input sl-cs-detail__edit"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={() => { commit(draft); setEditing(false); }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') { commit(draft); setEditing(false); }
+              if (e.key === 'Escape') setEditing(false);
+            }}
+          />
+        ) : (
+          <code
+            className="sl-cs-detail__value"
+            onClick={() => { setDraft(value); setEditing(true); }}
+            title="点击输入任意格式改色"
+          >
+            {value}
+          </code>
+        )}
+        <Btn variant="primary" icon="copy" onClick={copy}>
+          {copied ? '已复制' : '复制'}
+        </Btn>
       </div>
       <div className="sl-cs-detail__a11y">
         <span>对黑: {onBlack}</span>

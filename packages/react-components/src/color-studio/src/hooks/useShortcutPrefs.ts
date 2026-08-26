@@ -6,12 +6,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   createShortcutPrefsStore,
-  DEFAULT_SHORTCUTS,
+  defaultShortcutPrefs,
   type ShortcutMap,
   type ShortcutPrefs,
+  type CopyFormat,
+  COPY_FORMATS,
 } from '../../../../../../apps/showcase/src/api/components/color-studio/createShortcutPrefsStore';
 
 export type ShortcutAction = keyof ShortcutMap;
+export type { CopyFormat };
+export { COPY_FORMATS };
 
 const ACTION_LABELS: Record<ShortcutAction, string> = {
   eyedropper: '屏幕取色',
@@ -29,13 +33,10 @@ export function useShortcutPrefs(): {
   ready: boolean;
   /** 绑定键位。若键被其他动作占用,返回冲突动作名(未写入);成功返回 null。 */
   setKey: (action: ShortcutAction, key: string) => string | null;
+  setCopyFormat: (format: CopyFormat) => void;
   resetAll: () => void;
 } {
-  const [prefs, setPrefs] = useState<ShortcutPrefs>({
-    schemaVersion: '1.0.0',
-    shortcuts: { ...DEFAULT_SHORTCUTS },
-    updatedAt: 0,
-  });
+  const [prefs, setPrefs] = useState<ShortcutPrefs>(defaultShortcutPrefs());
   const [ready, setReady] = useState(false);
   const storeRef = useRef(createShortcutPrefsStore());
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -69,21 +70,24 @@ export function useShortcutPrefs(): {
       ...prefs,
       shortcuts: { ...prefs.shortcuts, [action]: key },
       updatedAt: Date.now(),
-    };
-    setPrefs(next);
+    };    setPrefs(next);
     persist(next);
     return null;
   }, [prefs, persist]);
 
+  const setCopyFormat = useCallback((format: CopyFormat) => {
+    setPrefs((prev) => {
+      const next = { ...prev, preferredCopyFormat: format, updatedAt: Date.now() };
+      persist(next);
+      return next;
+    });
+  }, [persist]);
+
   const resetAll = useCallback(() => {
-    const next: ShortcutPrefs = {
-      schemaVersion: '1.0.0',
-      shortcuts: { ...DEFAULT_SHORTCUTS },
-      updatedAt: Date.now(),
-    };
+    const next = defaultShortcutPrefs();
     setPrefs(next);
     persist(next);
   }, [persist]);
 
-  return { prefs, ready, setKey, resetAll };
+  return { prefs, ready, setKey, setCopyFormat, resetAll };
 }

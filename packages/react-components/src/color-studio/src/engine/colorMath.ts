@@ -102,3 +102,26 @@ export function interpolateColor(a: Hex, b: Hex, t: number): Hex {
 export function formatColorCss(hex: Hex, mode: 'rgb' | 'hsl' | 'oklch' = 'rgb'): string {
   return formatCss(mode, hex);
 }
+
+/** 可复制的格式类型(与 prefs.preferredCopyFormat 对齐)。 */
+export type CopyableFormat = 'hex' | 'rgb' | 'hsl' | 'lab' | 'lch' | 'oklch';
+
+/** hex → 指定格式的字符串。详情面板显示与复制按钮共用此出口,
+ *  保证"所见即所复制"。 */
+export function formatHexAs(hex: Hex, format: CopyableFormat): string {
+  const f = fromHex(hex);
+  switch (format) {
+    case 'hex':
+      return f.hex;
+    case 'rgb':
+      return `rgb(${Math.round(f.rgb.r * 255)}, ${Math.round(f.rgb.g * 255)}, ${Math.round(f.rgb.b * 255)})`;
+    case 'hsl':
+      return `hsl(${Math.round(f.hsl.h ?? 0)}, ${Math.round((f.hsl.s ?? 0) * 100)}%, ${Math.round((f.hsl.l ?? 0) * 100)}%)`;
+    case 'lab':
+      return `lab(${(f.lab.l ?? 0).toFixed(2)} ${(f.lab.a ?? 0).toFixed(2)} ${(f.lab.b ?? 0).toFixed(2)})`;
+    case 'lch':
+      return `lch(${(f.lch.l ?? 0).toFixed(2)} ${(f.lch.c ?? 0).toFixed(2)} ${(f.lch.h ?? 0).toFixed(2)})`;
+    case 'oklch':
+      return `oklch(${(f.oklch.l ?? 0).toFixed(3)} ${(f.oklch.c ?? 0).toFixed(3)} ${(f.oklch.h ?? 0).toFixed(2)})`;
+  }
+}

@@ -17,9 +17,15 @@ export interface ShortcutMap {
   clearHistory: string;
 }
 
+/** 首选项:复制用的颜色格式。 */
+export const COPY_FORMATS = ['hex', 'rgb', 'hsl', 'lab', 'lch', 'oklch'] as const;
+export type CopyFormat = (typeof COPY_FORMATS)[number];
+
 export interface ShortcutPrefs {
   schemaVersion: '1.0.0';
   shortcuts: ShortcutMap;
+  /** 复制按钮 / C 键使用的格式(用户首选项) */
+  preferredCopyFormat: CopyFormat;
   updatedAt: number;
 }
 
@@ -30,9 +36,13 @@ export const DEFAULT_SHORTCUTS: ShortcutMap = {
   clearHistory: 'x',
 };
 
-export interface ShortcutPrefsStoreLite {
-  load(): Promise<ShortcutPrefs>;
-  save(prefs: ShortcutPrefs): Promise<void>;
+export function defaultShortcutPrefs(): ShortcutPrefs {
+  return {
+    schemaVersion: '1.0.0',
+    shortcuts: { ...DEFAULT_SHORTCUTS },
+    preferredCopyFormat: 'hex',
+    updatedAt: 0,
+  };
 }
 
 function isShortcutMap(x: unknown): x is ShortcutMap {
@@ -42,7 +52,11 @@ function isShortcutMap(x: unknown): x is ShortcutMap {
     .every((k) => typeof m[k] === 'string' && m[k]?.length === 1);
 }
 
-/** 解析 KV value → ShortcutPrefs;非法/缺失 → 默认。 */
+function isCopyFormat(x: unknown): x is CopyFormat {
+  return typeof x === 'string' && (COPY_FORMATS as readonly string[]).includes(x);
+}
+
+/** 解析 KV value → ShortcutPrefs;非法/缺失字段逐项回落默认。 */
 export function parseShortcutPrefs(raw: string): ShortcutPrefs {
   try {
     const parsed = JSON.parse(raw) as Record<string, unknown>;
@@ -54,13 +68,21 @@ export function parseShortcutPrefs(raw: string): ShortcutPrefs {
       return {
         schemaVersion: '1.0.0',
         shortcuts: parsed.shortcuts,
+        preferredCopyFormat: isCopyFormat(parsed.preferredCopyFormat)
+          ? parsed.preferredCopyFormat
+          : 'hex',
         updatedAt: typeof parsed.updatedAt === 'number' ? parsed.updatedAt : 0,
       };
     }
   } catch {
     // fall through to default
   }
-  return { schemaVersion: '1.0.0', shortcuts: { ...DEFAULT_SHORTCUTS }, updatedAt: 0 };
+  return defaultShortcutPrefs();
+}
+
+export interface ShortcutPrefsStoreLite {
+  load(): Promise<ShortcutPrefs>;
+  save(prefs: ShortcutPrefs): Promise<void>;
 }
 
 export function createShortcutPrefsStore(): ShortcutPrefsStoreLite {
@@ -70,9 +92,9 @@ export function createShortcutPrefsStore(): ShortcutPrefsStoreLite {
       return parseShortcutPrefs(item.value);
     } catch (e) {
       if (e instanceof ApiError && (e.code === 50 || e.code === 404)) {
-        return { schemaVersion: '1.0.0', shortcuts: { ...DEFAULT_SHORTCUTS }, updatedAt: 0 };
+        return defaultShortcutPrefs();
       }
-      return { schemaVersion: '1.0.0', shortcuts: { ...DEFAULT_SHORTCUTS }, updatedAt: 0 };
+      return defaultShortcutPrefs();
     }
   }
 

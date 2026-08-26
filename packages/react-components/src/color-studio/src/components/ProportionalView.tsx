@@ -18,8 +18,6 @@ const DONUT_RI = 55;
 export function ProportionalView() {
   const { doc, setDoc } = useColorStudio();
   const [mode, setMode] = useState<Mode>('bar');
-  const [editing, setEditing] = useState<string | null>(null);
-  const [draftPct, setDraftPct] = useState('');
 
   const palette = doc.palettes.find((p) => p.id === doc.activePaletteId);
   const entries = useMemo(() => {
@@ -38,12 +36,6 @@ export function ProportionalView() {
       ),
       meta: { ...d.meta, updatedAt: Date.now() },
     }));
-  };
-
-  const commitPct = (entryId: string) => {
-    const v = parseFloat(draftPct);
-    if (!Number.isNaN(v)) setWeight(entryId, v);
-    setEditing(null);
   };
 
   const startBarDrag = (index: number, e: React.PointerEvent<HTMLDivElement>) => {
@@ -96,7 +88,11 @@ export function ProportionalView() {
         <div className="sl-cs-prop__bar">
           <div className="sl-cs-prop__bartrack">
             {slices.map((s, i) => (
-              <div key={s.entry.id}>
+              <div
+                key={s.entry.id}
+                className="sl-cs-prop__barwrap"
+                style={{ flexGrow: Math.max(0.0001, s.entry.weight) }}
+              >
                 {i > 0 && (
                   <div
                     className="sl-cs-prop__divider"
@@ -107,7 +103,7 @@ export function ProportionalView() {
                 )}
                 <div
                   className="sl-cs-prop__barseg"
-                  style={{ flexGrow: Math.max(0.0001, s.entry.weight), backgroundColor: s.entry.hex }}
+                  style={{ backgroundColor: s.entry.hex }}
                   title={`${s.entry.hex} ${s.pct}%`}
                 >
                   {s.pct >= 12 && <span>{s.pct}%</span>}
@@ -170,34 +166,22 @@ export function ProportionalView() {
           <li key={s.entry.id} className="sl-cs-prop__row">
             <span className="sl-cs-prop__dot" style={{ backgroundColor: s.entry.hex }} />
             <code>{s.entry.hex}</code>
-            {editing === s.entry.id ? (
-              <input
-                autoFocus
-                className="sl-cs-input sl-cs-prop__pctinput"
-                value={draftPct}
-                onChange={(e) => setDraftPct(e.target.value)}
-                onBlur={() => commitPct(s.entry.id)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') commitPct(s.entry.id);
-                  if (e.key === 'Escape') setEditing(null);
-                }}
-              />
-            ) : (
-              <button
-                type="button"
-                className="sl-cs-prop__pct"
-                onClick={() => { setDraftPct(String(s.entry.weight)); setEditing(s.entry.id); }}
-                title="点击编辑权重"
-              >
-                {s.pct}%
-              </button>
-            )}
-            <span className="sl-cs-prop__weight">权重 {s.entry.weight}</span>
+            {/* 权重滑杆:直接调,所见即所得 */}
+            <input
+              type="range"
+              className="sl-cs-prop__slider"
+              min={0} max={20} step={0.5}
+              value={s.entry.weight}
+              onChange={(e) => setWeight(s.entry.id, Number(e.target.value))}
+              aria-label={`${s.entry.hex} 权重`}
+            />
+            <code className="sl-cs-prop__wval">{s.entry.weight}</code>
+            <span className="sl-cs-prop__pct">{s.pct}%</span>
           </li>
         ))}
       </ul>
       <p className="sl-cs-prop__hint">
-        <Icon name="palette" size={11} /> 权重模拟实际使用面积占比;拖条形分割线或点击百分比直接输入
+        <Icon name="palette" size={11} /> 拖每行滑杆调权重;条形视图里也可以直接拖白色分割线
       </p>
     </div>
   );

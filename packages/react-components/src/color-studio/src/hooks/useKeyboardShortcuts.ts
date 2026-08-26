@@ -12,11 +12,15 @@ import { useColorStudio } from '../state/useColorStudio';
 import { useEyedropper } from './useEyedropper';
 import { writeClipboard } from '../utils/clipboard';
 import { makeId } from '../utils/id';
+import { formatHexAs } from '../engine/colorMath';
 import type { Hex } from '../../../../../../apps/showcase/src/api/components/color-studio/types';
 import type { ShortcutMap } from '../../../../../../apps/showcase/src/api/components/color-studio/createShortcutPrefsStore';
+import type { CopyableFormat } from '../engine/colorMath';
 
 interface Options {
   shortcuts: ShortcutMap;
+  /** C 键复制使用的格式(用户首选项) */
+  copyFormat?: CopyableFormat;
   onEyedropperPick?: (hex: Hex) => void;
 }
 
@@ -72,7 +76,12 @@ export function useKeyboardShortcuts(opts: Options) {
         const palette = doc.palettes.find((p) => p.id === doc.activePaletteId);
         const firstCid = palette?.colorIds[0];
         const anchor = firstCid ? doc.colorEntries.find((c) => c.id === firstCid) : null;
-        if (anchor) writeClipboard(anchor.hex).catch(() => undefined);
+        if (anchor) {
+          const text = optsRef.current.copyFormat
+            ? formatHexAs(anchor.hex, optsRef.current.copyFormat)
+            : anchor.hex;
+          writeClipboard(text).catch(() => undefined);
+        }
         return;
       }
 

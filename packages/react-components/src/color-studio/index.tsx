@@ -44,9 +44,10 @@ export default function ColorStudio() {
 
 function Shell() {
   const { doc, setDoc, status, authState } = useColorStudio();
-  const { prefs, ready, setKey, resetAll } = useShortcutPrefs();
+  const { prefs, ready, setKey, setCopyFormat, resetAll } = useShortcutPrefs();
   const [exportOpen, setExportOpen] = useState(false);
-  useKeyboardShortcuts({ shortcuts: prefs.shortcuts });
+  // C 键复制用首选格式
+  useKeyboardShortcuts({ shortcuts: prefs.shortcuts, copyFormat: prefs.preferredCopyFormat });
   useAutoFillEffect();
 
   const mainView = doc.viewState.mainView ?? 'wheel';
@@ -113,7 +114,12 @@ function Shell() {
         {mainView === 'wheel' && (
           <>
             <section className="sl-cs__wheel"><ColorWheel /></section>
-            <section className="sl-cs__detail"><ColorDetailPanel /></section>
+            <section className="sl-cs__detail">
+              <ColorDetailPanel
+                preferredFormat={prefs.preferredCopyFormat}
+                onPreferredFormatChange={setCopyFormat}
+              />
+            </section>
             <section className="sl-cs__history"><HistoryStrip /></section>
           </>
         )}
