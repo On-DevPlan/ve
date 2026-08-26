@@ -6,6 +6,7 @@
 
 import { useMemo, useState } from 'react';
 import { useColorStudio } from '../state/useColorStudio';
+import { useSelectedColor } from '../hooks/useSelectedColor';
 import { formatHexAs, parseUserInput, type CopyableFormat } from '../engine/colorMath';
 import { contrastRatio, wcagGrade } from '../engine/contrast';
 import { writeClipboard } from '../utils/clipboard';
@@ -27,10 +28,8 @@ interface Props {
 }
 
 export function ColorDetailPanel({ preferredFormat, onPreferredFormatChange }: Props) {
-  const { doc, setDoc } = useColorStudio();
-  const palette = doc.palettes.find((p) => p.id === doc.activePaletteId);
-  const anchorId = palette?.colorIds[0];
-  const entry = doc.colorEntries.find((c) => c.id === anchorId);
+  const { setDoc } = useColorStudio();
+  const { entry } = useSelectedColor();
   const hex = entry?.hex ?? '#000000';
   const value = useMemo(() => formatHexAs(hex, preferredFormat), [hex, preferredFormat]);
 

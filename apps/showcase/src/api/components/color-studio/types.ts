@@ -21,7 +21,7 @@ export interface ColorEntry {
   locked: boolean;
   note: string;
   tags: string[];
-  /** v1.1.0:分组标签(自由文本),undefined = 未分组 */
+  /** @deprecated v1.3.0 起废弃:调色板是唯一分组模型。字段仅为旧数据兼容保留。 */
   group?: string;
   /** v1.2.0:链接的全局 Token id;token hex 变化时同步本条目 */
   tokenId?: string;
@@ -87,16 +87,18 @@ export interface ColorStudioViewState {
   showHarmony: boolean;
   selectedHarmony: HarmonyType | null;
   brightness: number;
-  /** v1.1.0:调色板列表平铺 / 按组折叠 */
-  groupBy: 'none' | 'group';
+  /** @deprecated v1.3.0 起废弃(分组概念移除)。仅为旧数据兼容保留。 */
+  groupBy?: 'none' | 'group';
   /** v1.2.0:中央工作区视图(色盘 / 比例 / 笔刷) */
   mainView: 'wheel' | 'proportional' | 'brush';
+  /** v1.3.0:当前选中的色卡(色盘/详情面板跟随);null = 回退活动板首色 */
+  selectedColorId: string | null;
 }
 
 export interface ColorStudioDocument {
   meta: {
     /** v1.2.0 为当前版本;load 时旧文档由 docSchema 自动升级 */
-    schemaVersion: '1.2.0';
+    schemaVersion: '1.3.0';
     createdAt: number;
     updatedAt: number;
     authorEmail: string;
@@ -118,7 +120,7 @@ export function emptyDoc(authorEmail = '', now = Date.now()): ColorStudioDocumen
   const defaultAnchorId = makeId(now + 1);
   return {
     meta: {
-      schemaVersion: '1.2.0',
+      schemaVersion: '1.3.0',
       createdAt: now,
       updatedAt: now,
       authorEmail,
@@ -155,8 +157,8 @@ export function emptyDoc(authorEmail = '', now = Date.now()): ColorStudioDocumen
       showHarmony: false,
       selectedHarmony: null,
       brightness: 100,
-      groupBy: 'none',
       mainView: 'wheel',
+      selectedColorId: null,
     },
   };
 }

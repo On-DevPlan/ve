@@ -1,7 +1,8 @@
 // packages/react-components/src/color-studio/src/components/PaletteSidebar.tsx
 //
-// 调色板列表 + CRUD + 选 active + 上下移 + 分组渲染(平铺/分组切换)+
-// 组编辑(现有组菜单 + 新建)。
+// 调色板列表 + CRUD + 选 active + 上下移 + 色卡点击选中(色盘跟随)。
+// v1.3.0:分组概念移除(调色板是唯一分组模型);色卡菜单保留
+// 提升为全局色 / 锁定 / 删除。
 
 import { useMemo, useState } from 'react';
 import { useColorStudio } from '../state/useColorStudio';
@@ -10,19 +11,18 @@ import { Icon } from './ui/Icon';
 import { Btn } from './ui/Btn';
 import { makeId } from '../utils/id';
 import { parseUserInput } from '../engine/colorMath';
-import { groupByEntries, listGroupNames } from '../utils/grouping';
 import { promoteToToken } from '../engine/tokenLink';
+import { useSelectedColor } from '../hooks/useSelectedColor';
 import type { ColorEntry } from '../../../../../../apps/showcase/src/api/components/color-studio/types';
 
 function nowTs() { return Date.now(); }
 
 export function PaletteSidebar() {
   const { doc, setDoc } = useColorStudio();
+  const { effectiveId, select } = useSelectedColor();
   const [newPaletteName, setNewPaletteName] = useState('');
   const [newColorHex, setNewColorHex] = useState('');
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [groupMenuFor, setGroupMenuFor] = useState<string | null>(null);
-  const [newGroupName, setNewGroupName] = useState('');
 
   const activePalette = doc.palettes.find((p) => p.id === doc.activePaletteId);
   const activeEntries = useMemo(() => {
@@ -31,8 +31,6 @@ export function PaletteSidebar() {
       .map((cid) => doc.colorEntries.find((c) => c.id === cid))
       .filter((c): c is ColorEntry => !!c);
   }, [activePalette, doc.colorEntries]);
-  const groupNames = useMemo(() => listGroupNames(doc.colorEntries), [doc.colorEntries]);
-  const grouped = useMemo(() => groupByEntries(activeEntries), [activeEntries]);
 
   const addPalette = () => {
     if (!newPaletteName.trim()) return;
@@ -49,7 +47,13 @@ export function PaletteSidebar() {
   };
 
   const setActive = (id: string) => {
-    setDoc((d) => ({ ...d, activePaletteId: id, meta: { ...d.meta, updatedAt: nowTs() } }));
+    setDoc((d) => ({
+      ...d,
+      activePaletteId: id,
+      // 切板后选中态失效,回退新板首色
+      viewState: { ...d.viewState, selectedColorId: null },
+      meta: { ...d.meta, updatedAt: nowTs() },
+    }));
   };
 
   const addColorToActive = () => {
@@ -63,6 +67,8 @@ export function PaletteSidebar() {
       palettes: d.palettes.map((p) =>
         p.id === d.activePaletteId ? { ...p, colorIds: [...p.colorIds, id], updatedAt: ts } : p,
       ),
+      // 新加的颜色直接选中(色盘跟随)
+      viewState: { ...d.viewState, selectedColorId: id },
       meta: { ...d.meta, updatedAt: ts },
     }));
     setNewColorHex('');
@@ -73,6 +79,9 @@ export function PaletteSidebar() {
       ...d,
       colorEntries: d.colorEntries.filter((c) => c.id !== entryId),
       palettes: d.palettes.map((p) => ({ ...p, colorIds: p.colorIds.filter((id) => id !== entryId), updatedAt: nowTs() })),
+      viewState: d.viewState.selectedColorId === entryId
+        ? { ...d.viewState, selectedColorId: null }
+        : d.viewState,
       meta: { ...d.meta, updatedAt: nowTs() },
     }));
   };
@@ -107,109 +116,11 @@ export function PaletteSidebar() {
     }));
   };
 
-  const setGroup = (entryId: string, group: string | undefined) => {
-    setDoc((d) => ({
-      ...d,
-      colorEntries: d.colorEntries.map((c) =>
-        c.id === entryId ? { ...c, group, updatedAt: nowTs() } : c,
-      ),
-      meta: { ...d.meta, updatedAt: nowTs() },
-    }));
-    setGroupMenuFor(null);
-    setNewGroupName('');
-  };
-
-  /** 提升为全局色:打开命名输入(复用 groupmenu 的 newGroupName 状态流) */
+  /** 提升为全局色 */
   const promoteToGlobal = (entryId: string) => {
     setDoc((d) => promoteToToken(d, entryId, '').doc);
     setGroupMenuFor(null);
   };
-
-  const toggleCollapsed = (g: string | undefined) => {
-    const key = g ?? '__ungrouped__';
-    setCollapsed((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  };
-
-  const toggleGroupBy = () => {
-    setDoc((d) => ({
-      ...d,
-      viewState: { ...d.viewState, groupBy: d.viewState.groupBy === 'group' ? 'none' : 'group' },
-      meta: { ...d.meta, updatedAt: nowTs() },
-    }));
-  };
-
-  const renderEntries = (entries: ColorEntry[], withReorder: boolean) => (
-    entries.map((e, i) => (
-      <li key={e.id} className="sl-cs-palettes__color">
-        <ColorChip
-          entry={e}
-          onRemove={removeColor}
-          onToggleLock={toggleLock}
-          onSetGroup={() => setGroupMenuFor(groupMenuFor === e.id ? null : e.id)}
-        />
-        {groupMenuFor === e.id && (
-          <div className="sl-cs-palettes__groupmenu" role="menu">
-            {groupNames.map((g) => (
-              <button key={g} type="button" role="menuitem" onClick={() => setGroup(e.id, g)}>
-                <Icon name="group" size={11} /> {g}
-              </button>
-            ))}
-            {e.group && (
-              <button type="button" role="menuitem" onClick={() => setGroup(e.id, undefined)}>
-                <Icon name="close" size={11} /> 移出分组
-              </button>
-            )}
-            {!e.tokenId && (
-              <button type="button" role="menuitem" onClick={() => promoteToGlobal(e.id)} title="创建/复用全局色并链接本条目">
-                <Icon name="sync" size={11} /> 提升为全局色
-              </button>
-            )}
-            {e.tokenId && (
-              <span className="sl-cs-palettes__tokenhint" title="已链接全局色,改全局色即联动">
-                <Icon name="sync" size={11} /> 已链接全局色
-              </span>
-            )}
-            <div className="sl-cs-palettes__groupmenu-new">
-              <input
-                className="sl-cs-input"
-                placeholder="新组名"
-                value={newGroupName}
-                onChange={(ev) => setNewGroupName(ev.target.value)}
-                onKeyDown={(ev) => {
-                  if (ev.key === 'Enter' && newGroupName.trim()) setGroup(e.id, newGroupName.trim());
-                }}
-              />
-            </div>
-          </div>
-        )}
-        {withReorder && (
-          <>
-            <button
-              type="button"
-              className="sl-cs-chip__act"
-              onClick={() => moveColor(e.id, -1)}
-              disabled={i === 0}
-              aria-label="上移"
-              title="上移"
-            ><Icon name="chevronUp" size={12} /></button>
-            <button
-              type="button"
-              className="sl-cs-chip__act"
-              onClick={() => moveColor(e.id, 1)}
-              disabled={i === (activePalette?.colorIds.length ?? 1) - 1}
-              aria-label="下移"
-              title="下移"
-            ><Icon name="chevronDown" size={12} /></button>
-          </>
-        )}
-      </li>
-    ))
-  );
 
   return (
     <div className="sl-cs-palettes">
@@ -236,49 +147,51 @@ export function PaletteSidebar() {
         <Btn variant="secondary" size="sm" iconOnly icon="plus" onClick={addPalette} aria-label="新增调色板" />
       </div>
 
-      <div className="sl-cs-palettes__viewtoggle">
-        <h4>当前板色</h4>
-        <Btn
-          variant={doc.viewState.groupBy === 'group' ? 'primary' : 'secondary'}
-          size="sm"
-          icon="group"
-          onClick={toggleGroupBy}
-          title="平铺 / 按组折叠"
-        >
-          {doc.viewState.groupBy === 'group' ? '分组视图' : '平铺视图'}
-        </Btn>
-      </div>
-
-      {doc.viewState.groupBy === 'group' ? (
-        grouped.map((g) => {
-          const key = g.name ?? '__ungrouped__';
-          const isCollapsed = collapsed.has(key);
-          return (
-            <div key={key} className="sl-cs-palettes__group">
-              <button
-                type="button"
-                className="sl-cs-palettes__grouphead"
-                onClick={() => toggleCollapsed(g.name)}
-                aria-expanded={!isCollapsed}
-              >
-                <Icon name={isCollapsed ? 'chevronUp' : 'chevronDown'} size={12} />
-                <Icon name="group" size={11} />
-                <span>{g.name ?? '未分组'}</span>
-                <span className="sl-cs-palettes__count">{g.entries.length}</span>
-              </button>
-              {!isCollapsed && (
-                <ul className="sl-cs-palettes__colors">
-                  {renderEntries(g.entries, false)}
-                </ul>
-              )}
-            </div>
-          );
-        })
-      ) : (
-        <ul className="sl-cs-palettes__colors">
-          {renderEntries(activeEntries, true)}
-        </ul>
-      )}
+      <h4>当前板色</h4>
+      <ul className="sl-cs-palettes__colors">
+        {activeEntries.map((e, i) => (
+          <li key={e.id} className="sl-cs-palettes__color">
+            <ColorChip
+              entry={e}
+              active={e.id === effectiveId}
+              onClick={select}
+              onRemove={removeColor}
+              onToggleLock={toggleLock}
+              onSetGroup={() => setGroupMenuFor(groupMenuFor === e.id ? null : e.id)}
+            />
+            {groupMenuFor === e.id && (
+              <div className="sl-cs-palettes__groupmenu" role="menu">
+                {!e.tokenId && (
+                  <button type="button" role="menuitem" onClick={() => promoteToGlobal(e.id)} title="创建/复用全局色并链接本条目">
+                    <Icon name="sync" size={11} /> 提升为全局色
+                  </button>
+                )}
+                {e.tokenId && (
+                  <span className="sl-cs-palettes__tokenhint" title="已链接全局色,改全局色即联动">
+                    <Icon name="sync" size={11} /> 已链接全局色
+                  </span>
+                )}
+              </div>
+            )}
+            <button
+              type="button"
+              className="sl-cs-chip__act"
+              onClick={() => moveColor(e.id, -1)}
+              disabled={i === 0}
+              aria-label="上移"
+              title="上移"
+            ><Icon name="chevronUp" size={12} /></button>
+            <button
+              type="button"
+              className="sl-cs-chip__act"
+              onClick={() => moveColor(e.id, 1)}
+              disabled={i === activeEntries.length - 1}
+              aria-label="下移"
+              title="下移"
+            ><Icon name="chevronDown" size={12} /></button>
+          </li>
+        ))}
+      </ul>
 
       <div className="sl-cs-palettes__add-color">
         <input

@@ -106,7 +106,7 @@ describe('proportional', () => {
 describe('docSchema 1.2.0 migration', () => {
   it('emptyDoc emits 1.2.0 with globalTokens/filterStack/mainView', () => {
     const doc = emptyDoc();
-    expect(doc.meta.schemaVersion).toBe('1.2.0');
+    expect(doc.meta.schemaVersion).toBe('1.3.0');
     expect(doc.globalTokens).toEqual([]);
     expect(doc.filterStack).toEqual([]);
     expect(doc.viewState.mainView).toBe('wheel');
@@ -119,7 +119,7 @@ describe('docSchema 1.2.0 migration', () => {
     delete old.filterStack;
     (old.viewState as Record<string, unknown>).mainView = undefined;
     const parsed = docSchema.parse(old);
-    expect(parsed.meta.schemaVersion).toBe('1.2.0');
+    expect(parsed.meta.schemaVersion).toBe('1.3.0');
     expect(parsed.globalTokens).toEqual([]);
     expect(parsed.filterStack).toEqual([]);
     expect(parsed.viewState.mainView).toBe('wheel');
@@ -132,7 +132,7 @@ describe('docSchema 1.2.0 migration', () => {
     delete old.filterStack;
     delete (old.viewState as Record<string, unknown>).groupBy;
     const parsed = docSchema.parse(old);
-    expect(parsed.meta.schemaVersion).toBe('1.2.0');
+    expect(parsed.meta.schemaVersion).toBe('1.3.0');
     expect(parsed.viewState.groupBy).toBe('none');
     expect(parsed.viewState.mainView).toBe('wheel');
   });

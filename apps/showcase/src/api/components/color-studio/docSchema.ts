@@ -40,16 +40,17 @@ const paletteSchema = z.object({
   updatedAt: z.number(),
 });
 
-// ── v1.2.0(当前)──────────────────────────────────────────
+// ── v1.3.0(当前)──────────────────────────────────────────
+// 变更:group/groupBy 废弃(passthrough 保留旧数据);新增 selectedColorId。
 
-const colorEntryV120Schema = z.object({
+const colorEntryV130Schema = z.object({
   id: z.string().min(1),
   hex: hexSchema,
   weight: z.number().min(0).max(100),
   locked: z.boolean(),
   note: z.string(),
   tags: z.array(z.string()),
-  group: z.string().optional(),
+  group: z.string().optional(), // deprecated,旧数据 passthrough
   tokenId: z.string().optional(),
   derivedFrom: z.object({
     paletteId: z.string(),
@@ -80,22 +81,44 @@ const filterConfigSchema = z.object({
   enabled: z.boolean(),
 });
 
-const viewStateV120Schema = z.object({
+const viewStateV130Schema = z.object({
   leftPane: z.enum(['palettes', 'picker', 'history']),
   showHarmony: z.boolean(),
   selectedHarmony: harmonyTypeSchema.nullable(),
   brightness: z.number().min(0).max(100),
-  groupBy: z.enum(['none', 'group']),
+  groupBy: z.enum(['none', 'group']).optional(), // deprecated
   mainView: z.enum(['wheel', 'proportional', 'brush']),
+  selectedColorId: z.string().nullable(),
 });
 
+const metaV130Schema = z.object({
+  schemaVersion: z.literal('1.3.0'),
+  createdAt: z.number(),
+  updatedAt: z.number(),
+  authorEmail: z.string(),
+});
+
+const docV130Schema = z.object({
+  meta: metaV130Schema,
+  activePaletteId: z.string(),
+  palettes: z.array(paletteSchema).min(1),
+  colorEntries: z.array(colorEntryV130Schema).min(1),
+  globalTokens: z.array(globalTokenSchema),
+  filterStack: z.array(filterConfigSchema),
+  pickHistory: z.array(pickHistoryItemSchema).max(12),
+  viewState: viewStateV130Schema,
+});
+
+// ── v1.2.0(legacy:无 selectedColorId)─────────────────────
+
+const colorEntryV120Schema = colorEntryV130Schema;
+const viewStateV120Schema = viewStateV130Schema.omit({ selectedColorId: true });
 const metaV120Schema = z.object({
   schemaVersion: z.literal('1.2.0'),
   createdAt: z.number(),
   updatedAt: z.number(),
   authorEmail: z.string(),
 });
-
 const docV120Schema = z.object({
   meta: metaV120Schema,
   activePaletteId: z.string(),
@@ -145,32 +168,41 @@ const docV100Schema = z.object({
   viewState: viewStateV100Schema,
 });
 
-// ── union + 自动迁移到 v1.2.0 ──────────────────────────────
-//
-// 优先尝试 v1.2.0;旧版本文档落到 legacy 分支,transform 补默认字段并升
-// schemaVersion。parse 返回值恒为 v1.2.0 形态。
+// ── union + 自动迁移到 v1.3.0 ──────────────────────────────
 
 export const docSchema = z
-  .union([docV120Schema, docV110Schema, docV100Schema])
-  .transform((d): z.infer<typeof docV120Schema> => {
-    if (d.meta.schemaVersion === '1.2.0') return d;
+  .union([docV130Schema, docV120Schema, docV110Schema, docV100Schema])
+  .transform((d): z.infer<typeof docV130Schema> => {
+    if (d.meta.schemaVersion === '1.3.0') return d;
+    if (d.meta.schemaVersion === '1.2.0') {
+      return {
+        ...d,
+        meta: { ...d.meta, schemaVersion: '1.3.0' as const },
+        viewState: { ...d.viewState, selectedColorId: null },
+      };
+    }
     if (d.meta.schemaVersion === '1.1.0') {
       return {
         ...d,
-        meta: { ...d.meta, schemaVersion: '1.2.0' as const },
+        meta: { ...d.meta, schemaVersion: '1.3.0' as const },
         globalTokens: [],
         filterStack: [],
-        viewState: { ...d.viewState, mainView: 'wheel' as const },
+        viewState: { ...d.viewState, mainView: 'wheel' as const, selectedColorId: null },
       };
     }
     // 1.0.0
     return {
       ...d,
-      meta: { ...d.meta, schemaVersion: '1.2.0' as const },
+      meta: { ...d.meta, schemaVersion: '1.3.0' as const },
       globalTokens: [],
       filterStack: [],
-      viewState: { ...d.viewState, groupBy: 'none' as const, mainView: 'wheel' as const },
+      viewState: {
+        ...d.viewState,
+        groupBy: 'none' as const,
+        mainView: 'wheel' as const,
+        selectedColorId: null,
+      },
     };
   });
 
-export type ParsedDoc = z.infer<typeof docV120Schema>;
+export type ParsedDoc = z.infer<typeof docV130Schema>;

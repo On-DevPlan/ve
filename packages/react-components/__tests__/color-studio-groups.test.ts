@@ -13,34 +13,34 @@ function makeV100Doc() {
   return d;
 }
 
-describe('docSchema v1.1.0 migration', () => {
-  it('1.0.0 doc migrates to 1.1.0 with groupBy=none', () => {
+describe('docSchema legacy migration (to v1.3.0)', () => {
+  it('1.0.0 doc migrates to 1.3.0; selectedColorId seeded null', () => {
     const parsed = docSchema.parse(makeV100Doc());
-    expect(parsed.meta.schemaVersion).toBe('1.2.0');
-    expect(parsed.viewState.groupBy).toBe('none');
+    expect(parsed.meta.schemaVersion).toBe('1.3.0');
+    expect(parsed.viewState.selectedColorId).toBeNull();
   });
 
-  it('1.1.0 doc with group field round-trips', () => {
+  it('1.3.0 doc with deprecated group field round-trips (passthrough)', () => {
     const doc = emptyDoc();
-    doc.viewState.groupBy = 'group';
     (doc.colorEntries[0] as { group?: string }).group = '品牌色';
     const parsed = docSchema.parse(doc);
-    expect(parsed.meta.schemaVersion).toBe('1.2.0');
-    expect(parsed.viewState.groupBy).toBe('group');
+    expect(parsed.meta.schemaVersion).toBe('1.3.0');
+    expect(parsed.viewState.selectedColorId).toBeNull();
     expect((parsed.colorEntries[0] as { group?: string }).group).toBe('品牌色');
   });
 
-  it('emptyDoc emits 1.1.0 with groupBy=none', () => {
+  it('emptyDoc emits 1.3.0 with selectedColorId=null (no groupBy)', () => {
     const doc = emptyDoc();
-    expect(doc.meta.schemaVersion).toBe('1.2.0');
-    expect(doc.viewState.groupBy).toBe('none');
+    expect(doc.meta.schemaVersion).toBe('1.3.0');
+    expect(doc.viewState.selectedColorId).toBeNull();
+    expect(doc.viewState.groupBy).toBeUndefined();
   });
 
   it('docSchema.parse(emptyDoc()) passes', () => {
     expect(() => docSchema.parse(emptyDoc())).not.toThrow();
   });
 
-  it('group must be string when present', () => {
+  it('deprecated group must be string when present', () => {
     const doc = emptyDoc() as unknown as { colorEntries: Array<Record<string, unknown>> };
     doc.colorEntries[0].group = 123;
     expect(() => docSchema.parse(doc)).toThrow();

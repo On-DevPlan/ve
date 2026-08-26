@@ -8,6 +8,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useColorStudio } from '../state/useColorStudio';
+import { useSelectedColor } from '../hooks/useSelectedColor';
 import { fromHex, toHex } from '../engine/colorMath';
 import { addEntryToActivePalette } from '../utils/paletteActions';
 import { Btn } from './ui/Btn';
@@ -103,17 +104,13 @@ function paintWheel(ctx: CanvasRenderingContext2D, v: number) {
 
 export function ColorWheel() {
   const { doc, setDoc } = useColorStudio();
+  const { entry: selected, effectiveId: anchorId } = useSelectedColor();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const rafRef = useRef<number | null>(null);
   const draggingRef = useRef(false);
   const [cursor, setCursor] = useState<{ h: number; s: number } | null>(null);
 
-  const palette = doc.palettes.find((p) => p.id === doc.activePaletteId);
-  const anchorId = palette?.colorIds[0];
-  const anchorHex = useMemo(
-    () => doc.colorEntries.find((c) => c.id === anchorId)?.hex ?? '#000000',
-    [doc.colorEntries, anchorId],
-  );
+  const anchorHex = selected?.hex ?? '#000000';
   const v = doc.viewState.brightness / 100;
 
   // 受控:anchor hex 反推指示点(色盘点击 / 滑杆 / 外部改色 都会流经这里)
@@ -261,7 +258,8 @@ export function ColorWheel() {
                       ...p,
                       harmony: {
                         type: opt.value,
-                        anchorColorId: p.colorIds[0] ?? '',
+                        // 和声锚点 = 当前选中的色卡(而非固定首色)
+                        anchorColorId: anchorId ?? p.colorIds[0] ?? '',
                         autoFill: p.harmony?.autoFill ?? false,
                       },
                       updatedAt: Date.now(),
