@@ -157,3 +157,107 @@
   font-family: var(--sl-font-family-mono, monospace); font-size: 10px;
 }
 .sl-cs-kbds h4 { margin: 0 0 6px; font-size: 13px; font-weight: 600; }
+
+/* ── UI 基元:Icon / Btn / Input(v1.1)──────────────────── */
+
+.sl-cs-icon {
+  flex-shrink: 0;
+  display: inline-block;
+  vertical-align: -0.125em;
+}
+
+/* 按钮基元 */
+.sl-cs-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-family: var(--sl-font-family, system-ui);
+  font-weight: 500;
+  border-radius: var(--sl-radius-md, 6px);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background-color .12s ease, border-color .12s ease, color .12s ease, opacity .12s ease;
+  user-select: none;
+  white-space: nowrap;
+}
+.sl-cs-btn:focus-visible {
+  outline: 2px solid var(--sl-color-primary, #2563eb);
+  outline-offset: 1px;
+}
+.sl-cs-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.sl-cs-btn--sm { padding: 3px 8px;  font-size: 11px; min-height: 24px; }
+.sl-cs-btn--md { padding: 5px 12px; font-size: 12px; min-height: 30px; }
+.sl-cs-btn--icon-only { padding: 4px; gap: 0; }
+
+/* variant: primary 实心 */
+.sl-cs-btn--primary {
+  background: var(--sl-color-primary, #2563eb);
+  color: var(--sl-color-on-primary, #fff);
+  border-color: var(--sl-color-primary, #2563eb);
+}
+.sl-cs-btn--primary:hover:not(:disabled) { filter: brightness(1.08); }
+.sl-cs-btn--primary:active:not(:disabled) { filter: brightness(0.95); }
+
+/* variant: secondary 描边 */
+.sl-cs-btn--secondary {
+  background: var(--sl-color-surface, #fff);
+  color: var(--sl-color-text, #1a1a1a);
+  border-color: var(--sl-color-border, #d1d5db);
+}
+.sl-cs-btn--secondary:hover:not(:disabled) {
+  background: var(--sl-color-surface-alt, #f3f4f6);
+  border-color: var(--sl-color-primary, #2563eb);
+}
+.sl-cs-btn--secondary:active:not(:disabled) {
+  background: var(--sl-color-surface-alt, #e5e7eb);
+}
+
+/* variant: ghost 透明 */
+.sl-cs-btn--ghost {
+  background: transparent;
+  color: var(--sl-color-text, #1a1a1a);
+  border-color: transparent;
+}
+.sl-cs-btn--ghost:hover:not(:disabled) {
+  background: var(--sl-color-surface-alt, #f3f4f6);
+}
+.sl-cs-btn--ghost:active:not(:disabled) {
+  background: var(--sl-color-surface-alt, #e5e7eb);
+}
+.sl-cs-btn--ghost.is-active {
+  background: var(--sl-color-primary, #2563eb);
+  color: var(--sl-color-on-primary, #fff);
+}
+
+/* variant: danger 红描边 */
+.sl-cs-btn--danger {
+  background: var(--sl-color-surface, #fff);
+  color: #b91c1c;
+  border-color: #fca5a5;
+}
+.sl-cs-btn--danger:hover:not(:disabled) {
+  background: #fef2f2;
+  border-color: #ef4444;
+}
+
+/* 输入基元 */
+.sl-cs-input {
+  font-family: var(--sl-font-family, system-ui);
+  font-size: 12px;
+  padding: 5px 8px;
+  border: 1px solid var(--sl-color-border, #d1d5db);
+  border-radius: var(--sl-radius-md, 6px);
+  background: var(--sl-color-surface, #fff);
+  color: var(--sl-color-text, #1a1a1a);
+  transition: border-color .12s ease, box-shadow .12s ease;
+}
+.sl-cs-input:focus {
+  outline: none;
+  border-color: var(--sl-color-primary, #2563eb);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--sl-color-primary, #2563eb) 20%, transparent);
+}
+.sl-cs-input::placeholder { color: var(--sl-color-text-secondary, #9ca3af); }
