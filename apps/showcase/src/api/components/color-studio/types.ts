@@ -23,9 +23,41 @@ export interface ColorEntry {
   tags: string[];
   /** v1.1.0:分组标签(自由文本),undefined = 未分组 */
   group?: string;
+  /** v1.2.0:链接的全局 Token id;token hex 变化时同步本条目 */
+  tokenId?: string;
   derivedFrom?: { paletteId: string; rule: HarmonyType };
   createdAt: number;
   updatedAt: number;
+}
+
+/** v1.2.0:全局色彩变量。token 持有 hex 真源;条目通过 tokenId 链接联动。 */
+export interface GlobalToken {
+  id: string;
+  name: string;
+  hex: Hex;
+  group?: string;
+  note?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** v1.2.0:非破坏性滤镜配置。只存参数不改 hex,CSS filter 实时派生。 */
+export type FilterType =
+  | 'brightness'
+  | 'contrast'
+  | 'saturate'
+  | 'hueRotate'
+  | 'grayscale'
+  | 'sepia'
+  | 'invert';
+
+export interface FilterConfig {
+  id: string;
+  type: FilterType;
+  /** brightness/contrast/saturate: 0..300(100=中性);hueRotate: 0..360;
+   *  grayscale/sepia/invert: 0..100(%) */
+  value: number;
+  enabled: boolean;
 }
 
 export interface PaletteHarmony {
@@ -57,12 +89,14 @@ export interface ColorStudioViewState {
   brightness: number;
   /** v1.1.0:调色板列表平铺 / 按组折叠 */
   groupBy: 'none' | 'group';
+  /** v1.2.0:中央工作区视图(色盘 / 比例 / 笔刷) */
+  mainView: 'wheel' | 'proportional' | 'brush';
 }
 
 export interface ColorStudioDocument {
   meta: {
-    /** v1.1.0 为当前版本;load 时 1.0.0 旧文档由 docSchema 自动升级 */
-    schemaVersion: '1.1.0';
+    /** v1.2.0 为当前版本;load 时旧文档由 docSchema 自动升级 */
+    schemaVersion: '1.2.0';
     createdAt: number;
     updatedAt: number;
     authorEmail: string;
@@ -70,6 +104,10 @@ export interface ColorStudioDocument {
   activePaletteId: string;
   palettes: Palette[];
   colorEntries: ColorEntry[];
+  /** v1.2.0:全局色彩变量层 */
+  globalTokens: GlobalToken[];
+  /** v1.2.0:非破坏性滤镜栈(有序、可开关) */
+  filterStack: FilterConfig[];
   pickHistory: PickHistoryItem[];
   viewState: ColorStudioViewState;
 }
@@ -80,7 +118,7 @@ export function emptyDoc(authorEmail = '', now = Date.now()): ColorStudioDocumen
   const defaultAnchorId = makeId(now + 1);
   return {
     meta: {
-      schemaVersion: '1.1.0',
+      schemaVersion: '1.2.0',
       createdAt: now,
       updatedAt: now,
       authorEmail,
@@ -109,6 +147,8 @@ export function emptyDoc(authorEmail = '', now = Date.now()): ColorStudioDocumen
         updatedAt: now,
       },
     ],
+    globalTokens: [],
+    filterStack: [],
     pickHistory: [],
     viewState: {
       leftPane: 'palettes',
@@ -116,6 +156,7 @@ export function emptyDoc(authorEmail = '', now = Date.now()): ColorStudioDocumen
       selectedHarmony: null,
       brightness: 100,
       groupBy: 'none',
+      mainView: 'wheel',
     },
   };
 }
