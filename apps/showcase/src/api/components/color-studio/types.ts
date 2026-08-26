@@ -78,7 +78,7 @@ export interface Palette {
 
 export interface PickHistoryItem {
   hex: Hex;
-  source: 'wheel' | 'eyedropper' | 'image' | 'paste' | 'shortcut';
+  source: 'wheel' | 'eyedropper' | 'image' | 'paste' | 'shortcut' | 'filter';
   pickedAt: number;
 }
 

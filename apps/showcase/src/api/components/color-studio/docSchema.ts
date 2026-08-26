@@ -18,7 +18,7 @@ const harmonyTypeSchema = z.enum([
 
 const pickHistoryItemSchema = z.object({
   hex: hexSchema,
-  source: z.enum(['wheel', 'eyedropper', 'image', 'paste', 'shortcut']),
+  source: z.enum(['wheel', 'eyedropper', 'image', 'paste', 'shortcut', 'filter']),
   pickedAt: z.number(),
 });
 

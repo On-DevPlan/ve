@@ -11,7 +11,7 @@ import { useEffect, useRef } from 'react';
 import { useColorStudio } from '../state/useColorStudio';
 import { useEyedropper } from './useEyedropper';
 import { writeClipboard } from '../utils/clipboard';
-import { makeId } from '../utils/id';
+import { addEntryToActivePalette } from '../utils/paletteActions';
 import { formatHexAs } from '../engine/colorMath';
 import type { Hex } from '../../../../../../apps/showcase/src/api/components/color-studio/types';
 import type { ShortcutMap } from '../../../../../../apps/showcase/src/api/components/color-studio/createShortcutPrefsStore';
@@ -55,20 +55,7 @@ export function useKeyboardShortcuts(opts: Options) {
         const anchor = doc.colorEntries.find((c) => c.id === palette.colorIds[0]);
         if (!anchor) return;
         const hex = anchor.hex;
-        const now = Date.now();
-        const newId = makeId(now);
-        setDoc((d) => ({
-          ...d,
-          colorEntries: [
-            ...d.colorEntries,
-            { id: newId, hex, weight: 1, locked: false, note: '', tags: [], createdAt: now, updatedAt: now },
-          ],
-          palettes: d.palettes.map((p) =>
-            p.id === palette.id ? { ...p, colorIds: [...p.colorIds, newId], updatedAt: now } : p,
-          ),
-          pickHistory: [{ hex, source: 'shortcut', pickedAt: now }, ...d.pickHistory].slice(0, 12),
-          meta: { ...d.meta, updatedAt: now },
-        }));
+        setDoc((d) => addEntryToActivePalette(d, hex, 'shortcut'));
         return;
       }
 

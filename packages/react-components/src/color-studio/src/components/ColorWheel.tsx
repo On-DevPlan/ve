@@ -9,6 +9,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useColorStudio } from '../state/useColorStudio';
 import { fromHex, toHex } from '../engine/colorMath';
+import { addEntryToActivePalette } from '../utils/paletteActions';
+import { Btn } from './ui/Btn';
 import { HarmonyOverlay } from './HarmonyOverlay';
 import type { HarmonyType } from '../../../../../../apps/showcase/src/api/components/color-studio/types';
 
@@ -209,6 +211,20 @@ export function ColorWheel() {
         </svg>
       </div>
       <div className="sl-cw__controls">
+        {/* 快速落子:当前正在调的颜色一键存为新色卡(快捷键 A) */}
+        <div className="sl-cw__quickrow">
+          <span className="sl-cw__quickrow-hex" style={{ backgroundColor: anchorHex }} title={anchorHex} />
+          <code className="sl-cw__quickrow-value">{anchorHex}</code>
+          <Btn
+            variant="primary"
+            icon="plus"
+            onClick={() => setDoc((d) => addEntryToActivePalette(d, anchorHex, 'wheel'))}
+            title="把当前正在生成的颜色存为新色卡(快捷键 A)"
+          >
+            加入调色板
+          </Btn>
+          <span className="sl-cw__quickrow-kbd">A</span>
+        </div>
         <label className="sl-cw__slider">
           <span>B (明度)</span>
           <input

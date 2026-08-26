@@ -591,3 +591,31 @@
   padding: 3px 6px; font-size: 11px;
   color: var(--sl-color-primary, #2563eb);
 }
+
+/* ColorWheel 快速落子行 */
+.sl-cw__quickrow { display: flex; align-items: center; gap: 8px; }
+.sl-cw__quickrow-hex {
+  width: 22px; height: 22px; border-radius: 4px;
+  border: 1px solid rgba(0,0,0,.2); flex-shrink: 0;
+}
+.sl-cw__quickrow-value {
+  font-family: var(--sl-font-family-mono, monospace); font-size: 12px;
+  margin-right: auto;
+}
+.sl-cw__quickrow-kbd {
+  background: var(--sl-color-surface-alt, #f3f4f6);
+  border: 1px solid var(--sl-color-border, #d1d5db); border-bottom-width: 2px;
+  border-radius: 4px; padding: 1px 7px;
+  font-family: var(--sl-font-family-mono, monospace); font-size: 11px;
+}
+
+/* FilterPanel 固化行 */
+.sl-cs-filters__bake { display: flex; align-items: center; gap: 8px; }
+.sl-cs-filters__bakechip {
+  width: 22px; height: 22px; border-radius: 4px;
+  border: 1px solid rgba(0,0,0,.2); flex-shrink: 0;
+}
+.sl-cs-filters__bakehex {
+  font-family: var(--sl-font-family-mono, monospace); font-size: 11px;
+  margin-right: auto;
+}

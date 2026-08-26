@@ -4,7 +4,7 @@
 
 import { useColorStudio } from '../state/useColorStudio';
 import { useEyedropper } from '../hooks/useEyedropper';
-import { makeId } from '../utils/id';
+import { addEntryToActivePalette } from '../utils/paletteActions';
 import { Btn } from './ui/Btn';
 import { ImageColorPicker } from './ImageColorPicker';
 
@@ -13,23 +13,12 @@ interface Props {
 }
 
 export function PickerPanel({ onPicked }: Props) {
-  const { doc, setDoc } = useColorStudio();
+  const { setDoc } = useColorStudio();
   const { isSupported, open } = useEyedropper();
-  const { activePaletteId } = doc;
 
   const addPicked = (hex: string) => {
     if (!hex) return;
-    const id = makeId();
-    const ts = Date.now();
-    setDoc((d) => ({
-      ...d,
-      colorEntries: [...d.colorEntries, { id, hex, weight: 1, locked: false, note: '', tags: [], createdAt: ts, updatedAt: ts }],
-      palettes: d.palettes.map((p) => p.id === activePaletteId
-        ? { ...p, colorIds: [...p.colorIds, id], updatedAt: ts }
-        : p),
-      pickHistory: [{ hex, source: 'eyedropper', pickedAt: ts }, ...d.pickHistory].slice(0, 12),
-      meta: { ...d.meta, updatedAt: ts },
-    }));
+    setDoc((d) => addEntryToActivePalette(d, hex, 'eyedropper'));
     onPicked?.(hex);
   };
 

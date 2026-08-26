@@ -24,9 +24,8 @@ import { Icon, type IconName } from './src/components/ui/Icon';
 import { useKeyboardShortcuts } from './src/hooks/useKeyboardShortcuts';
 import { useShortcutPrefs } from './src/hooks/useShortcutPrefs';
 import { useAutoFillEffect } from './src/hooks/useHarmony';
-import { makeId } from './src/utils/id';
+import { addEntryToActivePalette } from './src/utils/paletteActions';
 import { parseUserInput } from './src/engine/colorMath';
-import type { ColorStudioDocument } from '../../../../apps/showcase/src/api/components/color-studio/types';
 
 const MAIN_VIEWS: { value: 'wheel' | 'proportional' | 'brush'; label: string; icon: IconName }[] = [
   { value: 'wheel', label: '色盘', icon: 'palette' },
@@ -62,20 +61,7 @@ function Shell() {
 
   const addPickedColor = (hex: string) => {
     if (!parseUserInput(hex)) return;
-    const ts = Date.now();
-    setDoc((d) => {
-      const id = makeId(ts);
-      const next: ColorStudioDocument = {
-        ...d,
-        colorEntries: [...d.colorEntries, { id, hex, weight: 1, locked: false, note: '', tags: [], createdAt: ts, updatedAt: ts }],
-        palettes: d.palettes.map((p) => p.id === d.activePaletteId
-          ? { ...p, colorIds: [...p.colorIds, id], updatedAt: ts }
-          : p),
-        pickHistory: [{ hex, source: 'eyedropper', pickedAt: ts }, ...d.pickHistory].slice(0, 12),
-        meta: { ...d.meta, updatedAt: ts },
-      };
-      return next;
-    });
+    setDoc((d) => addEntryToActivePalette(d, hex, 'eyedropper'));
   };
 
   return (

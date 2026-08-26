@@ -3,23 +3,14 @@
 // 最近 12 个取过/加过的色,横向排列,点击重新加入活动板。
 
 import { useColorStudio } from '../state/useColorStudio';
-import { makeId } from '../utils/id';
+import { addEntryToActivePalette } from '../utils/paletteActions';
 
 export function HistoryStrip() {
   const { doc, setDoc } = useColorStudio();
   const recent = doc.pickHistory.slice(0, 12);
 
   const reAdd = (hex: string) => {
-    const id = makeId();
-    const ts = Date.now();
-    setDoc((d) => ({
-      ...d,
-      colorEntries: [...d.colorEntries, { id, hex, weight: 1, locked: false, note: '', tags: [], createdAt: ts, updatedAt: ts }],
-      palettes: d.palettes.map((p) => p.id === d.activePaletteId
-        ? { ...p, colorIds: [...p.colorIds, id], updatedAt: ts }
-        : p),
-      meta: { ...d.meta, updatedAt: ts },
-    }));
+    setDoc((d) => addEntryToActivePalette(d, hex, 'shortcut'));
   };
 
   return (

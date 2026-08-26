@@ -2,8 +2,11 @@
 //
 // 滤镜栈编辑:加/删/开关/调值;预览区实时应用 CSS filter(非破坏性)。
 
+import { useMemo } from 'react';
 import { useColorStudio } from '../state/useColorStudio';
 import { filterStackToCss } from '../engine/filterCss';
+import { applyFilterStackToHex } from '../engine/filterColor';
+import { addEntryToActivePalette } from '../utils/paletteActions';
 import { makeId } from '../utils/id';
 import { Btn } from './ui/Btn';
 import { Icon } from './ui/Icon';
@@ -23,6 +26,15 @@ export function FilterPanel() {
   const { doc, setDoc } = useColorStudio();
   const stack = doc.filterStack;
   const css = filterStackToCss(stack);
+
+  // anchor 色 + 滤镜烘焙结果(把当前效果固化为新颜色的预览)
+  const palette = doc.palettes.find((p) => p.id === doc.activePaletteId);
+  const anchorHex = useMemo(() => {
+    const anchorId = palette?.colorIds[0];
+    return doc.colorEntries.find((c) => c.id === anchorId)?.hex ?? '#000000';
+  }, [doc.colorEntries, palette]);
+  const bakedHex = useMemo(() => applyFilterStackToHex(anchorHex, stack), [anchorHex, stack]);
+  const hasActive = stack.some((f) => f.enabled);
 
   const addFilter = (type: FilterType) => {
     const meta = FILTER_META.find((m) => m.type === type);
@@ -107,6 +119,23 @@ export function FilterPanel() {
           </Btn>
         ))}
       </div>
+
+      {/* 快速落子:滤镜效果固化为真实色值 */}
+      <div className="sl-cs-filters__bake">
+        <span className="sl-cs-filters__bakechip" style={{ backgroundColor: bakedHex }} title={bakedHex} />
+        <code className="sl-cs-filters__bakehex">{bakedHex}</code>
+        <Btn
+          variant="primary"
+          size="sm"
+          icon="plus"
+          disabled={!hasActive}
+          onClick={() => setDoc((d) => addEntryToActivePalette(d, bakedHex, 'filter'))}
+          title="把滤镜效果烘焙成新色卡存入调色板"
+        >
+          固化为新颜色
+        </Btn>
+      </div>
+
       {stack.length > 0 && (
         <p className="sl-cs-filters__css" title={css}>
           <code>filter: {css}</code>
