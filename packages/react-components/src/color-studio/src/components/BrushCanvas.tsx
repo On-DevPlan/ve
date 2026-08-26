@@ -7,7 +7,7 @@
 //   - 画布像素可反向取色(Alt+点击 或 取色按钮)→ onPickColor
 // 画布内容不持久化(MVP:会话级;spec 已登记 IndexedDB 为后续)。
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useColorStudio } from '../state/useColorStudio';
 import { toHex } from '../engine/colorMath';
 import { Btn } from './ui/Btn';
