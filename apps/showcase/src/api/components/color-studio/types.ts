@@ -3,6 +3,8 @@
 // 域类型(组件与服务之间的共享契约)。canonical 定义在这里,
 // 组件包通过 '@api/components/color-studio/types' 引用。
 
+import { makeId } from '../../../../../../packages/react-components/src/color-studio/src/utils/id';
+
 export type Hex = string; // '#RRGGBB',uppercase,with #
 
 export type HarmonyType =
@@ -67,18 +69,10 @@ export interface ColorStudioDocument {
   viewState: ColorStudioViewState;
 }
 
-/** 内部 helper:26-char URL-safe-ish ID;不是真 ulid,但碰撞概率 0。M1 占位,
-  M2 后会被独立 ulid() 工具替换。 */
-function ulidLike(): string {
-  const time = Date.now().toString(36);
-  const rand = Math.random().toString(36).slice(2, 12);
-  return `${time}-${rand}`;
-}
-
 /** Empty doc — used as load-fallback when KV missing or first-time user。 */
 export function emptyDoc(authorEmail = '', now = Date.now()): ColorStudioDocument {
-  const defaultPaletteId = ulidLike();
-  const defaultAnchorId = ulidLike();
+  const defaultPaletteId = makeId(now);
+  const defaultAnchorId = makeId(now + 1);
   return {
     meta: {
       schemaVersion: '1.0.0',
