@@ -49,7 +49,7 @@ describe('createColorStudioStore', () => {
     );
     const store = createColorStudioStore();
     const loaded = await store.load();
-    expect(loaded.meta.schemaVersion).toBe('1.1.0');
+    expect(loaded.meta.schemaVersion).toBe('1.2.0');
     expect(loaded.palettes[0].id).toBe('p1');
   });
 
@@ -64,7 +64,7 @@ describe('createColorStudioStore', () => {
     );
     const store = createColorStudioStore();
     const loaded = await store.load();
-    expect(loaded.meta.schemaVersion).toBe('1.1.0');
+    expect(loaded.meta.schemaVersion).toBe('1.2.0');
     expect(loaded.palettes.length).toBeGreaterThan(0);
   });
 
@@ -125,6 +125,6 @@ describe('createColorStudioStore', () => {
     const store = createColorStudioStore();
     const out = store.exportJson(emptyDoc());
     expect(out).toContain('schemaVersion');
-    expect(JSON.parse(out).meta.schemaVersion).toBe('1.1.0');
+    expect(JSON.parse(out).meta.schemaVersion).toBe('1.2.0');
   });
 });

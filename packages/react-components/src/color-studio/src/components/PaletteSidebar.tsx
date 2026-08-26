@@ -11,6 +11,7 @@ import { Btn } from './ui/Btn';
 import { makeId } from '../utils/id';
 import { parseUserInput } from '../engine/colorMath';
 import { groupByEntries, listGroupNames } from '../utils/grouping';
+import { promoteToToken } from '../engine/tokenLink';
 import type { ColorEntry } from '../../../../../../apps/showcase/src/api/components/color-studio/types';
 
 function nowTs() { return Date.now(); }
@@ -118,6 +119,12 @@ export function PaletteSidebar() {
     setNewGroupName('');
   };
 
+  /** 提升为全局色:打开命名输入(复用 groupmenu 的 newGroupName 状态流) */
+  const promoteToGlobal = (entryId: string) => {
+    setDoc((d) => promoteToToken(d, entryId, '').doc);
+    setGroupMenuFor(null);
+  };
+
   const toggleCollapsed = (g: string | undefined) => {
     const key = g ?? '__ungrouped__';
     setCollapsed((prev) => {
@@ -156,6 +163,16 @@ export function PaletteSidebar() {
               <button type="button" role="menuitem" onClick={() => setGroup(e.id, undefined)}>
                 <Icon name="close" size={11} /> 移出分组
               </button>
+            )}
+            {!e.tokenId && (
+              <button type="button" role="menuitem" onClick={() => promoteToGlobal(e.id)} title="创建/复用全局色并链接本条目">
+                <Icon name="sync" size={11} /> 提升为全局色
+              </button>
+            )}
+            {e.tokenId && (
+              <span className="sl-cs-palettes__tokenhint" title="已链接全局色,改全局色即联动">
+                <Icon name="sync" size={11} /> 已链接全局色
+              </span>
             )}
             <div className="sl-cs-palettes__groupmenu-new">
               <input

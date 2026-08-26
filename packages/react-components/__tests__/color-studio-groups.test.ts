@@ -16,7 +16,7 @@ function makeV100Doc() {
 describe('docSchema v1.1.0 migration', () => {
   it('1.0.0 doc migrates to 1.1.0 with groupBy=none', () => {
     const parsed = docSchema.parse(makeV100Doc());
-    expect(parsed.meta.schemaVersion).toBe('1.1.0');
+    expect(parsed.meta.schemaVersion).toBe('1.2.0');
     expect(parsed.viewState.groupBy).toBe('none');
   });
 
@@ -25,14 +25,14 @@ describe('docSchema v1.1.0 migration', () => {
     doc.viewState.groupBy = 'group';
     (doc.colorEntries[0] as { group?: string }).group = '品牌色';
     const parsed = docSchema.parse(doc);
-    expect(parsed.meta.schemaVersion).toBe('1.1.0');
+    expect(parsed.meta.schemaVersion).toBe('1.2.0');
     expect(parsed.viewState.groupBy).toBe('group');
     expect((parsed.colorEntries[0] as { group?: string }).group).toBe('品牌色');
   });
 
   it('emptyDoc emits 1.1.0 with groupBy=none', () => {
     const doc = emptyDoc();
-    expect(doc.meta.schemaVersion).toBe('1.1.0');
+    expect(doc.meta.schemaVersion).toBe('1.2.0');
     expect(doc.viewState.groupBy).toBe('none');
   });
 

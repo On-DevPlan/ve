@@ -67,7 +67,7 @@ describe('exporters', () => {
 
   it('exportJson round-trips the doc', () => {
     const out = exportJson(doc);
-    expect(JSON.parse(out).meta.schemaVersion).toBe('1.1.0');
+    expect(JSON.parse(out).meta.schemaVersion).toBe('1.2.0');
   });
 
   it('slug handles Chinese palette names', () => {
