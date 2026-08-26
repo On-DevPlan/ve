@@ -5,6 +5,7 @@
 import { useCallback, useRef, useState } from 'react';
 import { extractDominantColors } from '../engine/colorExtraction';
 import { toHex } from '../engine/colorMath';
+import { Btn } from './ui/Btn';
 
 interface Props { onPick: (hex: string) => void; }
 
@@ -71,7 +72,9 @@ export function ImageColorPicker({ onPick }: Props) {
         style={{ display: 'none' }}
         aria-label="选择取色图片"
       />
-      <button type="button" onClick={() => fileRef.current?.click()}>上传图片取色</button>
+      <Btn variant="secondary" icon="upload" onClick={() => fileRef.current?.click()}>
+        上传图片取色
+      </Btn>
       {imageUrl && (
         <div className="sl-cs-imagepicker__preview">
           <canvas
@@ -88,10 +91,12 @@ export function ImageColorPicker({ onPick }: Props) {
                 style={{ backgroundColor: hoverHex }}
               />
               <code>{hoverHex}</code>
-              <button type="button" onClick={onClick}>加入</button>
+              <Btn variant="secondary" size="sm" icon="plus" onClick={onClick}>加入</Btn>
             </div>
           )}
-          <button type="button" onClick={extractDominant}>提取 5 主色</button>
+          <Btn variant="secondary" icon="palette" onClick={extractDominant}>
+            提取 5 主色
+          </Btn>
         </div>
       )}
     </div>

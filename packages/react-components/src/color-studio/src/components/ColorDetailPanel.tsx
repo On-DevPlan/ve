@@ -8,6 +8,7 @@ import { useColorStudio } from '../state/useColorStudio';
 import { fromHex, parseUserInput } from '../engine/colorMath';
 import { contrastRatio, wcagGrade } from '../engine/contrast';
 import { writeClipboard } from '../utils/clipboard';
+import { Btn } from './ui/Btn';
 
 export function ColorDetailPanel() {
   const { doc, setDoc } = useColorStudio();
@@ -54,6 +55,7 @@ export function ColorDetailPanel() {
             {editingKey === f.key ? (
               <input
                 autoFocus
+                className="sl-cs-input"
                 defaultValue={draft}
                 onChange={(e) => setDraft(e.target.value)}
                 onBlur={() => { commit(draft); setEditingKey(null); }}
@@ -66,17 +68,20 @@ export function ColorDetailPanel() {
               <code
                 className="sl-cs-detail__value"
                 onClick={() => { setDraft(f.value); setEditingKey(f.key); }}
+                title="点击编辑"
               >
                 {f.value}
               </code>
             )}
-            <button
-              type="button"
+            <Btn
+              variant="ghost"
+              size="sm"
+              iconOnly
+              icon="copy"
               onClick={() => writeClipboard(f.value).catch(() => undefined)}
-              className="sl-cs-detail__copy"
-            >
-              复制
-            </button>
+              aria-label={`复制 ${f.label}`}
+              title="复制"
+            />
           </div>
         ))}
       </div>

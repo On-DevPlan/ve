@@ -1,11 +1,11 @@
 // packages/react-components/src/color-studio/src/hooks/useKeyboardShortcuts.ts
 //
-// 全局快捷键:
-//   P / E → Eyedropper(open → addPicked 上抛)
-//   A / Enter → 把当前活动板 anchor 色复制一份入板末
-//   C → copy current hex from active palette's anchor
-//   X → 清空 history
-// 在 INPUT/TEXTAREA 内不触发,避免抢输入焦点。
+// 全局快捷键(键位消费 useShortcutPrefs 的映射,支持自定义):
+//   eyedropper(默认 p,e 为别名)→ EyeDropper
+//   addColor(默认 a)→ 把当前活动板 anchor 色复制一份入板末
+//   copy(默认 c)→ copy current hex
+//   clearHistory(默认 x)→ 清空 history
+// 在 INPUT/TEXTAREA 内不触发。
 
 import { useEffect, useRef } from 'react';
 import { useColorStudio } from '../state/useColorStudio';
@@ -13,12 +13,14 @@ import { useEyedropper } from './useEyedropper';
 import { writeClipboard } from '../utils/clipboard';
 import { makeId } from '../utils/id';
 import type { Hex } from '../../../../../../apps/showcase/src/api/components/color-studio/types';
+import type { ShortcutMap } from '../../../../../../apps/showcase/src/api/components/color-studio/createShortcutPrefsStore';
 
 interface Options {
+  shortcuts: ShortcutMap;
   onEyedropperPick?: (hex: Hex) => void;
 }
 
-export function useKeyboardShortcuts(opts: Options = {}) {
+export function useKeyboardShortcuts(opts: Options) {
   const { doc, setDoc } = useColorStudio();
   const { open: openEyedropper, isSupported: eyeSupported } = useEyedropper();
   const optsRef = useRef(opts);
@@ -32,8 +34,9 @@ export function useKeyboardShortcuts(opts: Options = {}) {
       }
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const key = e.key.toLowerCase();
+      const sc = optsRef.current.shortcuts;
 
-      if ((key === 'p' || key === 'e') && eyeSupported) {
+      if ((key === sc.eyedropper || key === 'e') && eyeSupported) {
         e.preventDefault();
         openEyedropper().then((hex) => {
           if (hex) optsRef.current.onEyedropperPick?.(hex);
@@ -41,7 +44,7 @@ export function useKeyboardShortcuts(opts: Options = {}) {
         return;
       }
 
-      if (key === 'a' || key === 'enter') {
+      if (key === sc.addColor || key === 'enter') {
         e.preventDefault();
         const palette = doc.palettes.find((p) => p.id === doc.activePaletteId);
         if (!palette || palette.colorIds.length === 0) return;
@@ -65,17 +68,15 @@ export function useKeyboardShortcuts(opts: Options = {}) {
         return;
       }
 
-      if (key === 'c') {
+      if (key === sc.copy) {
         const palette = doc.palettes.find((p) => p.id === doc.activePaletteId);
         const firstCid = palette?.colorIds[0];
-        const anchor = firstCid
-          ? doc.colorEntries.find((c) => c.id === firstCid)
-          : null;
+        const anchor = firstCid ? doc.colorEntries.find((c) => c.id === firstCid) : null;
         if (anchor) writeClipboard(anchor.hex).catch(() => undefined);
         return;
       }
 
-      if (key === 'x') {
+      if (key === sc.clearHistory) {
         setDoc((d) => ({ ...d, pickHistory: [] }));
       }
     }

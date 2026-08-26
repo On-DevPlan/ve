@@ -261,3 +261,150 @@
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--sl-color-primary, #2563eb) 20%, transparent);
 }
 .sl-cs-input::placeholder { color: var(--sl-color-text-secondary, #9ca3af); }
+
+/* ── v1.1 新增:分组 / 弹窗 / 快捷键编辑 / chip 扩展 ───────── */
+
+.sl-cs__header-actions { margin-left: auto; display: flex; gap: 6px; }
+
+/* ColorChip 派生标记 + 组标签 */
+.sl-cs-chip__swatch { position: relative; }
+.sl-cs-chip__derived {
+  position: absolute; top: 1px; right: 1px;
+  width: 5px; height: 5px; border-radius: 50%;
+  background: #fff; border: 1px solid rgba(0,0,0,.4);
+  pointer-events: none;
+}
+.sl-cs-chip__group {
+  font-size: 10px; color: var(--sl-color-text-secondary, #6b7280);
+  background: var(--sl-color-surface-alt, #f3f4f6);
+  padding: 0 4px; border-radius: 3px; white-space: nowrap;
+}
+.sl-cs-chip__act {
+  display: inline-flex; align-items: center; justify-content: center;
+  background: transparent; border: 0; cursor: pointer;
+  color: var(--sl-color-text-secondary, #6b7280);
+  padding: 2px; border-radius: 3px;
+}
+.sl-cs-chip__act:hover:not(:disabled) { background: var(--sl-color-surface-alt, #e5e7eb); color: var(--sl-color-text, #1a1a1a); }
+.sl-cs-chip__act:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* PaletteSidebar 分组 */
+.sl-cs-palettes__viewtoggle { display: flex; align-items: center; justify-content: space-between; }
+.sl-cs-palettes__group { margin-bottom: 6px; }
+.sl-cs-palettes__grouphead {
+  display: flex; align-items: center; gap: 5px;
+  width: 100%; padding: 4px 4px;
+  background: transparent; border: 0; cursor: pointer;
+  font-size: 12px; font-weight: 600; color: var(--sl-color-text, #1a1a1a);
+  border-radius: 4px;
+}
+.sl-cs-palettes__grouphead:hover { background: var(--sl-color-surface-alt, #f3f4f6); }
+.sl-cs-palettes__count {
+  margin-left: auto; font-size: 10px; font-weight: 400;
+  color: var(--sl-color-text-secondary, #9ca3af);
+}
+.sl-cs-palettes__groupmenu {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 4px; margin: 2px 0 4px 18px;
+  background: var(--sl-color-surface, #fff);
+  border: 1px solid var(--sl-color-border, #e5e7eb);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.08);
+}
+.sl-cs-palettes__groupmenu button {
+  display: flex; align-items: center; gap: 5px;
+  background: transparent; border: 0; cursor: pointer;
+  padding: 3px 6px; font-size: 11px; text-align: left;
+  border-radius: 4px; color: var(--sl-color-text, #1a1a1a);
+}
+.sl-cs-palettes__groupmenu button:hover { background: var(--sl-color-surface-alt, #f3f4f6); }
+.sl-cs-palettes__groupmenu-new { padding-top: 4px; border-top: 1px solid var(--sl-color-border, #e5e7eb); }
+
+/* ColorWheel autoFill */
+.sl-cw__autofill {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; color: var(--sl-color-text-secondary, #6b7280);
+  cursor: pointer; user-select: none;
+}
+
+/* ExportModal */
+.sl-cs-modal__backdrop {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(0,0,0,.45);
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+.sl-cs-modal {
+  background: var(--sl-color-surface, #fff);
+  border-radius: 10px;
+  box-shadow: 0 12px 40px rgba(0,0,0,.2);
+  width: min(640px, 100%);
+  max-height: 80vh;
+  display: flex; flex-direction: column;
+  color: var(--sl-color-text, #1a1a1a);
+  font-family: var(--sl-font-family, system-ui);
+}
+.sl-cs-modal__head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px 8px;
+}
+.sl-cs-modal__head h3 { margin: 0; font-size: 15px; display: flex; align-items: center; gap: 6px; }
+.sl-cs-modal__tabs { display: flex; gap: 4px; padding: 0 16px 8px; flex-wrap: wrap; }
+.sl-cs-modal__tab {
+  background: transparent; border: 1px solid var(--sl-color-border, #d1d5db);
+  border-radius: 5px; padding: 3px 10px; font-size: 11px; cursor: pointer;
+  color: var(--sl-color-text, #1a1a1a);
+}
+.sl-cs-modal__tab.is-active {
+  background: var(--sl-color-primary, #2563eb);
+  border-color: var(--sl-color-primary, #2563eb);
+  color: var(--sl-color-on-primary, #fff);
+}
+.sl-cs-modal__preview {
+  flex: 1; margin: 0 16px; min-height: 240px;
+  font-family: var(--sl-font-family-mono, monospace); font-size: 11px;
+  border: 1px solid var(--sl-color-border, #e5e7eb); border-radius: 6px;
+  padding: 8px; resize: vertical;
+  background: var(--sl-color-surface-alt, #f9fafb);
+  color: var(--sl-color-text, #1a1a1a);
+}
+.sl-cs-modal__foot {
+  display: flex; justify-content: flex-end; gap: 8px;
+  padding: 10px 16px 14px;
+}
+
+/* ShortcutEditor */
+.sl-cs-kbds__head { display: flex; align-items: center; justify-content: space-between; }
+.sl-cs-kbds__head h4 { margin: 0; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 5px; }
+.sl-cs-kbds ul { list-style: none; padding: 0; margin: 0; }
+.sl-cs-kbds li {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 3px 0; font-size: 11px; gap: 6px;
+}
+.sl-cs-kbds__label { flex: 1; }
+.sl-cs-kbds__keybtn {
+  min-width: 34px; padding: 1px 6px;
+  background: var(--sl-color-surface-alt, #f3f4f6);
+  border: 1px solid var(--sl-color-border, #d1d5db);
+  border-radius: 4px; cursor: pointer;
+  font-family: var(--sl-font-family-mono, monospace); font-size: 11px;
+  color: var(--sl-color-text, #1a1a1a);
+}
+.sl-cs-kbds__keybtn:hover { border-color: var(--sl-color-primary, #2563eb); }
+.sl-cs-kbds__keybtn.is-capturing {
+  background: var(--sl-color-primary, #2563eb);
+  border-color: var(--sl-color-primary, #2563eb);
+  color: var(--sl-color-on-primary, #fff);
+}
+.sl-cs-kbds__custom { color: var(--sl-color-primary, #2563eb); }
+.sl-cs-kbds__loading, .sl-cs-kbds__conflict { font-size: 10px; margin: 4px 0 0; }
+.sl-cs-kbds__conflict { color: #b91c1c; }
+.sl-cs-kbds__loading { color: var(--sl-color-text-secondary, #9ca3af); }
+
+/* 旧 KeyboardHints kbd 样式保留兼容 */
+.sl-cs-kbds kbd {
+  background: var(--sl-color-surface-alt, #f3f4f6);
+  padding: 1px 5px; border-radius: 3px;
+  font-family: var(--sl-font-family-mono, monospace); font-size: 10px;
+}
+.sl-cs-kbds h4 { margin: 0 0 6px; font-size: 13px; font-weight: 600; }

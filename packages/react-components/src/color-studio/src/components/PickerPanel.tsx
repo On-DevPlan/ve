@@ -5,6 +5,7 @@
 import { useColorStudio } from '../state/useColorStudio';
 import { useEyedropper } from '../hooks/useEyedropper';
 import { makeId } from '../utils/id';
+import { Btn } from './ui/Btn';
 import { ImageColorPicker } from './ImageColorPicker';
 
 interface Props {
@@ -34,14 +35,16 @@ export function PickerPanel({ onPicked }: Props) {
 
   return (
     <div className="sl-cs-picker">
-      <button
-        type="button"
-        className="sl-cs-picker__eyedropper"
+      <Btn
+        variant="secondary"
+        icon="eyedropper"
         disabled={!isSupported}
         onClick={() => open().then((h) => h && addPicked(h))}
+        title={isSupported ? '浏览器原生屏幕取色' : '当前浏览器不支持 EyeDropper API'}
+        aria-label="屏幕取色"
       >
-        {isSupported ? '🎯 屏幕取色 (P)' : '🎯 当前浏览器不支持取色器'}
-      </button>
+        {isSupported ? '屏幕取色' : '不支持取色器'}
+      </Btn>
       <ImageColorPicker onPick={addPicked} />
     </div>
   );

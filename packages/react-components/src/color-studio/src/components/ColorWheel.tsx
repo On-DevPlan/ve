@@ -174,9 +174,20 @@ export function ColorWheel() {
             <button
               key={String(opt.value)}
               type="button"
-              className={`sl-cw__harmony-btn ${doc.viewState.selectedHarmony === opt.value ? 'is-active' : ''}`}
+              className={`sl-cs-btn sl-cs-btn--sm sl-cs-btn--ghost ${doc.viewState.selectedHarmony === opt.value ? 'is-active' : ''}`}
               onClick={() => setDoc((d) => ({
                 ...d,
+                palettes: d.palettes.map((p) => p.id === d.activePaletteId && opt.value
+                  ? {
+                      ...p,
+                      harmony: {
+                        type: opt.value,
+                        anchorColorId: p.colorIds[0] ?? '',
+                        autoFill: p.harmony?.autoFill ?? false,
+                      },
+                      updatedAt: Date.now(),
+                    }
+                  : p),
                 viewState: {
                   ...d.viewState,
                   selectedHarmony: opt.value,
@@ -189,6 +200,26 @@ export function ColorWheel() {
             </button>
           ))}
         </div>
+        {(() => {
+          const p = doc.palettes.find((x) => x.id === doc.activePaletteId);
+          if (!p || !p.harmony) return null;
+          return (
+            <label className="sl-cw__autofill">
+              <input
+                type="checkbox"
+                checked={p.harmony.autoFill}
+                onChange={(e) => setDoc((d) => ({
+                  ...d,
+                  palettes: d.palettes.map((x) => x.id === p.id && x.harmony
+                    ? { ...x, harmony: { ...x.harmony, autoFill: e.target.checked }, updatedAt: Date.now() }
+                    : x),
+                  meta: { ...d.meta, updatedAt: Date.now() },
+                }))}
+              />
+              <span>锚色变化自动重派生</span>
+            </label>
+          );
+        })()}
       </div>
     </div>
   );

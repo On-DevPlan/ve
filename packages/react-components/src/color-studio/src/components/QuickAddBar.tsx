@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { useColorStudio } from '../state/useColorStudio';
 import { parseUserInput } from '../engine/colorMath';
 import { makeId } from '../utils/id';
+import { Btn } from './ui/Btn';
 
 export function QuickAddBar() {
   const { setDoc } = useColorStudio();
@@ -52,13 +53,14 @@ export function QuickAddBar() {
   return (
     <div className="sl-cs-quickadd">
       <input
+        className="sl-cs-input sl-cs-quickadd__input"
         placeholder="粘贴 #FF5733 / rgb(255,...) / red(空格分隔多色)"
         value={text}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter') submit(); }}
         aria-label="快速添加颜色"
       />
-      <button type="button" onClick={submit}>添加</button>
+      <Btn variant="primary" icon="plus" onClick={submit}>添加</Btn>
       {error && <span className="sl-cs-quickadd__err">{error}</span>}
       <span className="sl-cs-quickadd__hint">A 添加 · C 复制 · P 取色 · X 清历史</span>
     </div>

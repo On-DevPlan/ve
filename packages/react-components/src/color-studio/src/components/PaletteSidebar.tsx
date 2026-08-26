@@ -1,12 +1,17 @@
 // packages/react-components/src/color-studio/src/components/PaletteSidebar.tsx
 //
-// 调色板列表 + CRUD + 选 active + 上下移按钮替代 dnd-kit。
+// 调色板列表 + CRUD + 选 active + 上下移 + 分组渲染(平铺/分组切换)+
+// 组编辑(现有组菜单 + 新建)。
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useColorStudio } from '../state/useColorStudio';
 import { ColorChip } from './ColorChip';
+import { Icon } from './ui/Icon';
+import { Btn } from './ui/Btn';
 import { makeId } from '../utils/id';
 import { parseUserInput } from '../engine/colorMath';
+import { groupByEntries, listGroupNames } from '../utils/grouping';
+import type { ColorEntry } from '../../../../../../apps/showcase/src/api/components/color-studio/types';
 
 function nowTs() { return Date.now(); }
 
@@ -14,6 +19,19 @@ export function PaletteSidebar() {
   const { doc, setDoc } = useColorStudio();
   const [newPaletteName, setNewPaletteName] = useState('');
   const [newColorHex, setNewColorHex] = useState('');
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [groupMenuFor, setGroupMenuFor] = useState<string | null>(null);
+  const [newGroupName, setNewGroupName] = useState('');
+
+  const activePalette = doc.palettes.find((p) => p.id === doc.activePaletteId);
+  const activeEntries = useMemo(() => {
+    if (!activePalette) return [] as ColorEntry[];
+    return activePalette.colorIds
+      .map((cid) => doc.colorEntries.find((c) => c.id === cid))
+      .filter((c): c is ColorEntry => !!c);
+  }, [activePalette, doc.colorEntries]);
+  const groupNames = useMemo(() => listGroupNames(doc.colorEntries), [doc.colorEntries]);
+  const grouped = useMemo(() => groupByEntries(activeEntries), [activeEntries]);
 
   const addPalette = () => {
     if (!newPaletteName.trim()) return;
@@ -88,6 +106,94 @@ export function PaletteSidebar() {
     }));
   };
 
+  const setGroup = (entryId: string, group: string | undefined) => {
+    setDoc((d) => ({
+      ...d,
+      colorEntries: d.colorEntries.map((c) =>
+        c.id === entryId ? { ...c, group, updatedAt: nowTs() } : c,
+      ),
+      meta: { ...d.meta, updatedAt: nowTs() },
+    }));
+    setGroupMenuFor(null);
+    setNewGroupName('');
+  };
+
+  const toggleCollapsed = (g: string | undefined) => {
+    const key = g ?? '__ungrouped__';
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const toggleGroupBy = () => {
+    setDoc((d) => ({
+      ...d,
+      viewState: { ...d.viewState, groupBy: d.viewState.groupBy === 'group' ? 'none' : 'group' },
+      meta: { ...d.meta, updatedAt: nowTs() },
+    }));
+  };
+
+  const renderEntries = (entries: ColorEntry[], withReorder: boolean) => (
+    entries.map((e, i) => (
+      <li key={e.id} className="sl-cs-palettes__color">
+        <ColorChip
+          entry={e}
+          onRemove={removeColor}
+          onToggleLock={toggleLock}
+          onSetGroup={() => setGroupMenuFor(groupMenuFor === e.id ? null : e.id)}
+        />
+        {groupMenuFor === e.id && (
+          <div className="sl-cs-palettes__groupmenu" role="menu">
+            {groupNames.map((g) => (
+              <button key={g} type="button" role="menuitem" onClick={() => setGroup(e.id, g)}>
+                <Icon name="group" size={11} /> {g}
+              </button>
+            ))}
+            {e.group && (
+              <button type="button" role="menuitem" onClick={() => setGroup(e.id, undefined)}>
+                <Icon name="close" size={11} /> 移出分组
+              </button>
+            )}
+            <div className="sl-cs-palettes__groupmenu-new">
+              <input
+                className="sl-cs-input"
+                placeholder="新组名"
+                value={newGroupName}
+                onChange={(ev) => setNewGroupName(ev.target.value)}
+                onKeyDown={(ev) => {
+                  if (ev.key === 'Enter' && newGroupName.trim()) setGroup(e.id, newGroupName.trim());
+                }}
+              />
+            </div>
+          </div>
+        )}
+        {withReorder && (
+          <>
+            <button
+              type="button"
+              className="sl-cs-chip__act"
+              onClick={() => moveColor(e.id, -1)}
+              disabled={i === 0}
+              aria-label="上移"
+              title="上移"
+            ><Icon name="chevronUp" size={12} /></button>
+            <button
+              type="button"
+              className="sl-cs-chip__act"
+              onClick={() => moveColor(e.id, 1)}
+              disabled={i === (activePalette?.colorIds.length ?? 1) - 1}
+              aria-label="下移"
+              title="下移"
+            ><Icon name="chevronDown" size={12} /></button>
+          </>
+        )}
+      </li>
+    ))
+  );
+
   return (
     <div className="sl-cs-palettes">
       <h3>调色板</h3>
@@ -104,47 +210,68 @@ export function PaletteSidebar() {
       </ul>
       <div className="sl-cs-palettes__add">
         <input
+          className="sl-cs-input"
           placeholder="新板名称"
           value={newPaletteName}
           onChange={(e) => setNewPaletteName(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') addPalette(); }}
         />
-        <button type="button" onClick={addPalette}>+</button>
+        <Btn variant="secondary" size="sm" iconOnly icon="plus" onClick={addPalette} aria-label="新增调色板" />
       </div>
-      <h4>当前板色</h4>
-      <ul className="sl-cs-palettes__colors">
-        {(() => {
-          const p = doc.palettes.find((x) => x.id === doc.activePaletteId);
-          if (!p) return null;
-          return p.colorIds.map((cid, i) => {
-            const e = doc.colorEntries.find((x) => x.id === cid);
-            if (!e) return null;
-            return (
-              <li key={cid} className="sl-cs-palettes__color">
-                <ColorChip
-                  entry={e}
-                  onRemove={removeColor}
-                  onToggleLock={toggleLock}
-                />
-                <button type="button" onClick={() => moveColor(cid, -1)} disabled={i === 0}>↑</button>
-                <button
-                  type="button"
-                  onClick={() => moveColor(cid, 1)}
-                  disabled={i === p.colorIds.length - 1}
-                >↓</button>
-              </li>
-            );
-          });
-        })()}
-      </ul>
+
+      <div className="sl-cs-palettes__viewtoggle">
+        <h4>当前板色</h4>
+        <Btn
+          variant={doc.viewState.groupBy === 'group' ? 'primary' : 'secondary'}
+          size="sm"
+          icon="group"
+          onClick={toggleGroupBy}
+          title="平铺 / 按组折叠"
+        >
+          {doc.viewState.groupBy === 'group' ? '分组视图' : '平铺视图'}
+        </Btn>
+      </div>
+
+      {doc.viewState.groupBy === 'group' ? (
+        grouped.map((g) => {
+          const key = g.name ?? '__ungrouped__';
+          const isCollapsed = collapsed.has(key);
+          return (
+            <div key={key} className="sl-cs-palettes__group">
+              <button
+                type="button"
+                className="sl-cs-palettes__grouphead"
+                onClick={() => toggleCollapsed(g.name)}
+                aria-expanded={!isCollapsed}
+              >
+                <Icon name={isCollapsed ? 'chevronUp' : 'chevronDown'} size={12} />
+                <Icon name="group" size={11} />
+                <span>{g.name ?? '未分组'}</span>
+                <span className="sl-cs-palettes__count">{g.entries.length}</span>
+              </button>
+              {!isCollapsed && (
+                <ul className="sl-cs-palettes__colors">
+                  {renderEntries(g.entries, false)}
+                </ul>
+              )}
+            </div>
+          );
+        })
+      ) : (
+        <ul className="sl-cs-palettes__colors">
+          {renderEntries(activeEntries, true)}
+        </ul>
+      )}
+
       <div className="sl-cs-palettes__add-color">
         <input
+          className="sl-cs-input"
           placeholder="#FF5733 或 red"
           value={newColorHex}
           onChange={(e) => setNewColorHex(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') addColorToActive(); }}
         />
-        <button type="button" onClick={addColorToActive}>添加</button>
+        <Btn variant="primary" size="sm" icon="plus" onClick={addColorToActive}>添加</Btn>
       </div>
     </div>
   );
