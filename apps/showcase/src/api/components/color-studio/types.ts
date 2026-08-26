@@ -21,6 +21,8 @@ export interface ColorEntry {
   locked: boolean;
   note: string;
   tags: string[];
+  /** v1.1.0:分组标签(自由文本),undefined = 未分组 */
+  group?: string;
   derivedFrom?: { paletteId: string; rule: HarmonyType };
   createdAt: number;
   updatedAt: number;
@@ -53,11 +55,14 @@ export interface ColorStudioViewState {
   showHarmony: boolean;
   selectedHarmony: HarmonyType | null;
   brightness: number;
+  /** v1.1.0:调色板列表平铺 / 按组折叠 */
+  groupBy: 'none' | 'group';
 }
 
 export interface ColorStudioDocument {
   meta: {
-    schemaVersion: '1.0.0';
+    /** v1.1.0 为当前版本;load 时 1.0.0 旧文档由 docSchema 自动升级 */
+    schemaVersion: '1.1.0';
     createdAt: number;
     updatedAt: number;
     authorEmail: string;
@@ -75,7 +80,7 @@ export function emptyDoc(authorEmail = '', now = Date.now()): ColorStudioDocumen
   const defaultAnchorId = makeId(now + 1);
   return {
     meta: {
-      schemaVersion: '1.0.0',
+      schemaVersion: '1.1.0',
       createdAt: now,
       updatedAt: now,
       authorEmail,
@@ -110,6 +115,7 @@ export function emptyDoc(authorEmail = '', now = Date.now()): ColorStudioDocumen
       showHarmony: false,
       selectedHarmony: null,
       brightness: 100,
+      groupBy: 'none',
     },
   };
 }
