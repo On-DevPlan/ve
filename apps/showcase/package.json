@@ -24,7 +24,8 @@
     "react-dom": "^19.0.0",
     "remotion": "4.0.505",
     "vue": "^3.4.0",
-    "vue-router": "^4.4.0"
+    "vue-router": "^4.4.0",
+    "zod": "^3.23.0"
   },
   "devDependencies": {
     "@testing-library/dom": "^10.4.1",
