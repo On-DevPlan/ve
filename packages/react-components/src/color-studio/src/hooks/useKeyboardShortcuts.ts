@@ -8,7 +8,7 @@
 // 在 INPUT/TEXTAREA 内不触发,避免抢输入焦点。
 
 import { useEffect, useRef } from 'react';
-import { useColorStudio } from '../state/ColorStudioProvider';
+import { useColorStudio } from '../state/useColorStudio';
 import { useEyedropper } from './useEyedropper';
 import { writeClipboard } from '../utils/clipboard';
 import { makeId } from '../utils/id';

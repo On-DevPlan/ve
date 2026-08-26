@@ -3,7 +3,7 @@
 // 当前 active palette 的和声派生色输出。
 
 import { useMemo } from 'react';
-import { useColorStudio } from '../state/ColorStudioProvider';
+import { useColorStudio } from '../state/useColorStudio';
 import { deriveHarmony } from '../engine/harmony';
 import type { Hex } from '../../../../../../apps/showcase/src/api/components/color-studio/types';
 
