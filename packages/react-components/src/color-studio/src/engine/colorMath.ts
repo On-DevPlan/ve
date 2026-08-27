@@ -92,6 +92,11 @@ export function parseUserInput(input: string): Hex | null {
   return null;
 }
 
+/** 解析"添加新颜色"输入:空/无效 → 白色兜底(空板一键新建可编辑色卡)。 */
+export function resolveNewColorHex(input: string): Hex {
+  return parseUserInput(input) ?? '#FFFFFF';
+}
+
 /** OKLCH 感知均匀插值,输出 hex。 */
 export function interpolateColor(a: Hex, b: Hex, t: number): Hex {
   const clampT = Math.max(0, Math.min(1, t));

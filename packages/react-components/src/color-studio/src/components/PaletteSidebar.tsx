@@ -10,7 +10,8 @@ import { ColorChip } from './ColorChip';
 import { Icon } from './ui/Icon';
 import { Btn } from './ui/Btn';
 import { makeId } from '../utils/id';
-import { parseUserInput } from '../engine/colorMath';
+import { resolveNewColorHex } from '../engine/colorMath';
+import { addColorEntryAndSelect } from '../engine/wheelCommit';
 import { promoteToToken } from '../engine/tokenLink';
 import { useSelectedColor } from '../hooks/useSelectedColor';
 import type { ColorEntry } from '../../../../../../apps/showcase/src/api/components/color-studio/types';
@@ -21,6 +22,7 @@ export function PaletteSidebar() {
   const { doc, setDoc } = useColorStudio();
   const { effectiveId, select } = useSelectedColor();
   const [newPaletteName, setNewPaletteName] = useState('');
+  const [createMode, setCreateMode] = useState<'input' | null>(null);
   const [newColorHex, setNewColorHex] = useState('');
   const [groupMenuFor, setGroupMenuFor] = useState<string | null>(null);
 
@@ -56,22 +58,18 @@ export function PaletteSidebar() {
     }));
   };
 
-  const addColorToActive = () => {
-    const hex = parseUserInput(newColorHex);
-    if (!hex) return;
-    const id = makeId();
-    const ts = nowTs();
-    setDoc((d) => ({
-      ...d,
-      colorEntries: [...d.colorEntries, { id, hex, weight: 1, locked: false, note: '', tags: [], createdAt: ts, updatedAt: ts }],
-      palettes: d.palettes.map((p) =>
-        p.id === d.activePaletteId ? { ...p, colorIds: [...p.colorIds, id], updatedAt: ts } : p,
-      ),
-      // 新加的颜色直接选中(色盘跟随)
-      viewState: { ...d.viewState, selectedColorId: id },
-      meta: { ...d.meta, updatedAt: ts },
-    }));
+  /** 新建颜色:加一个白色色卡并选中(空板白色画布 → 首色)。 */
+  const createWhite = () => {
+    setDoc((d) => addColorEntryAndSelect(d, '#FFFFFF', 'wheel'));
+    setCreateMode(null);
+  };
+
+  /** 输入创建:解析输入新建并选中(空/无效 → 白色)。 */
+  const createFromInput = () => {
+    const hex = resolveNewColorHex(newColorHex);
+    setDoc((d) => addColorEntryAndSelect(d, hex, 'wheel'));
     setNewColorHex('');
+    setCreateMode(null);
   };
 
   const removeColor = (entryId: string) => {
@@ -148,6 +146,31 @@ export function PaletteSidebar() {
       </div>
 
       <h4>当前板色</h4>
+      <div className="sl-cs-palettes__create">
+        <Btn variant="primary" size="sm" icon="plus" onClick={createWhite} title="新建一个白色色卡(空板白色画布 → 首色)">
+          新建颜色
+        </Btn>
+        <Btn
+          variant="secondary" size="sm" icon="palette"
+          onClick={() => setCreateMode(createMode === 'input' ? null : 'input')}
+          title="输入 hex/rgb/名字创建颜色"
+        >
+          输入创建
+        </Btn>
+      </div>
+      {createMode === 'input' && (
+        <div className="sl-cs-palettes__add-color">
+          <input
+            autoFocus
+            className="sl-cs-input"
+            placeholder="#FF5733 或 red(留空 → 白色)"
+            value={newColorHex}
+            onChange={(e) => setNewColorHex(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') createFromInput(); if (e.key === 'Escape') setCreateMode(null); }}
+          />
+          <Btn variant="primary" size="sm" icon="plus" onClick={createFromInput}>创建</Btn>
+        </div>
+      )}
       <ul className="sl-cs-palettes__colors">
         {activeEntries.map((e, i) => (
           <li key={e.id} className="sl-cs-palettes__color">
@@ -192,17 +215,6 @@ export function PaletteSidebar() {
           </li>
         ))}
       </ul>
-
-      <div className="sl-cs-palettes__add-color">
-        <input
-          className="sl-cs-input"
-          placeholder="#FF5733 或 red"
-          value={newColorHex}
-          onChange={(e) => setNewColorHex(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') addColorToActive(); }}
-        />
-        <Btn variant="primary" size="sm" icon="plus" onClick={addColorToActive}>添加</Btn>
-      </div>
     </div>
   );
 }

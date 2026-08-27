@@ -9,9 +9,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useColorStudio } from '../state/useColorStudio';
 import { useSelectedColor } from '../hooks/useSelectedColor';
-import { fromHex, toHex } from '../engine/colorMath';
-import { addEntryToActivePalette } from '../utils/paletteActions';
-import { Btn } from './ui/Btn';
+import { fromHex, toHex, parseUserInput } from '../engine/colorMath';
+import { pickWheelCommitMode, commitWheelColor } from '../engine/wheelCommit';
 import { HarmonyOverlay } from './HarmonyOverlay';
 import type { HarmonyType } from '../../../../../../apps/showcase/src/api/components/color-studio/types';
 
@@ -104,31 +103,46 @@ function paintWheel(ctx: CanvasRenderingContext2D, v: number) {
 
 export function ColorWheel() {
   const { doc, setDoc } = useColorStudio();
-  const { entry: selected, effectiveId: anchorId } = useSelectedColor();
+  const { entry: selected, effectiveId } = useSelectedColor();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const rafRef = useRef<number | null>(null);
   const draggingRef = useRef(false);
   const [cursor, setCursor] = useState<{ h: number; s: number } | null>(null);
+  // 色盘文本编辑:输入 hex/rgb/名字 → 改当前选中色
+  const [textHex, setTextHex] = useState('');
 
+  // 编辑目标:有 anchor 编辑,空板无目标(色盘仅编辑,新建走调色板侧栏)
+  const commitMode = useMemo(
+    () => pickWheelCommitMode(doc, effectiveId),
+    [doc, effectiveId],
+  );
+  const isEmpty = commitMode.mode === 'empty';
   const anchorHex = selected?.hex ?? '#000000';
   const v = doc.viewState.brightness / 100;
+
+  const commitText = useCallback(() => {
+    const parsed = parseUserInput(textHex);
+    if (!parsed) { setTextHex(''); return; }
+    setDoc((d) => {
+      const mode = pickWheelCommitMode(d, d.viewState.selectedColorId);
+      return commitWheelColor(d, mode.anchorColorId, parsed);
+    });
+    setTextHex('');
+  }, [textHex, setDoc]);
 
   // 受控:anchor hex 反推指示点(色盘点击 / 滑杆 / 外部改色 都会流经这里)
   const hsv = useMemo(() => hexToHsv(anchorHex), [anchorHex]);
   const indicator = cursor ?? { h: hsv.h, s: hsv.s };
 
   const commitHex = useCallback((h: number, s: number, vv: number) => {
-    if (!anchorId) return;
     const hex = hsvToHex(h, s, vv);
     const now = Date.now();
-    setDoc((d) => ({
-      ...d,
-      colorEntries: d.colorEntries.map((c) =>
-        c.id === anchorId ? { ...c, hex, updatedAt: now } : c,
-      ),
-      meta: { ...d.meta, updatedAt: now },
-    }));
-  }, [anchorId, setDoc]);
+    setDoc((d) => {
+      const mode = pickWheelCommitMode(d, d.viewState.selectedColorId);
+      // 空板无编辑目标,忽略拖拽(新建走调色板添加)
+      return commitWheelColor(d, mode.anchorColorId, hex, now);
+    });
+  }, [setDoc]);
 
   // 明度变化 → 重画圆盘
   useEffect(() => {
@@ -206,21 +220,30 @@ export function ColorWheel() {
             sourceHex={anchorHex}
           />
         </svg>
+        {isEmpty && (
+          <div className="sl-cw__empty" role="status">
+            当前板无颜色
+            <br />
+            用左侧「新建颜色」或「输入创建」添加第一个色卡，即可开始编辑
+          </div>
+        )}
       </div>
       <div className="sl-cw__controls">
-        {/* 快速落子:当前正在调的颜色一键存为新色卡(快捷键 A) */}
         <div className="sl-cw__quickrow">
           <span className="sl-cw__quickrow-hex" style={{ backgroundColor: anchorHex }} title={anchorHex} />
+          <input
+            className="sl-cw__quickrow-input"
+            value={textHex}
+            placeholder={anchorHex}
+            onChange={(e) => setTextHex(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commitText();
+              if (e.key === 'Escape') setTextHex('');
+            }}
+            aria-label="输入 hex/rgb/名字直接编辑当前色"
+            title="输入 hex/rgb/名字,回车编辑当前选中色卡"
+          />
           <code className="sl-cw__quickrow-value">{anchorHex}</code>
-          <Btn
-            variant="primary"
-            icon="plus"
-            onClick={() => setDoc((d) => addEntryToActivePalette(d, anchorHex, 'wheel'))}
-            title="把当前正在生成的颜色存为新色卡(快捷键 A)"
-          >
-            加入调色板
-          </Btn>
-          <span className="sl-cw__quickrow-kbd">A</span>
         </div>
         <label className="sl-cw__slider">
           <span>B (明度)</span>
@@ -230,17 +253,12 @@ export function ColorWheel() {
             value={doc.viewState.brightness}
             onChange={(e) => {
               const newV = Number(e.target.value);
-              setDoc((d) => ({
-                ...d,
-                // 明度滑杆同时改 viewState(记忆)与 anchor hex(实时反馈)
-                viewState: { ...d.viewState, brightness: newV },
-                colorEntries: d.colorEntries.map((c) =>
-                  c.id === anchorId
-                    ? { ...c, hex: hsvToHex(indicator.h, indicator.s, newV / 100), updatedAt: Date.now() }
-                    : c,
-                ),
-                meta: { ...d.meta, updatedAt: Date.now() },
-              }));
+              const nextHex = hsvToHex(indicator.h, indicator.s, newV / 100);
+              setDoc((d) => {
+                const mode = pickWheelCommitMode(d, d.viewState.selectedColorId);
+                // 明度滑杆同时改 viewState(记忆)与当前颜色(编辑 anchor)
+                return commitWheelColor(d, mode.anchorColorId, nextHex);
+              });
             }}
           />
           <span className="sl-cw__vlabel">{doc.viewState.brightness}</span>
@@ -259,7 +277,7 @@ export function ColorWheel() {
                       harmony: {
                         type: opt.value,
                         // 和声锚点 = 当前选中的色卡(而非固定首色)
-                        anchorColorId: anchorId ?? p.colorIds[0] ?? '',
+                        anchorColorId: commitMode.anchorColorId ?? p.colorIds[0] ?? '',
                         autoFill: p.harmony?.autoFill ?? false,
                       },
                       updatedAt: Date.now(),

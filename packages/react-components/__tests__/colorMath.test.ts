@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { toHex, fromHex, parseUserInput, interpolateColor } from '../src/color-studio/src/engine/colorMath';
+import { toHex, fromHex, parseUserInput, interpolateColor, resolveNewColorHex } from '../src/color-studio/src/engine/colorMath';
 
 describe('colorMath', () => {
   describe('toHex / fromHex', () => {
@@ -74,6 +74,24 @@ describe('colorMath', () => {
     it('t=0.5 produces a valid mid hex', () => {
       const mid = interpolateColor('#000000', '#FFFFFF', 0.5);
       expect(mid).toMatch(/^#[0-9A-F]{6}$/);
+    });
+  });
+
+  describe('resolveNewColorHex', () => {
+    it('空输入 → 白色', () => {
+      expect(resolveNewColorHex('')).toBe('#FFFFFF');
+    });
+    it('空白输入 → 白色', () => {
+      expect(resolveNewColorHex('   ')).toBe('#FFFFFF');
+    });
+    it('无效输入 → 白色', () => {
+      expect(resolveNewColorHex('not-a-color')).toBe('#FFFFFF');
+    });
+    it('有效 hex → 原样', () => {
+      expect(resolveNewColorHex('#FF5733')).toBe('#FF5733');
+    });
+    it('CSS 颜色名 → 解析结果', () => {
+      expect(resolveNewColorHex('red')).toBe('#FF0000');
     });
   });
 });

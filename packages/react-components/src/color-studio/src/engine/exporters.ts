@@ -72,12 +72,39 @@ export function exportJson(doc: ColorStudioDocument): string {
   return JSON.stringify(doc, null, 2);
 }
 
-export type ExportFormat = 'css-vars' | 'tailwind' | 'design-tokens' | 'json';
+/** TOML 导出 —— 与导入格式对称,便于「导出 → 复制给 LLM → 迭代 → 再导入」闭环。 */
+export function exportToml(doc: ColorStudioDocument): string {
+  const lines: string[] = ['# Color Studio export — TOML'];
+  for (const p of doc.palettes) {
+    lines.push('');
+    lines.push('[[palettes]]');
+    lines.push(`name = "${escapeToml(p.name)}"`);
+    paletteEntries(doc, p).forEach((e) => {
+      lines.push('');
+      lines.push('[[palettes.colors]]');
+      lines.push(`hex = "${e.hex}"`);
+      lines.push(`weight = ${e.weight}`);
+      if (e.note) lines.push(`note = "${escapeToml(e.note)}"`);
+      if (e.tags.length > 0) {
+        lines.push(`tags = [${e.tags.map((t) => `"${escapeToml(t)}"`).join(', ')}]`);
+      }
+    });
+  }
+  return lines.join('\n');
+}
+
+/** TOML basic string 转义:反斜杠 + 引号。换行等其余字符保持原样。 */
+function escapeToml(s: string): string {
+  return s.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
+export type ExportFormat = 'css-vars' | 'tailwind' | 'design-tokens' | 'json' | 'toml';
 
 export const EXPORT_FORMATS: { value: ExportFormat; label: string; ext: string }[] = [
   { value: 'css-vars', label: 'CSS Variables', ext: 'css' },
   { value: 'tailwind', label: 'Tailwind', ext: 'js' },
   { value: 'design-tokens', label: 'Design Tokens', ext: 'tokens.json' },
+  { value: 'toml', label: 'TOML 导入格式', ext: 'toml' },
   { value: 'json', label: 'JSON 文档', ext: 'json' },
 ];
 
@@ -86,6 +113,7 @@ export function exportDoc(doc: ColorStudioDocument, format: ExportFormat): strin
     case 'css-vars': return exportCssVars(doc);
     case 'tailwind': return exportTailwind(doc);
     case 'design-tokens': return exportDesignTokens(doc);
+    case 'toml': return exportToml(doc);
     case 'json': return exportJson(doc);
   }
 }

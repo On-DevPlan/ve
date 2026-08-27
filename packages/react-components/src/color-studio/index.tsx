@@ -4,7 +4,7 @@
 // 右栏(取色/全局色/滤镜/快捷键)+ 导出弹窗 + 全局快捷键。
 
 import './index.css';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ColorStudioProvider } from './src/state/ColorStudioProvider';
 import { useColorStudio } from './src/state/useColorStudio';
 import { ColorWheel } from './src/components/ColorWheel';
@@ -15,6 +15,7 @@ import { PickerPanel } from './src/components/PickerPanel';
 import { HistoryStrip } from './src/components/HistoryStrip';
 import { ShortcutEditor } from './src/components/ShortcutEditor';
 import { ExportModal } from './src/components/ExportModal';
+import { ImportModal } from './src/components/ImportModal';
 import { ProportionalView } from './src/components/ProportionalView';
 import { TokenPanel } from './src/components/TokenPanel';
 import { FilterPanel } from './src/components/FilterPanel';
@@ -25,6 +26,8 @@ import { useKeyboardShortcuts } from './src/hooks/useKeyboardShortcuts';
 import { useShortcutPrefs } from './src/hooks/useShortcutPrefs';
 import { useAutoFillEffect } from './src/hooks/useHarmony';
 import { addEntryToActivePalette } from './src/utils/paletteActions';
+import { mergePalettesIntoDoc } from './src/engine/importMerge';
+import type { ImportParseResult } from './src/engine/importParser';
 import { parseUserInput } from './src/engine/colorMath';
 
 const MAIN_VIEWS: { value: 'wheel' | 'proportional' | 'brush'; label: string; icon: IconName }[] = [
@@ -45,6 +48,7 @@ function Shell() {
   const { doc, setDoc, status, authState } = useColorStudio();
   const { prefs, ready, setKey, setCopyFormat, resetAll } = useShortcutPrefs();
   const [exportOpen, setExportOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   // C 键复制用首选格式
   useKeyboardShortcuts({ shortcuts: prefs.shortcuts, copyFormat: prefs.preferredCopyFormat });
   useAutoFillEffect();
@@ -64,6 +68,25 @@ function Shell() {
     setDoc((d) => addEntryToActivePalette(d, hex, 'eyedropper'));
   };
 
+  // 导入:解析结果 → 增量合并 → 统计供弹窗展示。
+  // 先基于当前 doc 纯函数计算(拿 stats),再一次性 setDoc。
+  // 注意:不依赖 setDoc updater 的同步执行时序,避免并发渲染下 stats 为空。
+  const handleImport = (result: ImportParseResult) => {
+    const merged = mergePalettesIntoDoc(doc, result);
+    setDoc(merged.doc);
+    return merged.stats;
+  };
+
+  // 当前活动调色板及其颜色(喂给 ImportModal 做「AI 增量提示词」)
+  const activePaletteForImport = useMemo(() => {
+    const p = doc.palettes.find((p) => p.id === doc.activePaletteId);
+    if (!p) return null;
+    const colors = p.colorIds
+      .map((cid) => doc.colorEntries.find((c) => c.id === cid))
+      .filter((c): c is NonNullable<typeof c> => !!c);
+    return { palette: p, colors };
+  }, [doc]);
+
   return (
     <div className="sl-cs">
       <header className="sl-cs__header">
@@ -73,6 +96,9 @@ function Shell() {
         </span>
         <span className="sl-cs__auth">{authState === 'logged-in' ? '已登录' : '未登录'}</span>
         <div className="sl-cs__header-actions">
+          <Btn variant="secondary" size="sm" icon="upload" onClick={() => setImportOpen(true)}>
+            导入
+          </Btn>
           <Btn variant="secondary" size="sm" icon="download" onClick={() => setExportOpen(true)}>
             导出
           </Btn>
@@ -123,6 +149,12 @@ function Shell() {
       </aside>
       <footer className="sl-cs__bottom"><QuickAddBar /></footer>
       <ExportModal open={exportOpen} onClose={() => setExportOpen(false)} />
+      <ImportModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImport={handleImport}
+        activePalette={activePaletteForImport}
+      />
     </div>
   );
 }

@@ -61,5 +61,34 @@ export function deriveHarmony(anchor: Hex, type: HarmonyType): Hex[] {
   return result.slice(0, expected);
 }
 
+/**
+ * 和声标记的角度(色盘上小点画在哪)。
+ * 相对 anchor 色相角偏移,归一化到 [0, 360)。
+ * 修正:此前 HarmonyOverlay 用绝对角度画点(互补永远 180°),
+ * 不随 anchor 色相变化,导致选不同颜色时小点位置不跟随、预览错位。
+ * monochromatic 无标记角度(画同心圆,见 harmonyMarkerRadiusFactor)。
+ */
+export function harmonyMarkerAngles(anchorHue: number, type: HarmonyType): number[] {
+  if (type === 'monochromatic') return [];
+  const offsets = HARMONY_ANGLE_TABLE[type];
+  if (!offsets) return [];
+  return offsets.map((deg) => (((anchorHue + deg) % 360) + 360) % 360);
+}
+
+/**
+ * 和声标记的径向位置系数(相对色盘半径,0..1)。
+ * 非单色规则:派生色饱和度 = anchor 饱和度(hueShift 保持 s),
+ * 因此小点应画在与 anchor 相同深度处 —— 近圆心锚点 → 近圆心派生点。
+ * 单色规则:返回 4 档同心圆系数(明度梯度示意,与 anchor 饱和度无关)。
+ */
+export function harmonyMarkerRadiusFactor(
+  type: HarmonyType,
+  anchorSaturation: number,
+): number[] {
+  if (type === 'monochromatic') return [0.2, 0.4, 0.6, 0.8];
+  const sat = Number.isFinite(anchorSaturation) ? Math.max(0, Math.min(1, anchorSaturation)) : 0;
+  return [sat];
+}
+
 // re-export modeRgb to keep tree-shaking warning quiet
 void modeRgb;
