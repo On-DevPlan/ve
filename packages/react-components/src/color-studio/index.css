@@ -689,3 +689,91 @@
 .sl-cs-filters__to { color: var(--sl-color-text-secondary, #9ca3af); }
 .sl-cs-filters__to.is-changed { color: var(--sl-color-primary, #2563eb); font-weight: 600; }
 .sl-cs-filters__groupempty { font-size: 11px; color: var(--sl-color-text-secondary, #9ca3af); }
+
+/* Cookbook 全屏文档页 */
+.sl-cs-cookbook {
+  position: fixed; inset: 0; z-index: 1000;
+  display: flex; flex-direction: column;
+  background: var(--sl-color-surface, #fff);
+  color: var(--sl-color-text, #111827);
+}
+.sl-cs-cookbook__head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--sl-color-border, #e5e7eb);
+  background: var(--sl-color-surface, #fff);
+}
+.sl-cs-cookbook__head h2 {
+  margin: 0; font-size: 16px; font-weight: 600;
+  display: flex; align-items: center; gap: 8px;
+  flex: 1;
+}
+.sl-cs-cookbook__body {
+  flex: 1; min-height: 0;
+  display: flex; gap: 0;
+  overflow: hidden;
+}
+.sl-cs-cookbook__nav {
+  width: 220px; flex-shrink: 0;
+  padding: 16px 12px;
+  border-right: 1px solid var(--sl-color-border, #e5e7eb);
+  overflow-y: auto;
+  background: var(--sl-color-surface-alt, #f9fafb);
+}
+.sl-cs-cookbook__nav ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 4px; }
+.sl-cs-cookbook__navbtn {
+  width: 100%; text-align: left;
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 10px 12px; border: 1px solid transparent; border-radius: 8px;
+  background: transparent; cursor: pointer;
+  transition: background .12s, border-color .12s;
+}
+.sl-cs-cookbook__navbtn:hover { background: var(--sl-color-surface, #fff); border-color: var(--sl-color-border, #e5e7eb); }
+.sl-cs-cookbook__navbtn.is-active {
+  background: var(--sl-color-surface, #fff);
+  border-color: var(--sl-color-primary, #2563eb);
+}
+.sl-cs-cookbook__navnum {
+  font-family: var(--sl-font-family-mono, monospace);
+  font-size: 10px; color: var(--sl-color-text-secondary, #9ca3af);
+}
+.sl-cs-cookbook__navtitle { font-size: 14px; font-weight: 600; }
+.sl-cs-cookbook__navbrief { font-size: 11px; color: var(--sl-color-text-secondary, #9ca3af); }
+.sl-cs-cookbook__article {
+  flex: 1; min-width: 0; overflow-y: auto;
+  padding: 28px 36px 40px;
+  max-width: 780px;
+}
+.sl-cs-cookbook__secthead { margin-bottom: 24px; }
+.sl-cs-cookbook__secthead h3 { margin: 0; font-size: 22px; font-weight: 700; }
+.sl-cs-cookbook__subtitle {
+  margin: 4px 0 0; font-size: 13px;
+  color: var(--sl-color-text-secondary, #6b7280);
+}
+.sl-cs-cookbook__block { margin-bottom: 28px; }
+.sl-cs-cookbook__block h4 {
+  margin: 0 0 10px; font-size: 15px; font-weight: 600;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--sl-color-border, #e5e7eb);
+}
+.sl-cs-cookbook__block p { margin: 0 0 10px; line-height: 1.65; font-size: 13.5px; }
+.sl-cs-cookbook__block ul { margin: 0 0 10px; padding-left: 20px; line-height: 1.7; font-size: 13.5px; }
+.sl-cs-cookbook__block li { margin-bottom: 4px; }
+.sl-cs-cookbook__block b { font-weight: 600; }
+.sl-cs-cookbook__table {
+  width: 100%; border-collapse: collapse;
+  font-size: 12.5px; margin: 8px 0 4px;
+}
+.sl-cs-cookbook__table th, .sl-cs-cookbook__table td {
+  text-align: left; padding: 8px 10px;
+  border-bottom: 1px solid var(--sl-color-border, #e5e7eb);
+}
+.sl-cs-cookbook__table th {
+  background: var(--sl-color-surface-alt, #f9fafb);
+  font-weight: 600;
+}
+.sl-cs-cookbook__table code {
+  font-family: var(--sl-font-family-mono, monospace);
+  font-size: 11.5px; padding: 1px 5px;
+  background: var(--sl-color-surface-alt, #f3f4f6); border-radius: 3px;
+}

@@ -16,6 +16,7 @@ import { HistoryStrip } from './src/components/HistoryStrip';
 import { ShortcutEditor } from './src/components/ShortcutEditor';
 import { ExportModal } from './src/components/ExportModal';
 import { ImportModal } from './src/components/ImportModal';
+import { CookbookPage } from './src/components/CookbookPage';
 import { ProportionalView } from './src/components/ProportionalView';
 import { TokenPanel } from './src/components/TokenPanel';
 import { FilterPanel } from './src/components/FilterPanel';
@@ -49,6 +50,7 @@ function Shell() {
   const { prefs, ready, setKey, setCopyFormat, resetAll } = useShortcutPrefs();
   const [exportOpen, setExportOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [cookbookOpen, setCookbookOpen] = useState(false);
   // C 键复制用首选格式
   useKeyboardShortcuts({ shortcuts: prefs.shortcuts, copyFormat: prefs.preferredCopyFormat });
   useAutoFillEffect();
@@ -96,6 +98,9 @@ function Shell() {
         </span>
         <span className="sl-cs__auth">{authState === 'logged-in' ? '已登录' : '未登录'}</span>
         <div className="sl-cs__header-actions">
+          <Btn variant="secondary" size="sm" icon="book" onClick={() => setCookbookOpen(true)}>
+            案例
+          </Btn>
           <Btn variant="secondary" size="sm" icon="upload" onClick={() => setImportOpen(true)}>
             导入
           </Btn>
@@ -155,6 +160,7 @@ function Shell() {
         onImport={handleImport}
         activePalette={activePaletteForImport}
       />
+      <CookbookPage open={cookbookOpen} onClose={() => setCookbookOpen(false)} />
     </div>
   );
 }

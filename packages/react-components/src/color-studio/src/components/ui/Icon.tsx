@@ -22,7 +22,8 @@ export type IconName =
   | 'chevronDown'
   | 'close'
   | 'keyboard'
-  | 'sync';
+  | 'sync'
+  | 'book';
 
 const PATHS: Record<IconName, string> = {
   // 吸管:斜杆 + 上部滴管囊
@@ -62,6 +63,8 @@ const PATHS: Record<IconName, string> = {
     'M3 7h18v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7ZM7 11h.01M11 11h.01M15 11h.01M8 14h8',
   // 双向循环箭头
   sync: 'M4 12a8 8 0 0 1 13.6-5.7L20 8M20 4v4h-4M20 12a8 8 0 0 1-13.6 5.7L4 16M4 20v-4h4',
+  // 书:左页 + 右页
+  book: 'M4 5a2 1 0 0 1 2-1h5v15H6a2 1 0 0 1-2-1V5ZM14 4h5a2 1 0 0 1 2 1v13a2 1 0 0 1-2 1h-5V4Z',
 };
 
 interface Props {
