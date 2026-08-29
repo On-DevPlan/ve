@@ -17,9 +17,49 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # 直接用默认(人类可读)格式,--max-warnings=0 保持严格。
-      # 不要用 `pnpm lint`:那个是 --format=json --output-file,CI 控制台看不到报错内容。
-      - run: pnpm exec eslint . --max-warnings=0
+      # 用 `pnpm lint`(定义在 package.json 里,等价于
+      # `eslint . --max-warnings=0 --format=json --output-file=eslint-report.json`)。
+      # 输出写到文件而非 stdout,这样:
+      #   - 控制台只打规则聚合表(lint-summary.mjs 渲染),
+      #     不再像默认格式那样把每条错误都 dump 出来;
+      #   - 后续 step 能读到结构化 JSON,生成 PR 评论。
+      # 用 set +e 包住是为了拿到 exit code(否则 pnpm lint 失败会
+      # 让 bash 提前退出,echo "exit=$?" 跑不到);最后再用 exit
+      # 把 ESLint 的退出码透传出去 —— 这是必须的:否则即使 lint
+      # 失败,step 也以 0 退出,job 不会被标记成 ❌,lint 就不再是
+      # merge gate 了。失败时后面两个 if: always() 仍然会跑,
+      # 因为 if: always() 忽略前置 step 状态。
+      - name: Run ESLint
+        id: eslint
+        run: |
+          set +e
+          pnpm lint
+          ESLINT_EXIT=$?
+          echo "exit=$ESLINT_EXIT" >> "$GITHUB_OUTPUT"
+          exit $ESLINT_EXIT
+      # 把规则聚合打到控制台 —— 不论 ESLint 成功失败都跑。
+      # 与之前直接用默认格式相比,console 失去"具体文件路径 + 行号",
+      # 但 PR 评论里会附带 top 5 错误(含路径),开发定位够用。
+      - name: Print lint summary
+        if: always()
+        run: |
+          if [ -s eslint-report.json ]; then
+            cat eslint-report.json | node scripts/lint-summary.mjs
+          else
+            echo "lint summary — no eslint-report.json (ESLint did not produce one)"
+          fi
+      # 发 PR 评论 —— 成功 / 失败都发。
+      # if: always() 是关键:失败时不希望整个 workflow 短路,
+      # 因为 CI 自带的 ❌ check 已经够明示,这个 step 只是补结构化摘要。
+      # sticky 化(同 PR 复用一条评论)留作未来可选 —— 当前实现是"每次
+      # run 一条新评论",保留每次 push 的独立审计轨迹。
+      - name: Post lint summary as PR comment
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: node scripts/lint-summary-comment.mjs
 
   build:
     runs-on: ubuntu-latest
