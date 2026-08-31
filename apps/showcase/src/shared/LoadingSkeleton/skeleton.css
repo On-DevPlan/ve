@@ -1,22 +1,32 @@
 /* skeleton.css —— 首次会话骨架样式。
    视觉构成:
-     1) 容器卡片化(surface-alt 背景 + 圆角 + 内边距),不再是裸的散块;
+     1) 容器为全屏覆盖层(absolute + 100dvh + surface 背景),组件挂载在骨架下方,
+        fadeOut 交叉淡出时无布局跳动;
      2) spinner 加大并加双层柔光(主圈 + 外圈 pulse),视觉重量更聚焦;
      3) 占位 bar 用主题色微调的渐变 + 横向 shimmer 扫光,层次柔和不死板;
      4) 文字 "加载中…" 提字号加 weight,与 spinner 形成呼吸节奏。
    主题色全部走现有 CSS 变量(--sl-color-* / --sl-radius-*),与 defaultTokens 对齐。 */
 
-/* ---------- 容器:卡片化 ---------- */
+/* ---------- 容器:全屏覆盖层 ---------- */
+/* absolute 覆盖全屏:挂载点在 ShadowRoot 内,定位锚点是详情页的 .detail__wrapper
+   (absolute inset:0);无定位祖先时退化为初始包含块,同样覆盖视口。
+   height 用 100dvh(动态视口,移动端工具栏收展不露底),不支持的浏览器回落 100vh。
+   z-index 压过组件内一般定位元素 —— 组件在骨架下方挂载,fadeOut 时交叉显出不跳动。 */
 .sl-skel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 14px;
-  padding: 20px 24px 24px;
-  min-height: 140px;
-  background: var(--sl-color-surface-alt, #f3f4f6);
-  border-radius: var(--sl-radius-md, 8px);
-  /* 容器不再加 border —— 视觉更像"占位卡"而非"边框框",更接近真实组件预览态 */
+  padding: 24px;
+  background: var(--sl-color-surface, #fff);
+  z-index: 100;
 }
 
 /* ---------- Spinner:环形 + 外圈 pulse ---------- */
@@ -64,6 +74,7 @@
   flex-direction: column;
   gap: 10px;
   width: 100%;
+  max-width: 420px; /* 全屏下限制占位条宽度,避免拉满整屏 */
   margin-top: 2px;
 }
 
@@ -132,7 +143,7 @@
    pulse 用更亮的 primary tone,保持可识别。 */
 @media (prefers-color-scheme: dark) {
   .sl-skel {
-    /* 在 dark 下让卡片背景明显一点,区分容器 */
+    /* 在 dark 下给覆盖层一点亮色 tint,与宿主深色背景区分 */
     background: rgba(255, 255, 255, 0.04);
   }
   .sl-skel__bar {

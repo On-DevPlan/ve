@@ -434,7 +434,7 @@ function flash(msg: string) {
 }
 
 /* === 主体 === */
-.main { padding: 5px 72px 96px; transition: padding .3s ease; }
+.main { padding: 5px 72px 96px; transition: padding .3s ease;height: 100dvh;overflow-y: hidden; }
 /* 折叠后主区变宽,收缩侧留白让卡片网格用满 */
 .home-pc.is-nav-collapsed .main { padding-left: 40px; padding-right: 40px; }
 .page-head {
