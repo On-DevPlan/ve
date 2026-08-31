@@ -23,6 +23,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router';
 import { useRegistry } from '../../composables/useRegistry';
 import { useDesktopStore, THEMES, type ThemeId, type DisplayMode, type PinnedNode, type FileInfo } from '../../composables/useDesktopStore';
+import BrandBadge from '../../components/BrandBadge.vue';
 import { jwtAuth } from '@/api/http/auth-store';
 import { useLoginModalState } from '@/shared/useLoginModal';
 
@@ -537,7 +538,7 @@ onMounted(() => {
     <!-- 顶栏 -->
     <header class="topbar">
       <div class="brand">
-        wb / showcase
+        <BrandBadge size="sm" />
         <small>Style Library — 2026</small>
       </div>
 
@@ -869,6 +870,7 @@ onMounted(() => {
   border-bottom: 1px solid var(--tile-border, var(--line));
 }
 .brand {
+  display: flex; align-items: center; gap: 10px;
   font-family: 'Songti SC', 'Iowan Old Style', Georgia, 'Times New Roman', serif;
   font-size: 26px; font-weight: 500; letter-spacing: -0.01em; line-height: 1;
 }

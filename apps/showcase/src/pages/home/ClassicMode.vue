@@ -10,6 +10,7 @@
 import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import CardGrid from '../../components/CardGrid.vue';
+import BrandBadge from '../../components/BrandBadge.vue';
 import SearchBar from '../../components/SearchBar.vue';
 import { useRegistry } from '../../composables/useRegistry';
 import { useSearch } from '../../composables/useSearch';
@@ -83,7 +84,7 @@ function flash(msg: string) {
   >
     <aside class="sidebar">
       <div class="brand">
-        wb / showcase
+        <BrandBadge size="md" />
         <small>Style Library — 2026</small>
       </div>
 
@@ -313,6 +314,7 @@ function flash(msg: string) {
   border-right-width: 0;
 }
 .brand {
+  display: flex; align-items: center; gap: 12px;
   font-family: "Cormorant Garamond", "Songti SC", serif;
   font-size: 30px; font-weight: 500; letter-spacing: -0.01em;
   border-bottom: 1px solid var(--ink); padding-bottom: 10px;

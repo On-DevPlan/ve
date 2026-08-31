@@ -24,6 +24,7 @@ import { ref, computed, watch, type Ref } from 'vue';
 import { useRegistry } from './useRegistry';
 import { kvV1Service, fileV1Service, type FileInfo } from '@/api/services';
 import { jwtAuth } from '@/api/http/auth-store';
+import { resolveFileUrl } from '@/api/tools/file-url';
 
 // 重新导出 FileInfo —— PinMode 用它在 rootEl 上写 CSS(背景是展示态,
 // 写在 store 的契约之外;但 PinMode 又需要这个类型做参数签名)
@@ -515,7 +516,8 @@ export function useDesktopStore(): UseDesktopStore {
           if (obj && obj.fileId && obj.url) {
             // 从 fileId 重新 info 拿最新 url(可能带签名/过期),保证可用
             const info = await fileV1Service.info({ fileId: obj.fileId });
-            bgFile.value = info;
+            // 改写 URL 为同源相对路径 /files/<fileId>,走 /files/ 代理避免 CORS/mixed-content
+            bgFile.value = { ...info, url: resolveFileUrl(info.url) };
             // 不在此处写 DOM —— 背景的渲染交给 PinMode 自己的 rootEl
             // (避免污染 :root / body,保持 PinMode 视觉自包含)
           }
