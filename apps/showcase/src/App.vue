@@ -14,10 +14,13 @@
 //   - transition 的 enter/leave 状态类由 Vue 渲染到 DOM 上,作用域必须非 scoped
 
 import { RouterView } from 'vue-router';
+import FloatingBack from './components/FloatingBack.vue';
 </script>
 
 <template>
   <div class="app-root">
+    <!-- 全局悬浮返回按钮:transition 之外,路由切换不重挂(拖动位置不闪) -->
+    <FloatingBack />
     <RouterView v-slot="{ Component, route }">
       <transition
         name="page-fade"
