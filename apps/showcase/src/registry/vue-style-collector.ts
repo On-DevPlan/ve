@@ -336,6 +336,44 @@ export function vueStyleCollector(opts: { vueComponentsRoot: string }): Plugin {
   let cssResolutionImporter: string | undefined;
   let root = '';
   let isProduction = false;
+  // 文件路径 → 上次见到的 style 块序列化内容,用于 handleHotUpdate 判定是否 style 改动。
+  // 只有 style 改动才走 full-reload;JS/template 改动让 plugin-vue 走正常 HMR(保 state)。
+  const lastStyleSignature = new Map<string, string>();
+  // 归一化路径比较(Windows 反斜杠 → posix)。
+  const watchRoot = opts.vueComponentsRoot.split('\\').join('/');
+
+  /** 重建整张快照 —— 从磁盘重读所有 SFC 的 <style> 块 + 第三方 CSS imports。 */
+  function rebuild() {
+    pseudoBlocks.clear();
+    thirdPartyCssPaths.clear();
+    const blocks = collectVueStyleBlocks(opts.vueComponentsRoot);
+    for (const b of blocks) {
+      pseudoBlocks.set(pseudoCssPath(b.file, b.index), b);
+    }
+    if (existsSync(opts.vueComponentsRoot) && statSync(opts.vueComponentsRoot).isDirectory()) {
+      const vueFiles: string[] = [];
+      walkVueFiles(opts.vueComponentsRoot, vueFiles);
+      cssResolutionImporter = vueFiles[0];
+    }
+    const thirdPartyCssImports = collectThirdPartyCssImports(opts.vueComponentsRoot);
+    for (const cssImports of Object.values(thirdPartyCssImports)) {
+      for (const spec of cssImports) {
+        thirdPartyCssPaths.add(stripQuery(toPosix(spec)));
+      }
+    }
+    code = generateVueStylesCode(blocks, { root, isProduction }, thirdPartyCssImports);
+  }
+
+  /** 计算一个 SFC 文件 style 块内容的签名 —— 多块按出现顺序拼起来,任意一块改动就判为变。 */
+  function signatureFor(file: string, source: string): string {
+    try {
+      const { descriptor } = parse(source, { filename: file });
+      return descriptor.styles.map((b) => `${b.scoped ? 's' : 'g'}::${b.content}`).join('\u0000');
+    } catch {
+      // 解析失败视为未变,让 plugin-vue 处理报错。
+      return undefined as unknown as string;
+    }
+  }
 
   return {
     name: 'vue-style-collector',
@@ -351,26 +389,51 @@ export function vueStyleCollector(opts: { vueComponentsRoot: string }): Plugin {
       // 默认 vite build 下两者等价,但 `vite build --mode development` 会分歧:
       // 本插件算 prod id、plugin-vue 算 dev id → scoped 静默失效。
       isProduction = config.isProduction;
-      const blocks = collectVueStyleBlocks(opts.vueComponentsRoot);
-      const thirdPartyCssImports = collectThirdPartyCssImports(opts.vueComponentsRoot);
-      pseudoBlocks.clear();
-      for (const b of blocks) {
-        pseudoBlocks.set(pseudoCssPath(b.file, b.index), b);
-      }
-      thirdPartyCssPaths.clear();
-      // 第三方 CSS 路径集合用于 resolveId 拦截 —— 我们要拦下来再用真实 SFC importer 重委托,
-      // 否则 vite 会从 apps/showcase 的 node_modules 找 `ol/ol.css`(那里没装),直接报错。
-      const vueFiles: string[] = [];
+      rebuild();
+      // 用启动态给所有 .vue 文件预填签名,避免首次保存任意文件时被误判为「style 变了」。
       if (existsSync(opts.vueComponentsRoot) && statSync(opts.vueComponentsRoot).isDirectory()) {
-        walkVueFiles(opts.vueComponentsRoot, vueFiles);
-      }
-      cssResolutionImporter = vueFiles[0];
-      for (const cssImports of Object.values(thirdPartyCssImports)) {
-        for (const spec of cssImports) {
-          thirdPartyCssPaths.add(stripQuery(toPosix(spec)));
+        const files: string[] = [];
+        walkVueFiles(opts.vueComponentsRoot, files);
+        for (const f of files) {
+          try {
+            const src = readFileSync(f, 'utf-8');
+            const sig = signatureFor(f, src);
+            if (sig !== undefined) lastStyleSignature.set(f, sig);
+          } catch {
+            /* ignore */
+          }
         }
       }
-      code = generateVueStylesCode(blocks, { root, isProduction }, thirdPartyCssImports);
+    },
+    /**
+     * SFC `<style>` 块被改时:shadow-root CSS 是 mount 时一次性 inject 的,
+     * 运行时改 <style> 不会自动回流到 ShadowRoot;plugin-vue 的 <style> HMR
+     * 走 document.head inject 也跨不进 shadow boundary。
+     * 唯一能保证用户看到新 CSS 的路径:重建快照 + 整页 full-reload,
+     * 让 mount 流程重跑 injectCss()。JS/template 改动不在此处拦截,放行给 plugin-vue。
+     */
+    handleHotUpdate(ctx) {
+      const file = ctx.file.split('\\').join('/');
+      if (!file.startsWith(watchRoot) || !file.endsWith('.vue')) return ctx.modules;
+      // ctx.read() 拿 vite 缓存里的最新内容,避免再读盘。
+      const source = typeof ctx.read === 'function' ? ctx.read() : readFileSync(file, 'utf-8');
+      const sig = signatureFor(file, typeof source === 'string' ? source : '');
+      const prev = lastStyleSignature.get(file);
+      // 解析失败 或 style 块未变 → 放行 plugin-vue 走 HMR(JS/template 编辑仍然保 state)。
+      if (sig === undefined || sig === prev) return ctx.modules;
+      try {
+        rebuild();
+        lastStyleSignature.set(file, sig);
+        // 主动发 full-reload 信号(via ws)。详情页 mount 流程会再次跑,
+        // 届时 ShadowRootHost.injectCss 重新拉新 CSS 覆盖旧的。
+        ctx.server.ws.send({ type: 'full-reload', path: '*' });
+        // 返回空数组 = 不让 vite 自己走 partial HMR(避免与 full-reload 抢同一文件)。
+        return [];
+      } catch (e) {
+        // rebuild 失败(磁盘暂时不可读之类) → 退回到普通 HMR。
+        console.warn('[vue-style-collector] rebuild failed, falling back:', e);
+        return ctx.modules;
+      }
     },
     async resolveId(id) {
       // 拦截 1:虚拟模块本身。
