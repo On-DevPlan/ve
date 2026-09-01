@@ -12,10 +12,17 @@ loadIndex()
 replacePiece(skinId, pieceKey, blob)
   → POST /api/v1/files  (multipart, tags=[chess-skin, chess-skin:<id>, chess-skin:<id>:<pieceKey>])
   → POST /api/v1/kv  (key=chess_skin:index, tags=[chess-skin])
+  → DELETE /api/v1/files/<oldFileId>?groupId=190  (best-effort 旧文件清理,失败仅 warn)
 
 applyBatchMeta(meta, files)
   → × 12 POST /api/v1/files  (并行后续优化)
   → POST /api/v1/kv  (合并 index)
+
+deleteSkin(skinId)
+  → 并发 N 个 DELETE /api/v1/files/<fileId>?groupId=190  (pieces + boardBackground)
+  → 任一失败 → 抛错中止,KV index 不动
+  → 全部成功 → POST /api/v1/kv  (key=chess_skin:index,从 index 移除该 skin)
+  → 顺序:文件先,KV 后 —— 任一文件失败整体回滚(KV index 字字未动)
 
 generateAiPrompt(args)
   → 返回 markdown 字符串（用户复制粘贴给 AI，只输出 meta JSON）

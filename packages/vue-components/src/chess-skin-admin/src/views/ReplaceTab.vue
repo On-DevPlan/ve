@@ -1,5 +1,5 @@
 <!-- ReplaceTab.vue —— 单棋子替换（仅 owner）。
-     点击棋子格 -> 模态选新图 -> 上传(fileV1 带 tags) + 写 KV。
+     点击棋子格 -> 模态选新图 -> 上传(fileV1 带 tags) + 写 KV + 清理旧文件。
      后端按 groupId=190 兜底校验，前端只控制 UI 可见性。 -->
 <script setup lang="ts">
 import { ref } from 'vue';
@@ -30,13 +30,27 @@ async function submit() {
   submitting.value = true;
   status.value = null;
   try {
-    await props.admin.replacePiece(
+    const result = await props.admin.replacePiece(
       target.value.skinId,
       target.value.pieceKey,
       file.value,
       file.value.name,
     );
-    status.value = { ok: true, text: `${target.value.pieceKey} 已替换并发布` };
+    const okText = `${target.value.pieceKey} 已替换并发布`;
+    if (result.orphanedFailed.length > 0) {
+      const failedIds = result.orphanedFailed.map((f) => f.fileId.slice(0, 8)).join(', ');
+      status.value = {
+        ok: true,
+        text: `${okText}（旧文件清理失败 ${result.orphanedFailed.length} 个: ${failedIds}）`,
+      };
+    } else if (result.orphanedCleaned.length > 0) {
+      status.value = {
+        ok: true,
+        text: `${okText}（旧文件 ${result.orphanedCleaned.length} 个已清理）`,
+      };
+    } else {
+      status.value = { ok: true, text: okText };
+    }
     target.value = null;
   } catch (e) {
     status.value = { ok: false, text: e instanceof Error ? e.message : String(e) };
@@ -58,7 +72,7 @@ async function submit() {
 
     <template v-else>
       <p class="csa-help">
-        点击任意棋子格上传新图替换。原文件保留可回滚，KV index 版本号自动 +1。
+        点击任意棋子格上传新图替换。KV index 版本号自动 +1，被替换的旧文件会一并清理（清理失败仅警告，不影响主操作）。
       </p>
 
       <ul>
