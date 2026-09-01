@@ -60,8 +60,12 @@ async function confirmDelete() {
   status.value = null;
   try {
     const id = deletingId.value;
-    await props.admin.deleteSkin(id);
-    status.value = { ok: true, text: `${id} 已从 chess_skin:index 移除` };
+    const result = await props.admin.deleteSkin(id);
+    const fileCount = result.pieceFilesDeleted + (result.backgroundDeleted ? 1 : 0);
+    status.value = {
+      ok: true,
+      text: `${id} 已从 chess_skin:index 移除（${fileCount} 个文件一并删除）`,
+    };
     deletingId.value = null;
     if (expandedId.value === id) expandedId.value = null;
   } catch (e) {
@@ -113,7 +117,7 @@ async function confirmDelete() {
             </button>
             <button
               class="csa-card__action csa-card__action--danger"
-              title="从 chess_skin:index 移除（文件保留）"
+              title="从 chess_skin:index 移除 + 联动删除文件"
               @click.stop="openDelete(m.id)"
             >
               删除
@@ -203,7 +207,7 @@ async function confirmDelete() {
           删除 <code>{{ deletingId }}</code>
         </h3>
         <p class="csa-modal__desc">
-          该操作从 KV chess_skin:index 移除该皮肤（版本号一并消失），文件资源保留。无法撤销。
+          该操作从 KV chess_skin:index 移除该皮肤（版本号一并消失），并联动删除该皮肤对应的全部棋子图文件（约 12 张，含 boardBackground）。任一文件删除失败将中止操作，KV index 不变。无法撤销。
         </p>
         <div class="csa-modal__actions">
           <button
