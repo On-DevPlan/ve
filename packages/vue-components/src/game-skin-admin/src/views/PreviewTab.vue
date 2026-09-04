@@ -1,11 +1,11 @@
-<!-- PreviewTab.vue —— 只读预览：皮肤卡片 + 12 张棋子网格;admin/owner 可在此行重命名 / 删除。
-     所有样式来自 index.vue 的共享设计系统（.csa-*）。 -->
+<!-- game-skin-admin/src/views/PreviewTab.vue — 只读预览，游戏无关。
+     admin 来自 useSkinAdmin(entry) 工厂，网格列数由 registry.gridColumns 驱动。 -->
 <script setup lang="ts">
 import { ref } from 'vue';
-import { PIECE_KEYS } from '../composables/useChessSkinAdmin';
+import type { UseSkinAdmin } from '../composables/useSkinAdmin';
 
 const props = defineProps<{
-  admin: ReturnType<typeof import('../composables/useChessSkinAdmin').useChessSkinAdmin>;
+  admin: UseSkinAdmin;
 }>();
 
 const expandedId = ref<string | null>(null);
@@ -20,7 +20,6 @@ function toggle(id: string) {
   expandedId.value = expandedId.value === id ? null : id;
 }
 
-/* ---- 重 rename modal ---- */
 function openRename(id: string, currentName: string) {
   renamingId.value = id;
   renameInput.value = currentName;
@@ -45,7 +44,6 @@ async function submitRename() {
   }
 }
 
-/* ---- 删除 modal ---- */
 function openDelete(id: string) {
   deletingId.value = id;
   status.value = null;
@@ -62,9 +60,10 @@ async function confirmDelete() {
     const id = deletingId.value;
     const result = await props.admin.deleteSkin(id);
     const fileCount = result.pieceFilesDeleted + (result.backgroundDeleted ? 1 : 0);
+    const kvKey = props.admin.entry.kvIndexKey;
     status.value = {
       ok: true,
-      text: `${id} 已从 chess_skin:index 移除（${fileCount} 个文件一并删除）`,
+      text: `${id} 已从 ${kvKey} 移除（${fileCount} 个文件一并删除）`,
     };
     deletingId.value = null;
     if (expandedId.value === id) expandedId.value = null;
@@ -74,12 +73,17 @@ async function confirmDelete() {
     deleteSubmitting.value = false;
   }
 }
+
+function assetMapFor(m: (typeof props.admin.index.value)[number]): Record<string, { fileId?: string }> {
+  // KV schema 字段名全游戏统一 `pieces`（与 fr GameSkinMeta 对齐）
+  return (m.pieces as Record<string, { fileId?: string }>) ?? {};
+}
 </script>
 
 <template>
   <section>
     <p class="csa-help">
-      共 {{ props.admin.index.value.length }} 套皮肤。点击行首名称展开 12 张棋子图。
+      共 {{ props.admin.index.value.length }} 套皮肤。点击行首名称展开 {{ props.admin.assetKeys.length }} 张资源图。
     </p>
 
     <div
@@ -117,7 +121,7 @@ async function confirmDelete() {
             </button>
             <button
               class="csa-card__action csa-card__action--danger"
-              title="从 chess_skin:index 移除 + 联动删除文件"
+              :title="`从 ${props.admin.entry.kvIndexKey} 移除 + 联动删除文件`"
               @click.stop="openDelete(m.id)"
             >
               删除
@@ -127,22 +131,27 @@ async function confirmDelete() {
         <div
           v-if="expandedId === m.id"
           class="csa-grid"
+          :style="{ gridTemplateColumns: `repeat(${props.admin.entry.gridColumns}, 1fr)` }"
         >
           <figure
-            v-for="k in PIECE_KEYS"
+            v-for="k in props.admin.assetKeys"
             :key="k"
             class="csa-piece"
           >
             <div class="csa-piece__tile">
               <img
-                :src="props.admin.previewFileUrl(m.pieces[k]?.fileId ?? '')"
+                :src="props.admin.previewFileUrl(assetMapFor(m)[k]?.fileId ?? '')"
                 :alt="k"
                 loading="lazy"
               >
             </div>
             <figcaption>
               <span class="csa-piece__key">{{ k }}</span>
-              <span class="csa-piece__fid">{{ m.pieces[k]?.fileId?.slice(0, 8) ?? '--' }}</span>
+              <span
+                v-if="props.admin.entry.labels[k]"
+                class="csa-piece__label"
+              >{{ props.admin.entry.labels[k] }}</span>
+              <span class="csa-piece__fid">{{ assetMapFor(m)[k]?.fileId?.slice(0, 8) ?? '--' }}</span>
             </figcaption>
           </figure>
         </div>
@@ -207,7 +216,7 @@ async function confirmDelete() {
           删除 <code>{{ deletingId }}</code>
         </h3>
         <p class="csa-modal__desc">
-          该操作从 KV chess_skin:index 移除该皮肤（版本号一并消失），并联动删除该皮肤对应的全部棋子图文件（约 12 张，含 boardBackground）。任一文件删除失败将中止操作，KV index 不变。无法撤销。
+          该操作从 KV {{ props.admin.entry.kvIndexKey }} 移除该皮肤（版本号一并消失），并联动删除该皮肤对应的全部资源文件（约 {{ props.admin.assetKeys.length }} 张，含 boardBackground）。任一文件删除失败将中止操作，KV index 不变。无法撤销。
         </p>
         <div class="csa-modal__actions">
           <button

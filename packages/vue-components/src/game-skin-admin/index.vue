@@ -1,124 +1,137 @@
-<!-- chess-skin-admin/index.vue —— 顶层入口（import.meta.glob 唯一扫描目标）。
-     只做组合：tab 状态 + useChessSkinAdmin + 三个子视图。
-     业务逻辑在 src/composables/useChessSkinAdmin.ts，视图在 src/views/。
-     共享设计系统（token + .csa-* 工具类）在本文件非 scoped <style> 块，
-     全部锁在 .sl-csa 根下，子视图 markup 直接消费。 -->
+<!-- game-skin-admin/index.vue — 游戏资产管理主页。
+     两级导航：
+       主页 2 个 tab：游戏 | 表情包
+       游戏 tab → 游戏卡片列表（GameListView）→ 点进详情（GameDetail：展示 | 更换 | 上传 三 tab）
+       表情包 tab → EmojiListView（Phase 3 通路接入后启用）
+     深链：?game=chess 直达游戏详情；?tab=emoji 直达表情包 tab；默认 = 游戏 tab 列表页。
+     Note: avoid importing vue-router here — the component chunk lives in packages/vue-components
+     which has no vue-router dependency; rollup would treat it as external and fail the build.
+     Use window.location / window.history for query handling (host router will still see the URL). -->
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { useChessSkinAdmin } from './src/composables/useChessSkinAdmin';
-import PreviewTab from './src/views/PreviewTab.vue';
-import ReplaceTab from './src/views/ReplaceTab.vue';
-import ImportTab from './src/views/ImportTab.vue';
+import { GAME_SKIN_REGISTRY, isSupportedGameId } from './src/composables/gameSkinRegistry';
+import GameListView from './src/views/GameListView.vue';
+import GameDetail from './src/views/GameDetail.vue';
+import EmojiListView from './src/views/EmojiListView.vue';
 
-type TabId = 'preview' | 'replace' | 'import';
-const tab = ref<TabId>('preview');
-const admin = useChessSkinAdmin();
+type MainTab = 'games' | 'emoji';
+
+function readTabFromUrl(): MainTab {
+  if (typeof window === 'undefined') return 'games';
+  return new URLSearchParams(window.location.search).get('tab')?.trim().toLowerCase() === 'emoji'
+    ? 'emoji'
+    : 'games';
+}
+
+function readGameFromUrl(): string | null {
+  if (typeof window === 'undefined') return null;
+  const g = new URLSearchParams(window.location.search).get('game')?.trim().toLowerCase() ?? '';
+  return isSupportedGameId(g) ? g : null;
+}
+
+function writeUrl(tab: MainTab, game: string | null) {
+  if (typeof window === 'undefined' || typeof history === 'undefined') return;
+  const url = new URL(window.location.href);
+  if (tab === 'emoji') url.searchParams.set('tab', 'emoji');
+  else url.searchParams.delete('tab');
+  if (tab === 'games' && game) url.searchParams.set('game', game);
+  else url.searchParams.delete('game');
+  history.replaceState(null, '', url.toString());
+}
+
+const mainTab = ref<MainTab>(readTabFromUrl());
+const selectedGame = ref<string | null>(mainTab.value === 'games' ? readGameFromUrl() : null);
+
+function setMainTab(next: MainTab) {
+  if (next === mainTab.value) return;
+  mainTab.value = next;
+  if (next === 'emoji') selectedGame.value = null;
+  writeUrl(next, selectedGame.value);
+}
+
+function openGame(gameId: string) {
+  selectedGame.value = gameId;
+  writeUrl('games', gameId);
+}
+
+function closeGame() {
+  selectedGame.value = null;
+  writeUrl('games', null);
+}
+
+// external navigation (back/forward) syncs from URL
+if (typeof window !== 'undefined') {
+  window.addEventListener('popstate', () => {
+    mainTab.value = readTabFromUrl();
+    selectedGame.value = mainTab.value === 'games' ? readGameFromUrl() : null;
+  });
+}
 
 onMounted(() => {
-  if (admin.loginHint.value === null) admin.loadIndex();
+  writeUrl(mainTab.value, selectedGame.value);
 });
 
-const TABS: { key: TabId; label: string; adminOnly: boolean }[] = [
-  { key: 'preview', label: '预览', adminOnly: false },
-  { key: 'replace', label: '单图替换', adminOnly: true },
-  { key: 'import', label: '批量导入', adminOnly: true },
-];
+const gameCount = Object.keys(GAME_SKIN_REGISTRY).length;
 </script>
 
 <template>
   <div class="sl-csa">
     <header class="csa-head">
       <div class="csa-head__title">
-        <h2>国际象棋皮肤管理</h2>
-        <span class="csa-sub">chess_skin:index · groupId 190</span>
+        <h2>游戏资产管理</h2>
+        <span class="csa-sub">skins · emoji · KV public · groupId 190</span>
       </div>
       <div class="csa-head__meta">
-        <span
-          v-if="admin.loading.value"
-          class="csa-badge csa-badge--info"
-        >加载中</span>
-        <span
-          v-else-if="admin.error.value"
-          class="csa-badge csa-badge--danger"
-        >{{ admin.error.value }}</span>
-        <span
-          v-else-if="admin.loginHint.value"
-          class="csa-badge csa-badge--warn"
-        >未登录 · 只读</span>
-        <template v-else>
-          <span class="csa-badge">{{ admin.myRole.value ?? '未登录' }}</span>
-          <span
-            v-if="admin.canEdit.value"
-            class="csa-badge csa-badge--ok"
-          >可编辑</span>
-          <span
-            v-else
-            class="csa-badge csa-badge--mute"
-          >只读</span>
-        </template>
-        <button
-          class="csa-btn csa-btn--ghost csa-btn--sm"
-          @click="admin.loadIndex"
-        >
-          刷新
-        </button>
+        <span class="csa-badge csa-badge--info">{{ gameCount }} 个游戏已注册</span>
       </div>
     </header>
 
-    <div class="csa-frame">
-      <nav
-        class="csa-tabs"
-        role="tablist"
+    <!-- 主页 tab：游戏 | 表情包 -->
+    <nav
+      class="csa-tabs"
+      role="tablist"
+    >
+      <button
+        role="tab"
+        :class="['csa-tabs__item', { 'is-active': mainTab === 'games' }]"
+        :aria-selected="mainTab === 'games'"
+        @click="setMainTab('games')"
       >
-        <button
-          v-for="t in TABS"
-          :key="t.key"
-          role="tab"
-          :class="['csa-tabs__item', {
-            'is-active': tab === t.key,
-            'is-disabled': t.adminOnly && !admin.canEdit.value,
-          }]"
-          :aria-selected="tab === t.key"
-          :disabled="t.adminOnly && !admin.canEdit.value"
-          :title="t.adminOnly && !admin.canEdit.value ? '仅 admin 可用' : ''"
-          @click="tab = t.key"
-        >
-          {{ t.label }}<span
-            v-if="t.adminOnly && !admin.canEdit.value"
-            class="csa-tabs__lock"
-          >locked</span>
-        </button>
-      </nav>
+        游戏
+      </button>
+      <button
+        role="tab"
+        :class="['csa-tabs__item', { 'is-active': mainTab === 'emoji' }]"
+        :aria-selected="mainTab === 'emoji'"
+        @click="setMainTab('emoji')"
+      >
+        表情包
+      </button>
+    </nav>
 
-      <main class="csa-main">
-        <PreviewTab
-          v-show="tab === 'preview'"
-          :admin="admin"
+    <main class="csa-main">
+      <!-- 游戏 tab：列表 ↔ 详情 -->
+      <template v-if="mainTab === 'games'">
+        <GameListView
+          v-if="!selectedGame"
+          @select="openGame"
         />
-        <ReplaceTab
-          v-show="tab === 'replace'"
-          :admin="admin"
+        <GameDetail
+          v-else
+          :key="selectedGame"
+          :game-id="selectedGame"
+          @back="closeGame"
         />
-        <ImportTab
-          v-show="tab === 'import'"
-          :admin="admin"
-        />
-      </main>
-    </div>
+      </template>
+
+      <!-- 表情包 tab -->
+      <EmojiListView v-show="mainTab === 'emoji'" />
+    </main>
   </div>
 </template>
 
 <style>
-/* ============================================================
-   共享设计系统 —— 非 scoped（子视图 .csa-* 类在此定义）。
-   全部选择器都在 .sl-csa 之下，不会泄漏到组件外；
-   ShadowRoot 隔离下也不会污染 host。
-   色板对齐 host tokens.ts（zinc 系 + #2563eb 主色）。
-   视觉语言：分段式 pill tabs / 卡片阴影层次 / 状态点 badge /
-   棋盘格装饰 / 统一 focus ring + reduced-motion 降级。
-   ============================================================ */
 .sl-csa {
-  /* 色板 */
   --csa-bg: #fafafa;
   --csa-panel: #ffffff;
   --csa-hover: #f4f4f5;
@@ -136,7 +149,6 @@ const TABS: { key: TabId; label: string; adminOnly: boolean }[] = [
   --csa-success-soft: #f0fdf4;
   --csa-warn: #d97706;
   --csa-warn-soft: #fffbeb;
-  /* 形状 / 阴影 / ring */
   --csa-radius: 10px;
   --csa-radius-sm: 8px;
   --csa-ring: 0 0 0 3px rgba(37, 99, 235, 0.14);
@@ -144,9 +156,6 @@ const TABS: { key: TabId; label: string; adminOnly: boolean }[] = [
   --csa-shadow-md: 0 1px 2px rgba(24, 24, 27, 0.04), 0 4px 16px rgba(24, 24, 27, 0.06);
   --csa-shadow-lg: 0 24px 48px -12px rgba(24, 24, 27, 0.28);
   --csa-mono: ui-monospace, "JetBrains Mono", "SFMono-Regular", Menlo, Consolas, monospace;
-
-  /* 滚动层(spec: 详情页宿主 overflow:hidden 不滚动,组件根做滚动;
-     ShadowRoot 宿主 height:auto,百分比链断 → 用 100dvh 不用 height:100%) */
   box-sizing: border-box;
   height: 100vh;
   height: 100dvh;
@@ -157,7 +166,6 @@ const TABS: { key: TabId; label: string; adminOnly: boolean }[] = [
   font-size: 13px;
   line-height: 1.55;
   color: var(--csa-fg);
-  /* 页面底色：zinc-50 基底 + 左右顶部各一道极淡品牌色晕染,缓解宽屏两侧空白感 */
   background:
     radial-gradient(900px 480px at 92% 18%, rgba(37, 99, 235, 0.045), transparent 65%),
     radial-gradient(1100px 300px at 16% -10%, rgba(37, 99, 235, 0.05), transparent 60%),
@@ -171,8 +179,6 @@ const TABS: { key: TabId; label: string; adminOnly: boolean }[] = [
 .sl-csa input, .sl-csa select, .sl-csa textarea { font: inherit; color: inherit; }
 .sl-csa ul, .sl-csa ol { margin: 0; padding: 0; list-style: none; }
 .sl-csa ::selection { background: #bfdbfe; color: #1e3a8a; }
-
-/* ── header ──────────────────────────────────── */
 .sl-csa .csa-head {
   display: flex;
   align-items: center;
@@ -209,8 +215,6 @@ const TABS: { key: TabId; label: string; adminOnly: boolean }[] = [
   gap: 8px;
   flex-wrap: wrap;
 }
-
-/* ── badge（::before 状态点随 currentColor 变色） ── */
 .sl-csa .csa-badge {
   display: inline-flex;
   align-items: center;
@@ -239,8 +243,6 @@ const TABS: { key: TabId; label: string; adminOnly: boolean }[] = [
 .sl-csa .csa-badge--danger { background: var(--csa-danger-soft); color: var(--csa-danger); border-color: #fecaca; }
 .sl-csa .csa-badge--info { background: var(--csa-primary-soft); color: var(--csa-primary); border-color: #bfdbfe; }
 .sl-csa .csa-badge--mute { background: var(--csa-hover); color: var(--csa-fg-3); box-shadow: none; }
-
-/* ── tabs（分段式 pill 控件） ─────────────────── */
 .sl-csa .csa-tabs {
   display: flex;
   align-items: center;
@@ -297,15 +299,10 @@ const TABS: { key: TabId; label: string; adminOnly: boolean }[] = [
 .sl-csa .csa-tabs__item.is-active .csa-tabs__lock {
   background: var(--csa-hover);
 }
-
-/* ── main / help ─────────────────────────────── */
-/* 居中容器 —— 限制内容最大宽度并水平居中,缓解宽屏右半侧空白感。
-   header 仍 full-bleed(标题左 + meta 右的不对称构图需要全宽)。 */
 .sl-csa .csa-frame {
   max-width: clamp(720px, 92vw, 1400px);
   margin-inline: auto;
 }
-/* .csa-main 由 .csa-frame 控制最大宽度,本身不再限宽 */
 .sl-csa .csa-help {
   font-size: 12px;
   color: var(--csa-fg-2);
@@ -319,8 +316,6 @@ const TABS: { key: TabId; label: string; adminOnly: boolean }[] = [
   padding: 1px 5px;
   border-radius: 4px;
 }
-
-/* ── empty（::before 棋盘格装饰） ─────────────── */
 .sl-csa .csa-empty {
   display: flex;
   flex-direction: column;
@@ -343,7 +338,6 @@ const TABS: { key: TabId; label: string; adminOnly: boolean }[] = [
   margin-bottom: 6px;
   border: 1px solid var(--csa-border);
   box-shadow: var(--csa-shadow-sm);
-  /* 4x4 棋盘格 —— 呼应主题，无 emoji */
   background: conic-gradient(var(--csa-hover) 0 25%, #ffffff 0 50%, var(--csa-hover) 0 75%, #ffffff 0) 0 0 / 11px 11px;
 }
 .sl-csa .csa-empty em {
@@ -351,8 +345,6 @@ const TABS: { key: TabId; label: string; adminOnly: boolean }[] = [
   color: var(--csa-fg-2);
   font-weight: 500;
 }
-
-/* ── status banner（::before 状态点 + 滑入动画） ── */
 .sl-csa .csa-status {
   display: flex;
   align-items: center;
@@ -383,8 +375,6 @@ const TABS: { key: TabId; label: string; adminOnly: boolean }[] = [
   color: var(--csa-danger);
   border-color: #fecaca;
 }
-
-/* ── button ──────────────────────────────────── */
 .sl-csa .csa-btn {
   display: inline-flex;
   align-items: center;
@@ -459,8 +449,6 @@ const TABS: { key: TabId; label: string; adminOnly: boolean }[] = [
   padding: 4px 10px;
   font-size: 12px;
 }
-
-/* ── skin card ───────────────────────────────── */
 .sl-csa .csa-card {
   background: var(--csa-panel);
   border: 1px solid var(--csa-border);
@@ -510,8 +498,6 @@ const TABS: { key: TabId; label: string; adminOnly: boolean }[] = [
   transition: transform 0.18s;
 }
 .sl-csa .csa-caret.is-open { transform: rotate(180deg); }
-
-/* 行 card 行内操作（admin/owner 才显示：重命名 / 删除） */
 .sl-csa .csa-card__action {
   margin-left: 8px;
   padding: 3px 8px;
@@ -533,19 +519,13 @@ const TABS: { key: TabId; label: string; adminOnly: boolean }[] = [
   color: var(--csa-danger);
   border-color: #fecaca;
 }
-
-/* ── piece grid ──────────────────────────────── */
 .sl-csa .csa-grid {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
   gap: 10px;
   padding: 2px 16px 16px;
 }
 @media (max-width: 640px) {
-  .sl-csa .csa-grid { grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 2px 12px 14px; }
-}
-@media (max-width: 440px) {
-  .sl-csa .csa-grid { grid-template-columns: repeat(3, 1fr); }
+  .sl-csa .csa-grid { gap: 8px; padding: 2px 12px 14px; }
 }
 .sl-csa .csa-piece {
   text-align: center;
@@ -558,7 +538,6 @@ const TABS: { key: TabId; label: string; adminOnly: boolean }[] = [
   aspect-ratio: 1;
   border: 1px solid var(--csa-border);
   border-radius: var(--csa-radius-sm);
-  /* 棋盘格底 —— 透明 webp 棋子在此底上可辨形 */
   background: conic-gradient(#ececee 0 25%, #ffffff 0 50%, #ececee 0 75%, #ffffff 0) 0 0 / 12px 12px;
   box-shadow: inset 0 0 0 1px rgba(24, 24, 27, 0.03);
   overflow: hidden;
@@ -577,6 +556,11 @@ const TABS: { key: TabId; label: string; adminOnly: boolean }[] = [
   font-weight: 500;
   letter-spacing: 0.02em;
   color: var(--csa-fg-2);
+}
+.sl-csa .csa-piece__label {
+  display: block;
+  font-size: 10px;
+  color: var(--csa-fg-3);
 }
 .sl-csa .csa-piece__fid {
   display: block;
@@ -609,8 +593,6 @@ const TABS: { key: TabId; label: string; adminOnly: boolean }[] = [
   opacity: 1;
   border-radius: 0 0 7px 7px;
 }
-
-/* ── upload tile（import tab 用） ─────────────── */
 .sl-csa .csa-up {
   cursor: pointer;
   text-align: center;
@@ -651,8 +633,6 @@ const TABS: { key: TabId; label: string; adminOnly: boolean }[] = [
   font-size: 10px;
   color: var(--csa-fg-2);
 }
-
-/* ── modal（backdrop blur + 弹入动画） ────────── */
 .sl-csa .csa-modal {
   position: fixed;
   inset: 0;
@@ -733,8 +713,6 @@ const TABS: { key: TabId; label: string; adminOnly: boolean }[] = [
   gap: 8px;
   margin-top: 16px;
 }
-
-/* ── form（import tab 用） ────────────────────── */
 .sl-csa .csa-form {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -782,8 +760,6 @@ const TABS: { key: TabId; label: string; adminOnly: boolean }[] = [
 }
 .sl-csa .csa-field__area { resize: vertical; }
 .sl-csa .csa-field--wide { grid-column: 1 / -1; }
-
-/* ── steps（import tab 用） ───────────────────── */
 .sl-csa .csa-step {
   background: var(--csa-panel);
   border: 1px solid var(--csa-border);
@@ -841,7 +817,83 @@ const TABS: { key: TabId; label: string; adminOnly: boolean }[] = [
 }
 .sl-csa .csa-json::placeholder { color: var(--csa-fg-3); }
 
-/* ── 动画 ────────────────────────────────────── */
+/* ── 游戏卡片列表（GameListView）── */
+.sl-csa .csa-games {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 14px;
+}
+.sl-csa .csa-game-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px;
+  background: var(--csa-panel);
+  border: 1px solid var(--csa-border);
+  border-radius: var(--csa-radius);
+  box-shadow: var(--csa-shadow-sm);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+.sl-csa .csa-game-card:hover {
+  border-color: var(--csa-primary);
+  box-shadow: var(--csa-shadow-md);
+  transform: translateY(-2px);
+}
+.sl-csa .csa-game-card:focus-visible {
+  outline: none;
+  box-shadow: var(--csa-ring);
+}
+.sl-csa .csa-game-card__icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  border: 1px solid var(--csa-border);
+  box-shadow: var(--csa-shadow-sm);
+  background: conic-gradient(var(--csa-hover) 0 25%, #ffffff 0 50%, var(--csa-hover) 0 75%, #ffffff 0) 0 0 / 11px 11px;
+}
+.sl-csa .csa-game-card__name {
+  font-size: 14px;
+  font-weight: 600;
+}
+.sl-csa .csa-game-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.sl-csa .csa-game-card__meta .csa-badge { box-shadow: none; }
+
+/* ── 详情页头部（GameDetail）── */
+.sl-csa .csa-detail-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.sl-csa .csa-detail-head__title {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.sl-csa .csa-detail-head__title h3 {
+  font-size: 15px;
+  font-weight: 600;
+}
+.sl-csa .csa-crumb {
+  font-family: var(--csa-mono);
+  font-size: 11px;
+  color: var(--csa-fg-3);
+}
+.sl-csa .csa-crumb button {
+  color: var(--csa-primary);
+  font-family: inherit;
+  font-size: inherit;
+}
+.sl-csa .csa-crumb button:hover { text-decoration: underline; }
+
 @keyframes csa-fade-in {
   from { opacity: 0; }
 }
@@ -851,15 +903,11 @@ const TABS: { key: TabId; label: string; adminOnly: boolean }[] = [
 @keyframes csa-slide-in {
   from { opacity: 0; transform: translateY(-4px); }
 }
-
-/* ── 移动端 ──────────────────────────────────── */
 @media (max-width: 640px) {
   .sl-csa { padding: 16px 16px 28px; }
   .sl-csa .csa-card__row { padding: 10px 12px; }
   .sl-csa .csa-step { padding: 14px; }
 }
-
-/* ── 动效降级 ────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   .sl-csa *,
   .sl-csa *::before,
