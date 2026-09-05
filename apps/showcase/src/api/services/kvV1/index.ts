@@ -42,7 +42,14 @@ export class KvV1Service extends HttpService {
   readonly BASE = apiPaths.kvV1;
 
   async set(args: KvSetArgs): Promise<void> {
-    const body: { key: string; value: string; ttl: number; tags: string[]; groupId?: number } = {
+    const body: {
+      key: string;
+      value: string;
+      ttl: number;
+      tags: string[];
+      groupId?: number;
+      visibility?: 'public' | 'private';
+    } = {
       key: args.key,
       value: args.value,
       ttl: args.ttl ?? 0,
@@ -50,6 +57,10 @@ export class KvV1Service extends HttpService {
       tags: args.tags ?? [],
     };
     if (args.groupId !== undefined && args.groupId > 0) body.groupId = args.groupId;
+    // 仅显式传入时写入；缺省不带字段，避免把其它业务 KV 误改成 public
+    if (args.visibility === 'public' || args.visibility === 'private') {
+      body.visibility = args.visibility;
+    }
     await this.reqPost('', body);
   }
 

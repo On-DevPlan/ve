@@ -21,7 +21,7 @@ describe('kvV1 service (throw model)', () => {
     });
   }
 
-  it('set POSTs to /api/v1/kv with Bearer header + tags + no visibility', async () => {
+  it('set POSTs to /api/v1/kv with Bearer header + tags + no visibility by default', async () => {
     const mockFetch = vi.fn().mockResolvedValue(mockJSON(200, { code: 0, message: 'ok' }));
     global.fetch = mockFetch;
 
@@ -40,6 +40,22 @@ describe('kvV1 service (throw model)', () => {
     const body = JSON.parse(init.body as string) as Record<string, unknown>;
     expect(body).toMatchObject({ key: 'shortcuts', value: '{}', ttl: 0, tags: ['prod', 'cache'], groupId: 42 });
     expect(body).not.toHaveProperty('visibility');
+  });
+
+  it('set includes visibility when explicitly provided', async () => {
+    const mockFetch = vi.fn().mockResolvedValue(mockJSON(200, { code: 0, message: 'ok' }));
+    global.fetch = mockFetch;
+
+    await kvV1Service.set({
+      key: 'game-center_skin:index',
+      value: '[]',
+      groupId: 190,
+      tags: ['game-center-skin'],
+      visibility: 'public',
+    });
+
+    const body = JSON.parse((mockFetch.mock.calls[0][1] as RequestInit).body as string);
+    expect(body.visibility).toBe('public');
   });
 
   it('set defaults tags to [] (replace semantics = clear)', async () => {

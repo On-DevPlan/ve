@@ -114,8 +114,9 @@ async function onPick(slug: string, key: string, e: Event) {
   <section>
     <p class="csa-help">
       游戏封面按 fr 发布的 KV 目录（<code>game-center_catalog:index</code>）列出全部游戏；
-      封面资产写在 <code>game-center_skin:index</code>（每款 <code>small</code> / <code>large</code>）。
+      封面资产写在 <code>game-center_skin:index</code>（每款 <code>small</code> / <code>large</code>，<strong>visibility=public</strong>）。
       封面索引尚未创建时会显示 0 条记录，上传第一张图时自动建 key。
+      fr 走匿名 public 读；若索引误落 private，ve 能预览但 App 看不见。
     </p>
 
     <!-- 状态徽标 -->
@@ -282,31 +283,31 @@ async function onPick(slug: string, key: string, e: Event) {
           class="csa-grid"
           :style="{ gridTemplateColumns: `repeat(2, 1fr)` }"
         >
-          <label
+          <figure
             v-for="k in COVER_ASSET_KEYS"
             :key="k"
             class="csa-piece csa-piece--click"
           >
-            <div class="csa-piece__tile">
+            <label class="csa-piece__tile">
               <img
                 :src="coverOf(manager, k)"
                 :alt="k"
                 loading="lazy"
               >
               <span class="csa-piece__hint">{{ uploading === k ? '上传中…' : '点击选择文件替换' }}</span>
-            </div>
-            <input
-              class="csa-cover-file"
-              type="file"
-              accept="image/*"
-              :disabled="uploading !== null"
-              @change="onPick(manager, k, $event)"
-            >
+              <input
+                class="csa-cover-file"
+                type="file"
+                accept="image/*"
+                :disabled="uploading !== null"
+                @change="onPick(manager, k, $event)"
+              >
+            </label>
             <figcaption>
               <span class="csa-piece__key">{{ k }}</span>
               <span class="csa-piece__label">{{ admin.entry.labels[k] }}</span>
             </figcaption>
-          </label>
+          </figure>
         </div>
         <div class="csa-modal__actions">
           <button

@@ -146,12 +146,14 @@ export function useSkinAdmin(gameIdOrEntry: string | GameSkinRegistryEntry): Use
   }
 
   async function persistIndex(next: SkinMeta[]): Promise<void> {
+    // 必须 public：fr 客户端匿名读 /kv/public/<game>_skin:index；缺省会落 private，ve 能看见、fr 看不见。
     await kvV1Service.set({
       key: entry.kvIndexKey,
       value: JSON.stringify(next),
       groupId: entry.groupId,
       tags: [entry.tagPrefix],
       ttl: 0,
+      visibility: 'public',
     });
   }
 

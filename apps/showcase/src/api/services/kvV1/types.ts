@@ -23,6 +23,11 @@ export interface KvSetArgs {
   tags?: string[];
   /** 工作空间 id;0 或不传 = 默认组 */
   groupId?: number;
+  /**
+   * 可见性。不传则后端沿用已有值 / 新建默认 private。
+   * fr 客户端走匿名 `/kv/public/*`，皮肤/封面/表情索引必须显式 `'public'`。
+   */
+  visibility?: 'public' | 'private';
 }
 
 export interface KvGetArgs {

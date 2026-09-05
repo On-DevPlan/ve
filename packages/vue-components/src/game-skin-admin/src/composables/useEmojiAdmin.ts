@@ -91,12 +91,14 @@ export function useEmojiAdmin(scopeOrEntry: string | EmojiScopeEntry | null | un
   }
 
   async function persistIndex(next: EmojiMeta[]): Promise<void> {
+    // 必须 public：fr 客户端匿名读 /kv/public/*；缺省落 private 会导致客户端永远拉不到。
     await kvV1Service.set({
       key: entry.kvIndexKey,
       value: JSON.stringify(next),
       groupId: entry.groupId,
       tags: [entry.tagPrefix],
       ttl: 0,
+      visibility: 'public',
     });
   }
 
