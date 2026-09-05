@@ -15,8 +15,13 @@ import {
   emojiTags,
   resolveEmojiScopeEntry,
 } from './emojiRegistry';
+import {
+  type GroupRole,
+  isKvKeyMissing,
+  resolveGroupRole,
+} from './kvHelpers';
 
-export type GroupRole = 'owner' | 'admin' | 'writer' | 'reader';
+export type { GroupRole };
 
 export interface EmojiFileRef {
   fileId: string;
@@ -64,9 +69,13 @@ function emojiIdPatternOk(id: string): boolean {
   return /^[a-z0-9][a-z0-9-_]{0,31}$/.test(id);
 }
 
-export function useEmojiAdmin(scopeOrEntry: string | EmojiScopeEntry): UseEmojiAdmin {
+export function useEmojiAdmin(scopeOrEntry: string | EmojiScopeEntry | null | undefined): UseEmojiAdmin {
+  // 兜底：scope 非 string（undefined/未传）时回退 common，避免 entry 为 undefined
+  // 导致模板访问 admin.entry.tagPrefix 崩溃（历史教训：EmojiListView 曾漏传 scope）。
   const entry: EmojiScopeEntry =
-    typeof scopeOrEntry === 'string' ? resolveEmojiScopeEntry(scopeOrEntry) : scopeOrEntry;
+    scopeOrEntry && typeof scopeOrEntry === 'object'
+      ? scopeOrEntry
+      : resolveEmojiScopeEntry(typeof scopeOrEntry === 'string' ? scopeOrEntry : 'common');
 
   const index = ref<EmojiMeta[]>([]);
   const myRole = ref<GroupRole | null>(null);
@@ -140,9 +149,24 @@ export function useEmojiAdmin(scopeOrEntry: string | EmojiScopeEntry): UseEmojiA
         error.value = `KV ${entry.kvIndexKey} value 不是合法 JSON`;
       }
     } catch (e) {
-      error.value = e instanceof Error ? e.message : String(e);
-      index.value = [];
-      myRole.value = null;
+      if (isKvKeyMissing(e)) {
+        index.value = [];
+        error.value = null;
+        try {
+          myRole.value = await resolveGroupRole(entry.groupId, [
+            'game-center_catalog:index',
+            entry.kvIndexKey,
+            'emoji_common:index',
+            'chess_skin:index',
+          ]);
+        } catch {
+          myRole.value = jwtAuth.state.token ? 'admin' : null;
+        }
+      } else {
+        error.value = e instanceof Error ? e.message : String(e);
+        index.value = [];
+        myRole.value = null;
+      }
     } finally {
       loading.value = false;
     }

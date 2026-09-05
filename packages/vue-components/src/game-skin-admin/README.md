@@ -1,18 +1,18 @@
 # game-skin-admin
 
-跨游戏皮肤管理（单组件 + 游戏切换器，不再为每游戏新建目录）。
+游戏资产管理（单组件）：对局皮肤 · 游戏封面 · 表情包。
 
-- `GAME_SKIN_REGISTRY`：`chess`（12 枚）+ `gomoku`（黑/白/棋盘）两条目；单点派生 `kvIndexKey / tagPrefix / groupId / assetKeys / fileNames / gridColumns / aiPrompt`。
-- `useSkinAdmin(config)` 工厂：chess 原 `useChessSkinAdmin` 的游戏无关版，KV key / tag / assetKeys 均由 registry 条目注入；`fileV1/kvV1` 导入保持不变。
-- 游戏切换：`?game=gomoku` deep-link；header game switcher 可切换，tab 与 index 自动重载。
-- 旧 `chess-skin-admin` 目录保留为**薄重定向**（见下方），manifest 扫描保留旧 id 以避免 dev watcher 抖动；新 id `game-skin-admin`。
+- `GAME_SKIN_REGISTRY`：`chess` / `gomoku` 对局皮肤 + `game-center`（封面，列表隐藏）
+- `EMOJI_SCOPE_REGISTRY`：`common` + 各 gameId 表情作用域
+- 主 tab：`游戏` | `游戏封面` | `表情包`
+- 深链：`?game=gomoku` · `?tab=covers` · `?tab=emoji&scope=chess`
 
 ## 数据流
 
 ```
-loadIndex()  → GET /api/v1/kv/<game>_skin:index?groupId=190
-replacePiece(skinId, assetKey, blob) → POST /files (tags=[<game>-skin, <game>-skin:<id>, <game>-skin:<id>:<key>]) → POST /kv → DELETE old file (best-effort)
-deleteSkin   → 并发 DELETE /files → 全部成功才 POST /kv（移除条目）
+皮肤：loadIndex → GET /api/v1/kv/<game>_skin:index?groupId=190
+表情：loadIndex → GET /api/v1/kv/emoji_<scope>:index?groupId=190
+上传：POST /files（tags）→ POST /kv →（删旧 file best-effort）
 ```
 
 ## 目录
@@ -20,13 +20,19 @@ deleteSkin   → 并发 DELETE /files → 全部成功才 POST /kv（移除条�
 ```
 game-skin-admin/
 ├── component.config.ts
-├── index.vue                 # 顶层 + game switcher + ?game deep-link
+├── index.vue
 └── src/
     ├── composables/
     │   ├── gameSkinRegistry.ts
-    │   └── useSkinAdmin.ts
+    │   ├── useSkinAdmin.ts
+    │   ├── emojiRegistry.ts
+    │   └── useEmojiAdmin.ts
     └── views/
-        ├── PreviewTab.vue
-        ├── ReplaceTab.vue
-        └── ImportTab.vue
+        ├── GameListView.vue
+        ├── GameDetail.vue
+        ├── CoversListView.vue
+        ├── PreviewTab / ReplaceTab / ImportTab
+        ├── EmojiListView.vue
+        ├── EmojiPackListView.vue
+        └── EmojiUploadModal.vue
 ```

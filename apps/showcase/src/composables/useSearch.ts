@@ -12,7 +12,7 @@
 import { inject, type InjectionKey } from 'vue';
 import type { SearchIndexReturn } from '../registry/SearchIndex';
 
-export const SearchKey: InjectionKey<SearchIndexReturn> = Symbol('Search');
+export const SearchKey: InjectionKey<SearchIndexReturn> = Symbol.for('sl:Search');
 
 export function useSearch(): SearchIndexReturn {
   const s = inject(SearchKey);

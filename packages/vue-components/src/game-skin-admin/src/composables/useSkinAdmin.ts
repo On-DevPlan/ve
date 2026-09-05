@@ -18,8 +18,13 @@ import {
   type AiPromptArgs,
   resolveGameSkinEntry,
 } from './gameSkinRegistry';
+import {
+  type GroupRole,
+  isKvKeyMissing,
+  resolveGroupRole,
+} from './kvHelpers';
 
-export type GroupRole = 'owner' | 'admin' | 'writer' | 'reader';
+export type { GroupRole };
 
 export interface AssetFile {
   fileId: string;
@@ -89,6 +94,8 @@ export interface UseSkinAdmin {
   error: Ref<string | null>;
   loginHint: ComputedRef<string | null>;
   loadIndex: () => Promise<void>;
+  /** 若 index 无此 skinId，创建空条目并写入 KV（封面首次上传用）。 */
+  ensureSkin: (skinId: string, displayName?: string) => Promise<SkinMeta>;
   replacePiece: (skinId: string, assetKey: string, blob: Blob, originalName?: string) => Promise<ReplacePieceResult>;
   renameSkin: (skinId: string, newDisplayName: string) => Promise<SkinMeta>;
   deleteSkin: (skinId: string) => Promise<DeleteSkinResult>;
@@ -156,16 +163,61 @@ export function useSkinAdmin(gameIdOrEntry: string | GameSkinRegistryEntry): Use
       myRole.value = item.myRole;
       try {
         const parsed = JSON.parse(item.value) as SkinMeta[];
-        // 归一：确保每条都有可读的 asset map（防御旧数据）
         index.value = Array.isArray(parsed) ? parsed : [];
       } catch {
         index.value = [];
         error.value = `KV ${entry.kvIndexKey} value 不是合法 JSON`;
       }
     } catch (e) {
+      if (isKvKeyMissing(e)) {
+        // 首次：index 空，从同组已有 key 探 role，允许后续 ensureSkin / set 建库
+        index.value = [];
+        error.value = null;
+        try {
+          myRole.value = await resolveGroupRole(entry.groupId, [
+            'game-center_catalog:index',
+            entry.kvIndexKey,
+            'chess_skin:index',
+            'emoji_common:index',
+          ]);
+        } catch {
+          myRole.value = jwtAuth.state.token ? 'admin' : null;
+        }
+      } else {
+        error.value = e instanceof Error ? e.message : String(e);
+        index.value = [];
+        myRole.value = null;
+      }
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  async function ensureSkin(skinId: string, displayName?: string): Promise<SkinMeta> {
+    const id = skinId.trim();
+    if (!id) throw new Error('skin id 不能为空');
+    const existing = index.value.find((m) => m.id === id);
+    if (existing) return existing;
+    if (!canEdit.value) throw new Error('insufficient role: need owner or admin');
+    loading.value = true;
+    error.value = null;
+    try {
+      const now = new Date().toISOString();
+      const stub: SkinMeta = {
+        id,
+        displayName: (displayName?.trim() || id),
+        version: 1,
+        createdAt: now,
+        updatedAt: now,
+        pieces: {},
+      };
+      const next = [...index.value, stub];
+      await persistIndex(next);
+      index.value = next;
+      return stub;
+    } catch (e) {
       error.value = e instanceof Error ? e.message : String(e);
-      index.value = [];
-      myRole.value = null;
+      throw e;
     } finally {
       loading.value = false;
     }
@@ -376,6 +428,7 @@ export function useSkinAdmin(gameIdOrEntry: string | GameSkinRegistryEntry): Use
     error,
     loginHint,
     loadIndex,
+    ensureSkin,
     replacePiece,
     renameSkin,
     deleteSkin,

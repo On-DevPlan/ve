@@ -34,6 +34,8 @@ export interface GameSkinRegistryEntry {
   gridColumns: number;
   /** 该游戏资产的人类可读标签（用于 tile 下方 key 行的补充说明，可空） */
   labels: Record<string, string>;
+  /** true 时不进「游戏」tab 的游戏卡片列表（如 game-center 走独立「游戏封面」tab） */
+  hiddenInGameList?: boolean;
   /** AI prompt 渲染器：由 registry 条目闭包生成，拿到 skinId/displayName/colorStyle/artDirection */
   aiPrompt: (args: AiPromptArgs) => string;
 }
@@ -134,6 +136,50 @@ function gomokuAiPrompt(args: AiPromptArgs): string {
   ].join('\n');
 }
 
+// ── game-center：游戏中心封面（每款游戏一个 skinId = fr demo.slug；small 卡片小图 / large 轮播大图） ──
+const GAME_CENTER_ASSET_KEYS = ['small', 'large'] as const;
+
+const GAME_CENTER_FILE_NAMES: Record<string, string> = {
+  small: 'small.webp',
+  large: 'large.webp',
+};
+
+const GAME_CENTER_LABELS: Record<string, string> = {
+  small: '卡片小图（建议 1.2:1，如 512×432）',
+  large: '轮播大图（建议 16:9，如 960×540）',
+};
+
+function gameCenterAiPrompt(args: AiPromptArgs): string {
+  const art = args.artDirection?.trim() || '游戏主题鲜明，风格与游戏玩法匹配，适合 App 卡片封面展示';
+  const pieceExample = (k: string) =>
+    `    "${k}": { "fileId": "TBD", "fileName": "${GAME_CENTER_FILE_NAMES[k]}", "sizeBytes": 0, "contentType": "image/webp" }`;
+  const piecesJson = GAME_CENTER_ASSET_KEYS.map(pieceExample).join(',\n');
+  return [
+    '请输出一个游戏中心封面 meta JSON（只输出 JSON，不要任何解释/代码块/前后缀文字）。',
+    '',
+    `封面主题：${art}`,
+    '',
+    'JSON schema:',
+    '{',
+    `  "id": "${args.skinId}",`,
+    `  "displayName": "${args.displayName}",`,
+    '  "version": 1,',
+    '  "createdAt": "<ISO 8601 时间戳，例如 2026-09-01T00:00:00Z>",',
+    '  "updatedAt": "<ISO 8601 时间戳>",',
+    '  "pieces": {',
+    piecesJson,
+    '  }',
+    '}',
+    '',
+    '硬约束：',
+    '- id 必须匹配 ^[a-z0-9][a-z0-9-]{0,31}$（= fr demo.slug，你已经拿到 skinId，直接填）',
+    '- 2 个 key 必须齐全：small（卡片小图）+ large（轮播大图）',
+    '- small 建议 1.2:1（如 512×432），large 建议 16:9（如 960×540），webp',
+    '- 所有 fileId 先填 "TBD" 占位 —— 用户拿到 JSON 后会用批量上传脚本回填',
+    '- createdAt / updatedAt 都填当前时间（ISO 8601）',
+  ].join('\n');
+}
+
 export const GAME_SKIN_REGISTRY: Record<string, GameSkinRegistryEntry> = {
   chess: {
     gameId: 'chess',
@@ -158,6 +204,21 @@ export const GAME_SKIN_REGISTRY: Record<string, GameSkinRegistryEntry> = {
     gridColumns: 3,
     labels: GOMOKU_LABELS,
     aiPrompt: gomokuAiPrompt,
+  },
+  'game-center': {
+    gameId: 'game-center',
+    displayName: '游戏中心',
+    kvIndexKey: 'game-center_skin:index',
+    tagPrefix: 'game-center-skin',
+    groupId: SHARED_GROUP_ID,
+    assetKeys: GAME_CENTER_ASSET_KEYS,
+    fileNames: GAME_CENTER_FILE_NAMES,
+    gridColumns: 2,
+    labels: GAME_CENTER_LABELS,
+    aiPrompt: gameCenterAiPrompt,
+    // 不进「游戏」tab：游戏中心封面走独立「游戏封面」tab（列表来自 fr 发布的
+    // KV game-center_catalog:index，见 CoversListView.vue）
+    hiddenInGameList: true,
   },
 };
 

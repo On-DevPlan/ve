@@ -9,7 +9,7 @@
 // 语义：open-set list（非固定 12 宫格），资产集合长度可变；
 // scope 维度的"游戏"复用 game-skin-admin 的 GAME_SKIN_REGISTRY 的 gameId 集合。
 
-import { GAME_SKIN_REGISTRY } from '../../../game-skin-admin/src/composables/gameSkinRegistry';
+import { GAME_SKIN_REGISTRY } from './gameSkinRegistry';
 
 const SHARED_GROUP_ID = 190;
 
@@ -60,6 +60,7 @@ export const EMOJI_SCOPE_REGISTRY: Record<string, EmojiScopeEntry> = (() => {
     groupId: SHARED_GROUP_ID,
   };
   for (const [gameId, entry] of Object.entries(GAME_SKIN_REGISTRY)) {
+    if (entry.hiddenInGameList) continue;
     out[gameId] = {
       scope: gameId,
       displayName: entry.displayName,

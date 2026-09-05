@@ -49,5 +49,5 @@ export function setLoaders(manifest?: ComponentManifest): LoadersMap {
   return merged;
 }
 
-/** Vue 注入 key,main.ts 用 app.provide(LoadersKey, ...) 注入 */
-export const LoadersKey: InjectionKey<LoadersMap> = Symbol('Loaders');
+/** Vue 注入 key；Symbol.for 保证 HMR 后仍与 app.provide 同一身份 */
+export const LoadersKey: InjectionKey<LoadersMap> = Symbol.for('sl:Loaders');

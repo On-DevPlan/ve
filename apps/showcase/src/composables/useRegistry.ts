@@ -13,8 +13,8 @@
 import { inject, type InjectionKey } from 'vue';
 import type { Registry } from '../registry/ComponentRegistry';
 
-// 全局 Symbol Key —— Symbol 不会与其他模块的 Key 冲突,也不可被 JSON 序列化
-export const RegistryKey: InjectionKey<Registry> = Symbol('Registry');
+// Symbol.for：HMR 后仍与 app.provide 同一身份（避免 inject 拿不到）
+export const RegistryKey: InjectionKey<Registry> = Symbol.for('sl:Registry');
 
 // 取注册表的 composable。组件内 const registry = useRegistry(); 即可。
 export function useRegistry(): Registry {
