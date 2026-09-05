@@ -387,6 +387,7 @@ export function useSkinAdmin(gameIdOrEntry: string | GameSkinRegistryEntry): Use
     loading.value = true;
     error.value = null;
     try {
+      const prev = index.value.find((m) => m.id === meta.id);
       const pieces = await uploadAll(meta.id, files);
       const now = new Date().toISOString();
       const full: SkinMeta = setAssetMap(
@@ -399,6 +400,32 @@ export function useSkinAdmin(gameIdOrEntry: string | GameSkinRegistryEntry): Use
       const next = Array.from(byId.values());
       await persistIndex(next);
       index.value = next;
+
+      // 同 id 覆盖：KV 落盘后再删旧源文件（与 replacePiece / add_skin.py 一致，best-effort）
+      if (prev) {
+        const keep = new Set(
+          Object.values(getAssetMap(full))
+            .map((p) => p.fileId)
+            .filter((id): id is string => typeof id === 'string' && id.length > 0),
+        );
+        const bgNew = full.boardBackground;
+        if (bgNew && typeof bgNew === 'object' && typeof (bgNew as { fileId?: unknown }).fileId === 'string') {
+          keep.add((bgNew as { fileId: string }).fileId);
+        }
+        const oldIds: string[] = Object.values(getAssetMap(prev))
+          .map((p) => p.fileId)
+          .filter((id): id is string => typeof id === 'string' && id.length > 0);
+        const bgOld = prev.boardBackground;
+        if (bgOld && typeof bgOld === 'object' && typeof (bgOld as { fileId?: unknown }).fileId === 'string') {
+          oldIds.push((bgOld as { fileId: string }).fileId);
+        }
+        await Promise.allSettled(
+          [...new Set(oldIds)]
+            .filter((id) => !keep.has(id))
+            .map((fileId) => fileV1Service.delete({ fileId, groupId: entry.groupId })),
+        );
+      }
+
       return full;
     } catch (e) {
       error.value = e instanceof Error ? e.message : String(e);
