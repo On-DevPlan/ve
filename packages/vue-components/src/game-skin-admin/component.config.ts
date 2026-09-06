@@ -1,7 +1,7 @@
 // game-skin-admin 组件的 config（对应 spec §4.1 ComponentConfig）。
 //
-// 游戏资产管理：对局皮肤 + 游戏封面 + 表情包（原 emoji-pack-admin 已迁入）。
-// 深链：?game=gomoku / ?tab=covers / ?tab=emoji&scope=common
+// 游戏资产管理：对局皮肤 + 游戏封面 + 表情包 + 小说目录。
+// 深链：?game=gomoku / ?tab=covers / ?tab=emoji&scope=common / ?tab=novel
 
 import type { ComponentConfig } from '@style-library/component-contract';
 
@@ -10,13 +10,13 @@ export default {
   name: 'GameSkinAdmin',
   title: '游戏资产管理',
   description:
-    '游戏资产管理：对局皮肤（chess/gomoku）、游戏封面、表情包（common/<gameId>）；KV public groupId 190；深链 ?game / ?tab=covers|emoji&scope=。',
-  version: '1.1.0',
+    '游戏资产管理：对局皮肤（chess/gomoku）、游戏封面、表情包、小说目录（novel_reader_catalog:index）；KV public groupId 190；深链 ?game / ?tab=covers|emoji|novel&scope=。',
+  version: '1.2.0',
   framework: 'vue',
   entry: './index.vue',
   group: '管理工具',
   category: '内容管理',
-  tags: ['chess', 'gomoku', 'skin', 'emoji', 'cover', 'kv', 'admin', 'game-skin'],
+  tags: ['chess', 'gomoku', 'skin', 'emoji', 'cover', 'novel', 'kv', 'admin', 'game-skin'],
   platform: 'both',
   status: 'stable',
   route: {

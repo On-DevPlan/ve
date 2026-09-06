@@ -1,18 +1,21 @@
 # game-skin-admin
 
-游戏资产管理（单组件）：对局皮肤 · 游戏封面 · 表情包。
+游戏资产管理（单组件）：对局皮肤 · 游戏封面 · 表情包 · 小说。
 
 - `GAME_SKIN_REGISTRY`：`chess` / `gomoku` 对局皮肤 + `game-center`（封面，列表隐藏）
 - `EMOJI_SCOPE_REGISTRY`：`common` + 各 gameId 表情作用域
-- 主 tab：`游戏` | `游戏封面` | `表情包`
-- 深链：`?game=gomoku` · `?tab=covers` · `?tab=emoji&scope=chess`
+- `NOVEL_CATALOG`：`novel_reader_catalog:index`（公共内置书目录）
+- 主 tab：`游戏` | `游戏封面` | `表情包` | `小说`
+- 深链：`?game=gomoku` · `?tab=covers` · `?tab=emoji&scope=chess` · `?tab=novel`
 
 ## 数据流
 
 ```
 皮肤：loadIndex → GET /api/v1/kv/<game>_skin:index?groupId=190
 表情：loadIndex → GET /api/v1/kv/emoji_<scope>:index?groupId=190
+小说：loadCatalog → GET /api/v1/kv/novel_reader_catalog:index?groupId=190
 上传：POST /files（tags）→ POST /kv →（删旧 file best-effort）
+小说发布：POST /kv（tags=['novel-reader-catalog'], visibility=public）
 ```
 
 ## 目录
@@ -26,7 +29,9 @@ game-skin-admin/
     │   ├── gameSkinRegistry.ts
     │   ├── useSkinAdmin.ts
     │   ├── emojiRegistry.ts
-    │   └── useEmojiAdmin.ts
+    │   ├── useEmojiAdmin.ts
+    │   ├── novelRegistry.ts
+    │   └── kvHelpers.ts
     └── views/
         ├── GameListView.vue
         ├── GameDetail.vue
@@ -34,5 +39,6 @@ game-skin-admin/
         ├── PreviewTab / ReplaceTab / ImportTab
         ├── EmojiListView.vue
         ├── EmojiPackListView.vue
-        └── EmojiUploadModal.vue
+        ├── EmojiUploadModal.vue
+        └── NovelCatalogView.vue
 ```

@@ -14,6 +14,7 @@ export const K_GROUP_ROLE_PROBE_KEYS = [
   'chess_skin:index',
   'gomoku_skin:index',
   'emoji_common:index',
+  'novel_reader_catalog:index',
 ] as const;
 
 export function isKvKeyMissing(e: unknown): boolean {

@@ -1,9 +1,10 @@
 <!-- game-skin-admin/index.vue — 游戏资产管理主页。
-     主 tab：游戏 | 游戏封面 | 表情包
+     主 tab：游戏 | 游戏封面 | 表情包 | 小说
        游戏 → GameListView → GameDetail（展示 | 更换 | 上传）
        游戏封面 → CoversListView
        表情包 → EmojiListView（原 emoji-pack-admin 全功能内嵌）
-     深链：?game=chess · ?tab=covers · ?tab=emoji&scope=common
+       小说 → NovelCatalogView（novel_reader_catalog:index）
+     深链：?game=chess · ?tab=covers · ?tab=emoji&scope=common · ?tab=novel
      不用 vue-router（chunk 无该依赖）；用 window.location / history。 -->
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
@@ -13,13 +14,17 @@ import GameListView from './src/views/GameListView.vue';
 import GameDetail from './src/views/GameDetail.vue';
 import CoversListView from './src/views/CoversListView.vue';
 import EmojiListView from './src/views/EmojiListView.vue';
+import NovelCatalogView from './src/views/NovelCatalogView.vue';
 
-type MainTab = 'games' | 'covers' | 'emoji';
+type MainTab = 'games' | 'covers' | 'emoji' | 'novel';
 
 function readTabFromUrl(): MainTab {
   if (typeof window === 'undefined') return 'games';
   const tab = new URLSearchParams(window.location.search).get('tab')?.trim().toLowerCase();
-  return tab === 'covers' ? 'covers' : tab === 'emoji' ? 'emoji' : 'games';
+  if (tab === 'covers') return 'covers';
+  if (tab === 'emoji') return 'emoji';
+  if (tab === 'novel') return 'novel';
+  return 'games';
 }
 
 function readGameFromUrl(): string | null {
@@ -37,7 +42,7 @@ function readScopeFromUrl(): string {
 function writeUrl(tab: MainTab, game: string | null, scope: string) {
   if (typeof window === 'undefined' || typeof history === 'undefined') return;
   const url = new URL(window.location.href);
-  if (tab === 'covers' || tab === 'emoji') url.searchParams.set('tab', tab);
+  if (tab === 'covers' || tab === 'emoji' || tab === 'novel') url.searchParams.set('tab', tab);
   else url.searchParams.delete('tab');
   if (tab === 'games' && game) url.searchParams.set('game', game);
   else url.searchParams.delete('game');
@@ -100,7 +105,7 @@ const gameCount = Object.values(GAME_SKIN_REGISTRY).filter((g) => !g.hiddenInGam
           <div class="csa-head__title">
             <h2>游戏资产管理</h2>
             <p class="csa-head__desc">
-              对局皮肤 · 游戏封面 · 表情包 · KV public · groupId 190
+              对局皮肤 · 游戏封面 · 表情包 · 小说 · KV public · groupId 190
             </p>
           </div>
         </div>
@@ -137,6 +142,14 @@ const gameCount = Object.values(GAME_SKIN_REGISTRY).filter((g) => !g.hiddenInGam
         >
           表情包
         </button>
+        <button
+          role="tab"
+          :class="['csa-tabs__item', { 'is-active': mainTab === 'novel' }]"
+          :aria-selected="mainTab === 'novel'"
+          @click="setMainTab('novel')"
+        >
+          小说
+        </button>
       </nav>
 
       <main class="csa-main">
@@ -156,11 +169,13 @@ const gameCount = Object.values(GAME_SKIN_REGISTRY).filter((g) => !g.hiddenInGam
         <CoversListView v-else-if="mainTab === 'covers'" />
 
         <EmojiListView
-          v-else
+          v-else-if="mainTab === 'emoji'"
           :key="emojiScope"
           :scope="emojiScope"
           @update:scope="setEmojiScope"
         />
+
+        <NovelCatalogView v-else-if="mainTab === 'novel'" />
       </main>
     </div>
   </div>
