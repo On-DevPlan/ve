@@ -145,7 +145,7 @@ flowchart TB
 ## 7. 关联文档
 
 - 审计与 P0/P1/P2 完整清单: `docs/architecture/framework-architecture-review.md`
-- 对账机制已落地: `docs/architecture/manifest-loader-reconciliation.md`
+- 对账机制已落地: 见 [[manifest-loader-reconciliation]](原 `docs/architecture/manifest-loader-reconciliation.md` 已删除,内容收拢进该 ref)
 - Dev-only proxy 模式(已废弃): [[component-level-dev-proxy]] 顶部 banner
 - 加组件教程: [[how-to-add-component]]
 - 类型契约源: `packages/component-contract/src/types.ts`

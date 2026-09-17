@@ -23,10 +23,14 @@ const references = [
   'eslint-testing-pattern.md',
   'fix-lint-loop.md',
   'how-to-add-component.md',
+  'how-to-consume-api.md',
   'large-component-layout.md',
+  'loading-skeleton-first-session.md',
   'manifest-loader-reconciliation.md',
   'protocol.md',
   'shadow-dom-build-css-loss.md',
+  'shadow-root-css-sync-mount.md',
+  'shared-layer.md',
   'when-eslint-vs-ajv.md',
 ];
 

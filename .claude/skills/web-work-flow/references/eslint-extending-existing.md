@@ -126,7 +126,7 @@ it('flags theme.namespace format', () => {
 
 ## messageId 命名约定
 
-wb 项目里现有 messageId 用 camelCase + 名词性:
+ve 项目里现有 messageId 用 camelCase + 名词性:
 - `noDefaultExport`(动名词短语)
 - `idMismatch`(X + Y 关系)
 - `frameworkMismatch`

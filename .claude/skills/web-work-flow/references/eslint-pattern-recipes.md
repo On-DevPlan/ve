@@ -5,7 +5,7 @@ parent: eslint-rule-authoring
 
 # AST 处理模式 + filename 处理样板
 
-基于 `valid-component-config.js` 提炼,wb 项目加新规则的常用模式。
+基于 `valid-component-config.js` 提炼,ve 项目加新规则的常用模式。
 
 ---
 

@@ -1,12 +1,12 @@
 ---
 ref: architecture-and-design-philosophy
 parent: web-work-flow
-source: docs/superpowers/specs/2026-07-23-vue-react-microfrontend-component-showcase-design.md
+source: docs/architecture/framework-architecture-review.md
 ---
 
 # ref1: Architecture & Design Philosophy
 
-详细讲述 wb 项目的架构设计哲学。**先读 `docs/superpowers/specs/2026-07-23-vue-react-microfrontend-component-showcase-design.md`**,这份 ref 是它的导读与决策摘要。
+详细讲述 ve 项目的架构设计哲学。原始 spec `docs/superpowers/specs/2026-07-23-vue-react-microfrontend-component-showcase-design.md` 已删除;现存的架构文档是 `docs/architecture/framework-architecture-review.md`,这份 ref 是架构决策的导读与摘要。
 
 ---
 
@@ -240,6 +240,6 @@ eslint/rules/
 docs/superpowers/specs/         # 完整设计文档(本 ref 是其导读)
 ```
 
-## 10. 相关 spec 文档
+## 10. 相关架构文档
 
-完整设计在 `docs/superpowers/specs/2026-07-23-vue-react-microfrontend-component-showcase-design.md`。本 ref 只是它的导读与决策摘要,具体字段、错误码、降级策略、e2e 验收标准请回查 spec 原文。
+完整架构审计在 `docs/architecture/framework-architecture-review.md`(P0/P1/P2 问题清单)。本 ref 是架构决策的导读与摘要,具体包边界、对账机制、遗留问题请回查该文档。原始设计 spec 已删除,不要去找 `docs/superpowers/specs/2026-07-23-*`。

@@ -1,6 +1,6 @@
 ---
 name: web-work-flow
-description: Use when working on the ve project (D:\DevProjects\my\github\ve) — a Vue-host + React-compatible micro-frontend showcase. Trigger on questions about architecture / how to add or delete components / fixing lint / debugging manifest issues / dev server setup / component-level dev dependencies / backend API routing in dev or production / nginx route generation / troubleshooting a broken component / authoring a new ESLint rule. Loads the right reference doc on demand instead of dumping everything upfront.
+description: Use when working on the ve project (this repository) — a Vue-host + React-compatible micro-frontend showcase. Trigger on questions about architecture / how to add or delete components / fixing lint / debugging manifest issues / dev server setup / component-level dev dependencies / backend API routing in dev or production / nginx route generation / troubleshooting a broken component / authoring a new ESLint rule. Loads the right reference doc on demand instead of dumping everything upfront.
 ---
 
 # web-work-flow

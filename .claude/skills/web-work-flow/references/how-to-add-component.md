@@ -5,7 +5,7 @@ parent: web-work-flow
 
 # ref2: How to Add a Component
 
-在 wb 项目中新增一个 Vue 或 React 组件的标准流程。**核心结论:加组件 = 写 `component.config.ts` + `index.{vue,tsx}`,别无其他步骤**。
+在 ve 项目中新增一个 Vue 或 React 组件的标准流程。**核心结论:加组件 = 写 `component.config.ts` + `index.{vue,tsx}`,别无其他步骤**。
 
 > 字段名 / 类型严格对齐 `packages/component-contract/src/types.ts` —— 改字段名会导致 manifest 校验失败。
 

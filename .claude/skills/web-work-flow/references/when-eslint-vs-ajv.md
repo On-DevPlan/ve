@@ -5,7 +5,7 @@ parent: eslint-rule-authoring
 
 # 何时用 ESLint 规则 vs ajv schema
 
-wb 项目里有两套校验机制,各自负责不同性质的事。**写错地方** = 校验不全或误报。
+ve 项目里有两套校验机制,各自负责不同性质的事。**写错地方** = 校验不全或误报。
 
 ## ajv schema(已在用)
 

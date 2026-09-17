@@ -26,6 +26,11 @@ deprecated-at: 2026-08-03
 > 不要回退到 `component.config.ts` 的 `api` 字段 —— 那是过去的设计。
 >
 > 本 ref 保留以便阅读历史 PR / commit message 时理解"为什么改"。
+>
+> **注意:** 正文中提到的 `packages/manifest-generator/src/mfe-dynamic-proxy.ts`、
+> `packages/manifest-generator/src/nginx-emit.ts`、`scripts/gen-nginx.mjs` 均已删除,
+> 分别被 `apps/showcase/src/api/to-vite-proxy.ts`(`apiGateway()`)和
+> `apps/showcase/src/api/gen-nginx.ts`(`genNginxOut()`)取代。正文表格仅作历史记录。
 
 `vite.config.ts` 不应硬编码组件特定的 proxy(如 shortcut-library 需要 `:8080`)。proxy 是**组件的 dev 依赖**,应由组件自己声明,host 零感知。
 
