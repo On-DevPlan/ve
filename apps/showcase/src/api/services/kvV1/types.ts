@@ -13,6 +13,18 @@ export interface KvItem {
    * 老后端可能不返回 → 视为 `'private'`(降级到原行为)。
    */
   visibility?: 'public' | 'private';
+  /**
+   * 是否 secret 加密 KV。value 在 DB 是 `enc1.<base64>` 密文;只有当 ctx 中
+   * 有 KEK(用户解锁过二级密码)时,后端才会尝试解密并把明文放进 value 字段。
+   * 老后端可能不返回 → 视为 `false`(降级到原行为)。
+   */
+  secret?: boolean;
+  /**
+   * 是否当前为「locked」状态。true 表示 secret=true 但用户未解锁 / 解密失败,
+   * 此时 value 字段是密文占位,UI 应展示锁图标 + 提示用户解锁。
+   * 老后端可能不返回 → 视为 `false`。
+   */
+  locked?: boolean;
 }
 
 export interface KvListResponse {
@@ -34,6 +46,12 @@ export interface KvSetArgs {
    * fr 客户端走匿名 `/kv/public/*`，皮肤/封面/表情索引必须显式 `'public'`。
    */
   visibility?: 'public' | 'private';
+  /**
+   * 是否用二级密码加密 value(列内 `enc1.` 密文)。true 时后端要求 ctx 中
+   * 有 KEK(由 X-Secret-Password header 或 POST /kv/unlock 提供),否则报错。
+   * 不传 = false(明文写入,默认行为不变)。
+   */
+  secret?: boolean;
 }
 
 /** POST /kv/:key/visibility —— 切换可见性(需组内 write 角色,审计 set_public/set_private)。
@@ -113,4 +131,24 @@ export interface KvDuplicateArgs {
 export interface KvDuplicateResponse {
   newKey: string;
   targetGroupId: number;
+}
+
+// ── KV Secret 二级密码(2026-09-19 后端新增)──────────────────────────────
+
+/** POST /kv/unlock —— 派生 KEK 入 LRU + ctx,后续 secret KV 请求无需带 header。 */
+export interface KvUnlockSecretArgs {
+  /** 二级密码(用于派生 KEK;首次设置时若 salt 不存在则生成新 salt) */
+  password: string;
+}
+
+/** POST /kv/reset-secret —— 验证旧密码 + 事务内全表重加密 + 写新 salt。 */
+export interface KvResetSecretArgs {
+  oldPassword: string;
+  newPassword: string;
+}
+
+/** POST /kv/reset-secret 响应 —— reEncrypted = 重加密的 secret KV 主行数。 */
+export interface KvResetSecretResponse {
+  message: string;
+  reEncrypted: number;
 }

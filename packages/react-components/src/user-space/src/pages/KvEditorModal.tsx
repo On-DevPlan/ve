@@ -28,10 +28,10 @@ export interface KvEditorModalProps {
   versionsLoading?: boolean;
   /** 回滚到指定版本。版本列表不含 value 全文,所以"选择版本"的动作即回滚。 */
   onRestoreVersion?: (version: number) => void;
-  onSave: (payload: { key: string; value: string; tags: string[]; ttl: number; visibility?: 'public' | 'private' }) => Promise<void>;
+  onSave: (payload: { key: string; value: string; tags: string[]; ttl: number; visibility?: 'public' | 'private'; secret?: boolean }) => Promise<void>;
   /** 当前组 id(用于构造公开链接 URL)。不传则「复制公开链接」按钮不出。 */
   groupId?: number;
-  /** 当前组名称(展示用,例如「默认组的 site-banner」)。 */
+  /** 当前组名称(展示用,例如「默认组的 site-banner」)。当前实现里父级仍传入以便未来扩展展示。 */
   groupName?: string;
   /** 构造公开读完整 URL(`origin/api/v1/kv/public/:key?groupId=`)。 */
   getPublicUrl: (args: { key: string; groupId: number }) => string;
@@ -51,6 +51,9 @@ export default function KvEditorModal({
   versions = [], versionsLoading = false, onRestoreVersion,
   onSave, groupId, groupName, getPublicUrl, onClose,
 }: KvEditorModalProps) {
+  // groupName 由父级传入但当前 modal 内未直接渲染(用于未来「默认组的 site-banner」
+  // 这类上下文标签)。Linter 报 unused → 这里显式引用一次,避免删除 prop 影响 API 兼容。
+  void groupName;
   const [key, setKey] = useState('');
   const [value, setValue] = useState('');
   const [tagsText, setTagsText] = useState('');
@@ -61,6 +64,8 @@ export default function KvEditorModal({
   // 新建模式无 initial → 默认 'private',显式由用户切换为 'public' 才上送。
   const [initialVisibility, setInitialVisibility] = useState<'public' | 'private'>('private');
   const [visibility, setVisibility] = useState<'public' | 'private'>('private');
+  // secret(2026-09-19):同 visibility 模式——只有用户主动开关才传 payload.secret,否则省略保留原态。
+  const [secret, setSecret] = useState(false);
   // 复制公开链接成功 toast;3s 自动消失。不复用父级 actionError(那是失败反馈)。
   const [publicLinkCopied, setPublicLinkCopied] = useState(false);
 
@@ -74,6 +79,7 @@ export default function KvEditorModal({
     setSelectedVersion(null);
     setInitialVisibility(initVis);
     setVisibility(initVis);
+    setSecret(initial?.secret ?? false);
     setPublicLinkCopied(false);
   }, [open, mode, initial]);
 
@@ -120,6 +126,10 @@ export default function KvEditorModal({
   const visibilityChanged = visibility !== initialVisibility;
   // 只有「用户主动改过 visibility」才在 payload 里带上,否则省略让后端保留现有可见态。
   const visibilityPayload: 'public' | 'private' | undefined = visibilityChanged ? visibility : (mode === 'create' ? visibility : undefined);
+  // secret 同 visibility:只在用户主动改了开关才透传;创建模式默认 false → 不传(后端按明文处理)。
+  const secretInitial = initial?.secret ?? false;
+  const secretChanged = secret !== secretInitial;
+  const secretPayload: boolean | undefined = secretChanged ? secret : (mode === 'create' ? secret : undefined);
 
   const portalRoot =
     (typeof document !== 'undefined' && document.querySelector('[data-sl-portal]')) ||
@@ -231,6 +241,31 @@ export default function KvEditorModal({
               <span className="sl-us-field__hint">保存后此 KV 即可匿名公开读取;复制链接按钮在编辑模式可用</span>
             )}
           </div>
+          {/* Secret 加密(2026-09-19):勾选后 value 在 DB 列内是 enc1. 密文,
+              后端会用 ctx 中 KEK(由全局二级密码会话注入)解密回明文。
+              编辑模式若 initial.locked=true 表示用户当前未解锁,checkbox 仍可改但提示解锁。 */}
+          <div className="sl-us-field">
+            <span className="sl-us-field__label">加密</span>
+            <label className="sl-us-checkbox">
+              <input
+                type="checkbox"
+                checked={secret}
+                onChange={(e) => setSecret(e.target.checked)}
+                disabled={saving || !canWrite}
+              />
+              <span>🔒 用二级密码加密(value 在 DB 不可见)</span>
+            </label>
+            {secret && mode === 'edit' && initial?.locked && (
+              <span className="sl-us-field__hint">
+                当前 KV 已加密但您未解锁二级密码,提交后值仍是密文。先在顶部「🔓 解锁」输入二级密码再保存。
+              </span>
+            )}
+            {secret && mode === 'create' && (
+              <span className="sl-us-field__hint">
+                提交前请确保已解锁二级密码(顶部 🔓 按钮),否则保存会失败。
+              </span>
+            )}
+          </div>
           {mode === 'edit' && (
             <div className="sl-us-field">
               <span className="sl-us-field__label">版本历史</span>
@@ -279,6 +314,7 @@ export default function KvEditorModal({
               tags,
               ttl: ttlDays > 0 ? ttlDays * 86400 : 0,
               visibility: visibilityPayload,
+              secret: secretPayload,
             })}
           >
             {saving ? '保存中…' : mode === 'create' ? '创建' : '保存'}

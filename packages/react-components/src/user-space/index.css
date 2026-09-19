@@ -396,6 +396,11 @@
 /* KV visibility(2026-08-30 起) */
 .sl-us-chip--public  { background: #e0f2fe; color: #075985; }
 .sl-us-chip--private { background: var(--hover); color: var(--fg-2); }
+/* KV secret(2026-09-19 起) —— 锁图标所在的小 chip */
+.sl-us-chip--secret  {
+  background: #fef3c7; color: #92400e;
+  font-size: 11px; padding: 0 4px; margin-right: 4px;
+}
 .sl-us-chip--tag {
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 10.5px;
@@ -705,6 +710,12 @@
 .sl-us-radio { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; cursor: pointer; }
 .sl-us-radio input[type="radio"] { margin: 0; cursor: pointer; }
 .sl-us-radio input[type="radio"][disabled] + span { color: var(--fg-3); cursor: not-allowed; }
+/* 复选框行(2026-09-19 KV secret 开关) */
+.sl-us-checkbox { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; cursor: pointer; }
+.sl-us-checkbox input[type="checkbox"] { margin: 0; cursor: pointer; }
+.sl-us-checkbox input[type="checkbox"][disabled] + span { color: var(--fg-3); cursor: not-allowed; }
+/* locked 占位(secret=true + 未解锁)—— 加粗 + 警示色 */
+.sl-us-table__cell-locked { color: #b45309; font-style: italic; font-size: 12px; }
 /* 公开链接区块 —— visibility='public' 且编辑模式时显示 */
 .sl-us-field__public-link {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;

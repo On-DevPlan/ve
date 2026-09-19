@@ -66,6 +66,16 @@ export interface KvView {
    * 后端老版本可能不返回 → store 兜底为 `'private'`,UI 行为与旧版一致。
    */
   visibility: 'public' | 'private';
+  /**
+   * 是否 secret 加密 KV(value 在 DB 是 enc1. 密文)。老后端不返回 → 兜底 false。
+   *  UI 借此在列表/编辑器展示锁图标 + "解锁后可见"占位文案。
+   */
+  secret: boolean;
+  /**
+   * 是否当前未解锁。secret=true 且 locked=true → value 字段是密文占位,
+   *  UI 不展示明文,提示用户解锁二级密码。老后端不返回 → 兜底 false。
+   */
+  locked: boolean;
 }
 
 export interface KvListResult {
@@ -155,6 +165,11 @@ export interface KvEditorPayload {
    * 想改可见性请走 `setKvVisibility` 专用端点。
    */
   visibility?: 'public' | 'private';
+  /**
+   * 是否用二级密码加密 value(true=enc1. 列内密文,需用户已解锁或带 header)。
+   * 老后端不识别 → store 兜底 false;UI 端"锁定"开关打开时设 true。
+   */
+  secret?: boolean;
 }
 
 /** 三视图模式:only one of Overview / Members / Invitations / Inventory / Files */
@@ -208,6 +223,13 @@ export interface UserSpaceStore {
   setKvVisibility(args: KvSetVisibilityArgs): Promise<void>;
   /** 构造公开读完整 URL(`/api/v1/kv/public/:key?groupId=`)。不发起请求。 */
   getKvPublicUrl(args: { key: string; groupId: number }): string;
+
+  // ── Secret 二级密码(2026-09-19 后端新增) ────────────────────────
+  /** 解锁 secret —— 设/验证 KEK 入 LRU;之后 KV 请求自动带 X-Secret-Password。
+   *  老后端不识别 → 抛 ApiError(code 50/no-route 之类)。 */
+  unlockSecret(password: string): Promise<void>;
+  /** 改二级密码:验证旧密码 + 全表重加密;成功后新密码立即生效。 */
+  resetSecret(oldPassword: string, newPassword: string): Promise<{ reEncrypted: number }>;
 
   // ── 文件(本期为公开图床) ─────────────────────────
   // upload 固定 accessLevel='public';tags replace 语义。displayName 由后端

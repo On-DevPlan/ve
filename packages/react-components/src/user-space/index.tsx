@@ -8,6 +8,7 @@ import './index.css';
 import { useUserSpaceStore } from './src/hooks/useUserSpaceStore';
 import { useJwtAuth } from './src/hooks/useAuth';
 import { useLoginModal } from './src/hooks/useLoginModal';
+import { useSecretUnlock } from './src/hooks/useSecretUnlock';
 import Sidebar from './src/pages/Sidebar';
 import Overview from './src/pages/Overview';
 import Members from './src/pages/Members';
@@ -16,6 +17,7 @@ import Inventory from './src/pages/Inventory';
 import Files from './src/pages/Files';
 import KvEditorModal from './src/pages/KvEditorModal';
 import DuplicateKvModal from './src/pages/DuplicateKvModal';
+import SecretUnlockModal from './src/pages/SecretUnlockModal';
 import UploadFileModal from './src/pages/UploadFileModal';
 import DuplicateFileModal from './src/pages/DuplicateFileModal';
 import SettingsPanel from './src/pages/SettingsPanel';
@@ -48,6 +50,10 @@ export default function UserSpace() {
   const auth = useJwtAuth();
   const loginModal = useLoginModal();
   const { groups, defaultGroupId, loading, error, reload, store } = useUserSpaceStore();
+  const secret = useSecretUnlock();
+  const [secretModalOpen, setSecretModalOpen] = useState(false);
+  const [secretModalMode, setSecretModalMode] = useState<'unlock' | 'reset'>('unlock');
+  const [secretReEncryptedToast, setSecretReEncryptedToast] = useState<number | null>(null);
 
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [view, setView] = useState<ViewMode>('overview');
@@ -396,7 +402,7 @@ export default function UserSpace() {
   }
 
   // ── KV CRUD handlers ─────────────────────────────
-  async function handleCreateKv(payload: { key: string; value: string; tags: string[]; ttl: number; visibility?: 'public' | 'private' }): Promise<void> {
+  async function handleCreateKv(payload: { key: string; value: string; tags: string[]; ttl: number; visibility?: 'public' | 'private'; secret?: boolean }): Promise<void> {
     if (!currentSelected) return;
     await withError(async () => {
       await store.createKv(currentSelected, payload);
@@ -406,7 +412,7 @@ export default function UserSpace() {
     });
   }
 
-  async function handleUpdateKv(payload: { key: string; value: string; tags: string[]; ttl: number; visibility?: 'public' | 'private' }): Promise<void> {
+  async function handleUpdateKv(payload: { key: string; value: string; tags: string[]; ttl: number; visibility?: 'public' | 'private'; secret?: boolean }): Promise<void> {
     if (!currentSelected) return;
     await withError(async () => {
       await store.updateKv(currentSelected, payload);
@@ -622,6 +628,24 @@ export default function UserSpace() {
     return () => clearTimeout(t);
   }, [fileToast]);
 
+  // ── Secret 二级密码(2026-09-19) ─────────────────
+  // 顶部「🔓 解锁」按钮触发 unlock;重置密码由 SettingsPanel 入口触发 reset。
+  // 改密成功后顶部 banner 显示「已重加密 N 条」,3s 自动消失;同时 reload KV
+  // 列表(因为旧密文 → 新密文,backend 派生空间变了)。
+  async function handleSecretSubmit(input: { password?: string; oldPassword?: string; newPassword?: string }): Promise<void> {
+    if (secretModalMode === 'reset' && input.oldPassword && input.newPassword) {
+      const res = await secret.reset(input.oldPassword, input.newPassword);
+      if (res) {
+        setSecretReEncryptedToast(res.reEncrypted);
+        setTimeout(() => setSecretReEncryptedToast(null), 4000);
+        await loadKv(kvPage, kvTag);
+      }
+    } else if (input.password) {
+      await secret.unlock(input.password);
+    }
+    setSecretModalOpen(false);
+  }
+
   // duplicateToast 自动消失:8s 后清空,避免长时间挂着旧消息。
   useEffect(() => {
     if (!duplicateToast) return;
@@ -709,6 +733,11 @@ export default function UserSpace() {
         {fileToast && (
           <div className="sl-us-toast" role="status">{fileToast}</div>
         )}
+        {secretReEncryptedToast !== null && (
+          <div className="sl-us-toast sl-us-toast--ok" role="status">
+            🔒 二级密码已改,事务内重加密了 {secretReEncryptedToast} 条 secret KV
+          </div>
+        )}
 
         {selectedGroup ? (
           <>
@@ -725,6 +754,13 @@ export default function UserSpace() {
               <span className="sl-us-topbar__crumb-sep">/</span>
               <div className="sl-us-topbar__crumb">{VIEW_TABS.find((t) => t.key === view)?.label}</div>
               <span className="sl-us-topbar__spacer" />
+              <button
+                className="sl-us-btn sl-us-btn--ghost sl-us-btn--sm"
+                onClick={() => { setSecretModalMode(secret.unlocked ? 'reset' : 'unlock'); setSecretModalOpen(true); }}
+                title={secret.unlocked ? '已解锁;点击改密码' : '解锁后 secret KV 可见明文'}
+              >
+                {secret.unlocked ? '🔓 已解锁' : '🔓 解锁'}
+              </button>
               <span className={`sl-us-chip sl-us-chip--${selectedGroup.myRole}`}>
                 {selectedGroup.myRole.toUpperCase()}
               </span>
@@ -900,6 +936,15 @@ export default function UserSpace() {
         kvPageSize={kvPageSize}
         onChangeKvPageSize={changeKvPageSize}
         defaultGroupName={groups?.find((g) => g.id === defaultGroupId)?.name ?? null}
+      />
+      {/* 二级密码解锁/改密弹窗 */}
+      <SecretUnlockModal
+        open={secretModalOpen}
+        mode={secretModalMode}
+        busy={secret.busy}
+        error={secret.error}
+        onSubmit={handleSecretSubmit}
+        onClose={() => setSecretModalOpen(false)}
       />
     </div>
   );

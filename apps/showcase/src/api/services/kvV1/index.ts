@@ -8,6 +8,10 @@
 // tag 契约(与后端对齐):Set 带 tags(replace 语义),List 支持 tags=重复参数 +
 // match=any|all 过滤,GET /kv/tags 返回 facet。见 dev_ctr_hello
 // user-kv-invitecode skill 的 [[client-api]] / [[kv-multi-tag]]。
+//
+// KV Secret 二级密码(2026-09-19 后端新增):
+//   - X-Secret-Password header 由 setSecretPasswordProvider 注入(per-request 派生 KEK)
+//   - unlockSecret / resetSecret 走专用端点 + body
 
 import { HttpService } from '../base';
 import { apiPaths } from '../../registry';
@@ -25,6 +29,9 @@ import type {
   KvDuplicateResponse,
   KvPublicGetArgs,
   KvPublicItem,
+  KvUnlockSecretArgs,
+  KvResetSecretArgs,
+  KvResetSecretResponse,
 } from './types';
 
 export { ApiError } from '../base';
@@ -42,10 +49,40 @@ export type {
   KvDuplicateResponse,
   KvPublicGetArgs,
   KvPublicItem,
+  KvUnlockSecretArgs,
+  KvResetSecretArgs,
+  KvResetSecretResponse,
 } from './types';
+
+// ───── X-Secret-Password 注入(per-request 派生 KEK)────────────────────
+// useSecretUnlock 在 unlock endpoint 成功后调 setSecretPasswordProvider,把
+// 二级密码钉到当前会话;之后任意 KV 请求自动带 header,中间件会在 server 端
+// Argon2id 派生 KEK 入 ctx + LRU。这样:
+//   1. UI 一次输入二级密码 → 整页可用,不需要每个组件弹窗
+//   2. 用户改密码 → clearSecretPassword 触发 reload 提示
+type SecretPasswordProvider = () => string | null;
+let secretPasswordProvider: SecretPasswordProvider = () => null;
+
+export function setSecretPasswordProvider(fn: SecretPasswordProvider): void {
+  secretPasswordProvider = fn;
+}
+
+export function clearSecretPassword(): void {
+  secretPasswordProvider = () => null;
+}
+
+function secretPasswordHeader(): Record<string, string> {
+  const pw = secretPasswordProvider();
+  return pw ? { 'X-Secret-Password': pw } : {};
+}
 
 export class KvV1Service extends HttpService {
   readonly BASE = apiPaths.kvV1;
+
+  /** 每次请求都带 X-Secret-Password(若已解锁)。empty = no header。 */
+  private secretHeaders(): Record<string, string> {
+    return secretPasswordHeader();
+  }
 
   async set(args: KvSetArgs): Promise<void> {
     const body: {
@@ -55,6 +92,7 @@ export class KvV1Service extends HttpService {
       tags: string[];
       groupId?: number;
       visibility?: 'public' | 'private';
+      secret?: boolean;
     } = {
       key: args.key,
       value: args.value,
@@ -67,17 +105,19 @@ export class KvV1Service extends HttpService {
     if (args.visibility === 'public' || args.visibility === 'private') {
       body.visibility = args.visibility;
     }
-    await this.reqPost('', body);
+    // secret 同理:缺省=明文(老行为不变);显式 true 才加密
+    if (args.secret === true) body.secret = true;
+    await this.reqPost('', body, { headers: this.secretHeaders() });
   }
 
   async get(args: KvGetArgs): Promise<KvItem> {
     const qs = args.groupId && args.groupId > 0 ? `?groupId=${args.groupId}` : '';
-    return this.reqGet<KvItem>(`/${encodeURIComponent(args.key)}${qs}`);
+    return this.reqGet<KvItem>(`/${encodeURIComponent(args.key)}${qs}`, { headers: this.secretHeaders() });
   }
 
   async delete(args: KvDeleteArgs): Promise<void> {
     const qs = args.groupId && args.groupId > 0 ? `?groupId=${args.groupId}` : '';
-    await this.reqDelete(`/${encodeURIComponent(args.key)}${qs}`);
+    await this.reqDelete(`/${encodeURIComponent(args.key)}${qs}`, { headers: this.secretHeaders() });
   }
 
   async list(args: KvListArgs = {}): Promise<KvListResponse> {
@@ -89,21 +129,21 @@ export class KvV1Service extends HttpService {
     for (const tag of args.tags ?? []) qs.append('tags', tag);
     if (args.match) qs.set('match', args.match);
     const path = `${qs.toString() ? `?${qs}` : ''}`;
-    return this.reqGet<KvListResponse>(path);
+    return this.reqGet<KvListResponse>(path, { headers: this.secretHeaders() });
   }
 
   /** GET /kv/tags —— 当前用户非过期 KV 的 {tag, count} facet(按 count desc / tag asc)。
    *  后端响应是 `{tags: [{tag,count}, ...]}`(KvTagsRes),信封解一层后拿 data.tags。 */
   async tags(args: { groupId?: number } = {}): Promise<KvTagCount[]> {
     const qs = args.groupId && args.groupId > 0 ? `?groupId=${args.groupId}` : '';
-    const res = await this.reqGet<{ tags: KvTagCount[] }>(`/tags${qs}`);
+    const res = await this.reqGet<{ tags: KvTagCount[] }>(`/tags${qs}`, { headers: this.secretHeaders() });
     return res?.tags ?? [];
   }
 
   /** GET /kv/:key/versions —— 历史版本摘要(version_no / value_len / replaced_at,不回 value 全文)。read+。 */
   async versions(args: { key: string; groupId?: number }): Promise<KvVersionInfo[]> {
     const qs = args.groupId && args.groupId > 0 ? `?groupId=${args.groupId}` : '';
-    const res = await this.reqGet<{ versions: KvVersionInfo[] }>(`/${encodeURIComponent(args.key)}/versions${qs}`);
+    const res = await this.reqGet<{ versions: KvVersionInfo[] }>(`/${encodeURIComponent(args.key)}/versions${qs}`, { headers: this.secretHeaders() });
     return res.versions;
   }
 
@@ -111,7 +151,7 @@ export class KvV1Service extends HttpService {
   async restore(args: { key: string; version: number; groupId?: number }): Promise<void> {
     const body: { version: number; groupId?: number } = { version: args.version };
     if (args.groupId !== undefined && args.groupId > 0) body.groupId = args.groupId;
-    await this.reqPost(`/${encodeURIComponent(args.key)}/restore`, body);
+    await this.reqPost(`/${encodeURIComponent(args.key)}/restore`, body, { headers: this.secretHeaders() });
   }
 
   /** POST /kv/:key/duplicate —— 把 KV 从 sourceGroupId 复制到 targetGroupId(源 read+,目标 write+)。
@@ -121,7 +161,7 @@ export class KvV1Service extends HttpService {
       targetGroupId: args.targetGroupId,
     };
     if (args.sourceGroupId !== undefined && args.sourceGroupId > 0) body.sourceGroupId = args.sourceGroupId;
-    return this.reqPost<KvDuplicateResponse>(`/${encodeURIComponent(args.key)}/duplicate`, body);
+    return this.reqPost<KvDuplicateResponse>(`/${encodeURIComponent(args.key)}/duplicate`, body, { headers: this.secretHeaders() });
   }
 
   /** POST /kv/:key/visibility —— 切换可见性(write+)。独立于 Set,避免普通覆盖写
@@ -132,7 +172,7 @@ export class KvV1Service extends HttpService {
       visibility: args.visibility,
     };
     if (args.groupId !== undefined && args.groupId > 0) body.groupId = args.groupId;
-    await this.reqPost(`/${encodeURIComponent(args.key)}/visibility`, body);
+    await this.reqPost(`/${encodeURIComponent(args.key)}/visibility`, body, { headers: this.secretHeaders() });
   }
 
   /**
@@ -164,7 +204,26 @@ export class KvV1Service extends HttpService {
     const qs = `?groupId=${args.groupId}`;
     return this.reqGet<KvPublicItem>(`/public/${encodeURIComponent(args.key)}${qs}`);
   }
+
+  // ── Secret 二级密码(2026-09-19) ────────────────────────────────
+
+  /** POST /kv/unlock —— 设/验证 KEK 入 LRU。成功后调用方应同步
+   *  setSecretPasswordProvider 以让后续 KV 请求自动带 X-Secret-Password header。 */
+  async unlockSecret(args: KvUnlockSecretArgs): Promise<void> {
+    await this.reqPost('/unlock', { password: args.password });
+  }
+
+  /** POST /kv/reset-secret —— 验证旧密码 + 事务内全表重加密 + 写新 salt。
+   *  成功后调用方应同步 setSecretPasswordProvider 注入新密码,旧密码 cache
+   *  应清掉(clearSecretPassword() 或刷新 provider)。 */
+  async resetSecret(args: KvResetSecretArgs): Promise<KvResetSecretResponse> {
+    return this.reqPost<KvResetSecretResponse>('/reset-secret', {
+      oldPassword: args.oldPassword,
+      newPassword: args.newPassword,
+    });
+  }
 }
 
 export const kvV1Service = new KvV1Service();
+
 

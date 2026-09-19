@@ -91,7 +91,7 @@ function toGroupSummary(input: {
   };
 }
 
-function toKvView(kv: { key: string; value: string; expires_at: string; groupId: number; groupName: string; myRole: KvView['myRole']; tags?: string[]; visibility?: 'public' | 'private' }): KvView {
+function toKvView(kv: { key: string; value: string; expires_at: string; groupId: number; groupName: string; myRole: KvView['myRole']; tags?: string[]; visibility?: 'public' | 'private'; secret?: boolean; locked?: boolean }): KvView {
   return {
     key: kv.key,
     value: kv.value,
@@ -104,6 +104,9 @@ function toKvView(kv: { key: string; value: string; expires_at: string; groupId:
     expiresAt: kv.expires_at,
     // 老后端不返回 visibility → 兜底 private,UI 行为与旧版一致(无公开链接按钮)。
     visibility: kv.visibility ?? 'private',
+    // 老后端不返回 secret/locked → 兜底 false,UI 行为与旧版一致(无锁图标)。
+    secret: kv.secret ?? false,
+    locked: kv.locked ?? false,
   };
 }
 
@@ -358,6 +361,7 @@ export function createUserSpaceStore(): UserSpaceStore {
       tags: args.tags,
       groupId,
       visibility: args.visibility,
+      secret: args.secret,
     });
   }
 
@@ -371,6 +375,7 @@ export function createUserSpaceStore(): UserSpaceStore {
       groupId,
       // args.visibility 省略时 = 不带 visibility 字段 → 后端保留现有可见态(防覆盖写把 public 打回 private)
       visibility: args.visibility,
+      secret: args.secret,
     });
   }
 
@@ -425,6 +430,21 @@ export function createUserSpaceStore(): UserSpaceStore {
   /** 构造公开读完整 URL(`window.location.origin + /api/v1/kv/public/:key?groupId=`)。不发起请求。 */
   function getKvPublicUrl(args: { key: string; groupId: number }): string {
     return kvV1Service.getPublicUrl(args);
+  }
+
+  // ── Secret 二级密码(2026-09-19) ────────────────────────────────
+  // UI 层在「全局二级密码会话」hook 里调这些 + setSecretPasswordProvider,
+  // 这样后续任意 KV 请求自动带 X-Secret-Password header。
+
+  async function unlockSecret(password: string): Promise<void> {
+    requireAuth();
+    await kvV1Service.unlockSecret({ password });
+  }
+
+  async function resetSecret(oldPassword: string, newPassword: string): Promise<{ reEncrypted: number }> {
+    requireAuth();
+    const res = await kvV1Service.resetSecret({ oldPassword, newPassword });
+    return { reEncrypted: res.reEncrypted };
   }
 
   // ── 文件 CRUD ──────────────────────────────────
@@ -654,6 +674,8 @@ export function createUserSpaceStore(): UserSpaceStore {
     duplicateKv,
     setKvVisibility,
     getKvPublicUrl,
+    unlockSecret,
+    resetSecret,
     uploadFile,
     uploadFileChunked,
     listFiles,

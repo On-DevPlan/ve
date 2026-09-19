@@ -19,12 +19,15 @@ import type { ApiPathLiteral } from '../registry';
 export { ApiError };
 
 /**
- * api/http/request.ts 的 RequestOptions 子集 —— 排除掉 body / headers / method
- * (helper 已封),调用方只需关心 skipUnauthorized 等业务侧选项。
+ * api/http/request.ts 的 RequestOptions 子集 —— 排除掉 body / method。
+ * headers 在这里开放:子类(如 kvV1)需要在每次请求上挂载 per-request header
+ * (例如 X-Secret-Password),不必新建第二层 wrapper。
  */
 export interface RequestOptions {
   skipUnauthorized?: boolean;
   signal?: AbortSignal;
+  /** 附加到该次请求的 header(覆盖调用方已有同名键)。 */
+  headers?: Record<string, string>;
 }
 
 /**
@@ -43,22 +46,22 @@ export abstract class HttpService {
   abstract readonly BASE: string & ApiPathLiteral;
 
   protected reqGet<T>(path: string, opts?: RequestOptions): Promise<T> {
-    return api.get<T>(`${this.BASE}${path}`, opts);
+    return api.get<T>(`${this.BASE}${path}`, opts as Parameters<typeof api.get>[1]);
   }
 
   protected reqPost<T>(path: string, body?: unknown, opts?: RequestOptions): Promise<T> {
-    return api.post<T>(`${this.BASE}${path}`, body, opts);
+    return api.post<T>(`${this.BASE}${path}`, body, opts as Parameters<typeof api.post>[2]);
   }
 
   protected reqPut<T>(path: string, body?: unknown, opts?: RequestOptions): Promise<T> {
-    return api.put<T>(`${this.BASE}${path}`, body, opts);
+    return api.put<T>(`${this.BASE}${path}`, body, opts as Parameters<typeof api.put>[2]);
   }
 
   protected reqPatch<T>(path: string, body?: unknown, opts?: RequestOptions): Promise<T> {
-    return api.patch<T>(`${this.BASE}${path}`, body, opts);
+    return api.patch<T>(`${this.BASE}${path}`, body, opts as Parameters<typeof api.patch>[2]);
   }
 
   protected reqDelete(path: string, opts?: RequestOptions): Promise<void> {
-    return api.delete(`${this.BASE}${path}`, opts);
+    return api.delete(`${this.BASE}${path}`, opts as Parameters<typeof api.delete>[1]);
   }
 }

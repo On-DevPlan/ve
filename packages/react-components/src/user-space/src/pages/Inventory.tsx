@@ -93,15 +93,35 @@ export default function Inventory(props: InventoryProps) {
               </tr>
             </thead>
             <tbody>
-              {kv?.items.map((item) => (
+              {kv?.items.map((item) => {
+                // secret + locked: value 是 enc1. 密文占位,UI 用锁图标 + 提示文案替代 value 字段
+                const showLockedPlaceholder = item.secret && item.locked;
+                return (
                 <tr key={item.key}>
                   <td>
-                    <span className="sl-us-table__cell-key sl-us-table__cell-mono">{item.key}</span>
+                    <span className="sl-us-table__cell-key sl-us-table__cell-mono">
+                      {item.secret && (
+                        <span
+                          className="sl-us-chip sl-us-chip--secret"
+                          title={item.locked ? '已加密,需解锁二级密码后可见' : '已加密,已解锁'}
+                          aria-label="secret"
+                        >
+                          🔒
+                        </span>
+                      )}{' '}
+                      {item.key}
+                    </span>
                   </td>
                   <td>
-                    <span className="sl-us-table__cell-value" title={item.value}>
-                      {item.valuePreview || '—'}
-                    </span>
+                    {showLockedPlaceholder ? (
+                      <span className="sl-us-table__cell-value sl-us-table__cell-locked" title="请解锁二级密码后查看">
+                        🔒 已加密,需解锁
+                      </span>
+                    ) : (
+                      <span className="sl-us-table__cell-value" title={item.value}>
+                        {item.valuePreview || '—'}
+                      </span>
+                    )}
                   </td>
                   <td>
                     {item.tags.length === 0
@@ -163,7 +183,8 @@ export default function Inventory(props: InventoryProps) {
                     </div>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
           {kv && kv.total > 0 && (
