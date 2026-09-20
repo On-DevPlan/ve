@@ -70,9 +70,9 @@ export default function SecretUnlockModal({ open, mode, busy, error, onSubmit, o
 
   const node = (
     <div className="sl-us-modal-backdrop" onClick={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}>
-      <div className="sl-us-modal" role="dialog" aria-label={isReset ? '重置二级密码' : '解锁二级密码'}>
+      <div className="sl-us-modal" role="dialog" aria-label={isReset ? '修改二级密码' : '设置 / 解锁二级密码'}>
         <header className="sl-us-modal__head">
-          <h3 className="sl-us-modal__title">{isReset ? '重置二级密码' : '🔓 解锁二级密码'}</h3>
+          <h3 className="sl-us-modal__title">{isReset ? '修改二级密码' : '设置二级密码 / 解锁'}</h3>
           <button
             className="sl-us-btn sl-us-btn--ghost sl-us-btn--icon-sm"
             aria-label="关闭"
@@ -85,8 +85,8 @@ export default function SecretUnlockModal({ open, mode, busy, error, onSubmit, o
         <div className="sl-us-modal__body">
           <p className="sl-us-muted" style={{ fontSize: '12px', margin: '0 0 12px' }}>
             {isReset
-              ? '验证旧密码后,事务内全表重加密所有 secret KV,然后写入新 salt。旧密文将用新密码可读;不会丢失。'
-              : '输入二级密码以解锁 secret KV。后续本会话内所有 KV 请求自动带 header,不需要重复输入。'}
+              ? '修改二级密码:验证旧密码后,服务端会在事务内把全部 secret KV 重加密为新密码可解。不会丢失数据。'
+              : '首次输入即为「设置二级密码」;已设置过则用于「解锁」。解锁后本会话内所有 KV 请求自动携带,不需重复输入。\n加密某个 KV:在「KV 库存」打开该条编辑弹窗,勾选「用二级密码加密」。'}
           </p>
           {!isReset && (
             <div className="sl-us-field">

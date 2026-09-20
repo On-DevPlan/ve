@@ -106,7 +106,7 @@ export default function Inventory(props: InventoryProps) {
                           title={item.locked ? '已加密,需解锁二级密码后可见' : '已加密,已解锁'}
                           aria-label="secret"
                         >
-                          🔒
+                          密
                         </span>
                       )}{' '}
                       {item.key}
@@ -115,7 +115,7 @@ export default function Inventory(props: InventoryProps) {
                   <td>
                     {showLockedPlaceholder ? (
                       <span className="sl-us-table__cell-value sl-us-table__cell-locked" title="请解锁二级密码后查看">
-                        🔒 已加密,需解锁
+                        已加密,需解锁
                       </span>
                     ) : (
                       <span className="sl-us-table__cell-value" title={item.value}>

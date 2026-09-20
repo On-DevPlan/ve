@@ -253,16 +253,16 @@ export default function KvEditorModal({
                 onChange={(e) => setSecret(e.target.checked)}
                 disabled={saving || !canWrite}
               />
-              <span>🔒 用二级密码加密(value 在 DB 不可见)</span>
+              <span>用二级密码加密(value 在 DB 不可见)</span>
             </label>
             {secret && mode === 'edit' && initial?.locked && (
               <span className="sl-us-field__hint">
-                当前 KV 已加密但您未解锁二级密码,提交后值仍是密文。先在顶部「🔓 解锁」输入二级密码再保存。
+                当前 KV 已加密但您未解锁二级密码,提交后值仍是密文。先在顶部「解锁」输入二级密码再保存。
               </span>
             )}
             {secret && mode === 'create' && (
               <span className="sl-us-field__hint">
-                提交前请确保已解锁二级密码(顶部 🔓 按钮),否则保存会失败。
+                提交前请确保已解锁二级密码(顶部 按钮),否则保存会失败。
               </span>
             )}
           </div>

@@ -629,7 +629,7 @@ export default function UserSpace() {
   }, [fileToast]);
 
   // ── Secret 二级密码(2026-09-19) ─────────────────
-  // 顶部「🔓 解锁」按钮触发 unlock;重置密码由 SettingsPanel 入口触发 reset。
+  // 顶部「解锁」按钮触发 unlock;重置密码由 SettingsPanel 入口触发 reset。
   // 改密成功后顶部 banner 显示「已重加密 N 条」,3s 自动消失;同时 reload KV
   // 列表(因为旧密文 → 新密文,backend 派生空间变了)。
   async function handleSecretSubmit(input: { password?: string; oldPassword?: string; newPassword?: string }): Promise<void> {
@@ -735,7 +735,7 @@ export default function UserSpace() {
         )}
         {secretReEncryptedToast !== null && (
           <div className="sl-us-toast sl-us-toast--ok" role="status">
-            🔒 二级密码已改,事务内重加密了 {secretReEncryptedToast} 条 secret KV
+            二级密码已改,事务内重加密了 {secretReEncryptedToast} 条 secret KV
           </div>
         )}
 
@@ -757,9 +757,11 @@ export default function UserSpace() {
               <button
                 className="sl-us-btn sl-us-btn--ghost sl-us-btn--sm"
                 onClick={() => { setSecretModalMode(secret.unlocked ? 'reset' : 'unlock'); setSecretModalOpen(true); }}
-                title={secret.unlocked ? '已解锁;点击改密码' : '解锁后 secret KV 可见明文'}
+                title={secret.unlocked
+                  ? '二级密码已生效;点击可修改密码'
+                  : '设置 / 输入二级密码:用于加密 KV 与解锁查看'}
               >
-                {secret.unlocked ? '🔓 已解锁' : '🔓 解锁'}
+                {secret.unlocked ? '二级密码(已解锁)' : '二级密码'}
               </button>
               <span className={`sl-us-chip sl-us-chip--${selectedGroup.myRole}`}>
                 {selectedGroup.myRole.toUpperCase()}
