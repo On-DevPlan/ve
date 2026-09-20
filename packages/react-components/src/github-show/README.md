@@ -16,6 +16,7 @@ GitHub 项目展示数据库 —— Notion/Feishu 式表格,给面试官看项�
 - **展示视图**:统计卡(项目总数 / 已填亮点 / 已填启发 / 内容完整度)+ ECharts 图表(项目介绍充实度柱状图、亮点填写率环形图)+ 只读表格(列头可排序,多选列渲染为标签)
 - **导出 PDF**:展示视图一键**下载 .pdf 文件**(html2canvas + jsPDF 分页,中文/图表所见即所得;异常自动降级浏览器打印)
 - **链接自动解析**:粘贴 `https://github.com/owner/repo` 自动填充项目名,可手动覆盖
+- **TOML 批量导入**(2026-09 起):编辑视图顶栏「导入」按钮,粘贴 / 上传 TOML 一次性导入多行项目;支持 gh CLI 提示词一键复制(详见下文)
 - **搜索**:跨链接 / 项目名 / 亮点 / 启发 / 产出 / 自定义列过滤
 - **云端同步**:整份文档 JSON blob 存单个 KV key(`github-show`),登录后自动云端保存
 - **游客降级**:未登录时数据保存在本机 localStorage,登录后无缝接管
@@ -71,6 +72,56 @@ https://<host>/components/github-show?groupId=42&key=my-cover
 - 关闭公开 = 在 KV UI 切回 `私有`,原 URL 立即 404(下次访问就看不到)
 - TTL 设了就会过期;过期后原 URL 也 404
 
+## TOML 批量导入(2026-09 起)
+
+编辑视图顶栏 **「导入」** 按钮(空库时空态区也有「导入 TOML」入口)打开导入弹窗:
+粘贴 TOML 文本或选择 `.toml` 文件(上限 1MB),实时解析预览后一键批量写入。
+
+### 文件格式
+
+只认 `[[projects]]` 表数组(必须复数),UTF-8 编码:
+
+```toml
+[[projects]]
+repo_url = "https://github.com/vuejs/core"   # 必填;缺失整条跳过
+name = "vuejs/core"                          # 可选;省略时自动从链接解析 owner/repo
+highlights = ""                              # 可选;亮点(建议留空,导入后自填)
+insights = ""                                # 可选;启发(建议留空,导入后自填)
+output = ""                                  # 可选;产出 / 线上地址
+is_fork = false                              # 可选布尔;仅作预览提示,不写入数据
+pushed_at = "2026-03-15T10:00:00Z"           # 可选;解析时忽略
+visibility = "公开"                          # 任意其它 key = 自定义文本列(列名 = key)
+```
+
+导入行为:
+
+- **增量合并**:与现有行按归一化链接去重,已存在的跳过并在结果里计数
+- **自动建列**:TOML 里的未知 key(如 `visibility`)若与现有自定义列同名则直接填值,
+  否则自动新建文本列;解析预览会提示「新建 K 列: 列名列表」
+- **解析警告**不阻断导入:文件内重复链接保留首条、`is_fork` 值非布尔忽略、
+  无法解析的行 / 缺 `repo_url` 的项目进错误明细(展示前 10 条)
+
+### gh CLI 提示词(快速导入仓库)
+
+弹窗中部是 **gh 提示词区**:四个选项(时间窗 3/6/12/24/36 个月、仓库范围 仅个人/个人+组织、
+fork 排除/包含、可见性 全部/仅公开)+ **「复制 gh 提示词」** 按钮。
+
+工作流:
+
+1. 按需调整选项,点「复制 gh 提示词」
+2. 把提示词发给本机任意 AI agent(Claude Code 等),agent 会:
+   - `gh auth status` 确认登录(未登录提示 `gh auth login`)
+   - `gh api user --jq .login` 取用户名 → `gh repo list` 按 cutoff 过滤 `pushedAt`
+     (组织范围时额外遍历 `gh api user/orgs`)
+   - 输出本组件可导入的 TOML(亮点 / 启发留空占位,visibility 转成中文「公开/私有」列)
+3. 把 agent 输出的 TOML 粘贴回弹窗上方 → 预览 → 确认导入 → 表格中自填亮点 / 启发
+
+弹窗底部折叠区提供完整 **TOML 格式说明** 与 **「复制格式提示词」** 按钮(发给 AI 生成合规
+TOML,适合手工整理仓库清单的场景)。
+
+公开分享模式(URL 带 `?groupId=`)下导入按钮与弹窗整体隐藏,`importProjects` 内部再兜底
+返回只读错误(双保险)。
+
 ## 数据模型(v1.4.0)
 
 ```ts
@@ -119,11 +170,14 @@ src/
   utils/repo.ts            # GitHub 链接解析 + http 链接/文本拆分纯函数
   utils/tags.ts            # 多选值序列化 / 解析纯函数
   engine/stats.ts          # 展示统计纯函数(指标 + 图表数据)
+  engine/import-parser.ts  # TOML 导入解析器(零依赖,[[projects]] 子集)
+  engine/import-prompts.ts # 格式说明提示词 + gh CLI 盘点提示词生成
   engine/printDoc.ts       # PDF 导出内容生成(纯函数,可单测)
   engine/exportPdf.ts      # PDF 直接下载(html2canvas + jsPDF 分页)
   engine/print.ts          # iframe 打印(降级路径)
   components/GithubShowTable.tsx    # 编辑视图表格
   components/DisplayView.tsx        # 展示视图(统计 + 图表 + 只读表格 + 导出)
+  components/ImportModal.tsx        # TOML 批量导入弹窗(粘贴/文件 + gh 提示词一键复制)
   components/ColumnSettingsModal.tsx # 列扩展弹窗(类型选择 + CRUD + 展示页显示开关)
   components/LinkCell.tsx           # 可点击跳转的链接单元格
   components/MultiSelectCell.tsx    # 多选列 chip 编辑器

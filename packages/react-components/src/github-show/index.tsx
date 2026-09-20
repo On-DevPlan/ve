@@ -17,6 +17,7 @@ import { useGithubShow } from './src/hooks/useGithubShow';
 import { useLoginModal } from './src/hooks/useLoginModal';
 import GithubShowTable from './src/components/GithubShowTable';
 import ColumnSettingsModal from './src/components/ColumnSettingsModal';
+import ImportModal from './src/components/ImportModal';
 import DisplayView from './src/components/DisplayView';
 import SyncPill from './src/components/SyncPill';
 import PublicShareBanner from './src/components/PublicShareBanner';
@@ -62,6 +63,7 @@ export default function GithubShow() {
   // 非公开模式维持原 LS 记忆(默认 edit)。
   const [view, setView] = useState<ViewMode>(() => (store.readOnly ? 'display' : readInitialView()));
   const [columnsOpen, setColumnsOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -160,6 +162,13 @@ export default function GithubShow() {
               <button
                 type="button"
                 className="sl-gh-btn sl-gh-btn--ghost"
+                onClick={() => setImportOpen(true)}
+              >
+                导入
+              </button>
+              <button
+                type="button"
+                className="sl-gh-btn sl-gh-btn--ghost"
                 onClick={() => setColumnsOpen(true)}
               >
                 列设置
@@ -207,6 +216,13 @@ export default function GithubShow() {
             <button
               type="button"
               className="sl-gh-btn sl-gh-btn--ghost"
+              onClick={() => setImportOpen(true)}
+            >
+              导入 TOML
+            </button>
+            <button
+              type="button"
+              className="sl-gh-btn sl-gh-btn--ghost"
               onClick={() => handleAddRow(SAMPLE_ROW)}
             >
               填充示例
@@ -239,6 +255,14 @@ export default function GithubShow() {
           onDelete={store.deleteColumn}
           onToggleVisible={store.toggleColumnVisibility}
           onClose={() => setColumnsOpen(false)}
+        />
+      )}
+
+      {importOpen && !store.readOnly && (
+        <ImportModal
+          onImport={store.importProjects}
+          columns={store.columns}
+          onClose={() => setImportOpen(false)}
         />
       )}
 

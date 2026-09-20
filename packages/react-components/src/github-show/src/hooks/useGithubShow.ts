@@ -18,6 +18,8 @@ import { createGithubShowStore, type GithubShowStoreLite } from '@api/components
 import { LocalGithubShowStore } from '../storage/LocalStore';
 import { PublicGithubShowStore } from '../storage/PublicStore';
 import { readPublicParamsFromUrl, buildShareUrl } from '../utils/shareLink';
+import { normalizeRepoUrl } from '../utils/repo';
+import type { GithubShowImportParseResult } from '../engine/import-parser';
 import { useJwtAuth } from './useAuth';
 
 export type GithubShowStatus = 'loading' | 'ready' | 'error';
@@ -27,6 +29,14 @@ type PersistStore = GithubShowStoreLite | LocalGithubShowStore | PublicGithubSho
 
 function freshId(): string {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+}
+
+/** TOML 批量导入的结果统计(ImportModal 展示用)。 */
+export interface GithubShowImportStats {
+  rowsAdded: number;
+  columnsCreated: number;
+  rowsSkipped: number;
+  errors: string[];
 }
 
 export function useGithubShow() {
@@ -327,6 +337,80 @@ export function useGithubShow() {
     scheduleSave(current, activeStore);
   }, [activeStore, scheduleSave, publicParams]);
 
+  // ── TOML 批量导入 ─────────────────────────────────────
+
+  const importProjects = useCallback(
+    (parsed: GithubShowImportParseResult): GithubShowImportStats => {
+      if (publicParams) {
+        return { rowsAdded: 0, columnsCreated: 0, rowsSkipped: 0, errors: ['公开分享模式只读,不能导入'] };
+      }
+      const now = Date.now();
+      const prev = docRef.current;
+
+      // 1. 待新建列:解析器汇总的列名(文件内已去重)。与现有列同名的不重复建。
+      const existingTitles = new Set(prev.columns.map((c) => c.title));
+      const createdTitles = parsed.pendingColumnTitles.filter((t) => !existingTitles.has(t));
+      const titleToColId = new Map<string, string>();
+      const newColumns = createdTitles.map((title) => {
+        const colId = freshId();
+        titleToColId.set(title, colId);
+        return { id: colId, title, type: 'text' as const, createdAt: now, hiddenInDisplay: false };
+      });
+
+      // 2. 与现有行按归一化链接去重
+      const existingUrls = new Set(prev.rows.map((r) => normalizeRepoUrl(r.repoUrl)));
+
+      const addedRows: GithubShowRow[] = [];
+      let rowsSkipped = 0;
+      for (const p of parsed.projects) {
+        const url = normalizeRepoUrl(p.repoUrl);
+        if (!url || existingUrls.has(url)) {
+          rowsSkipped += 1;
+          continue;
+        }
+        existingUrls.add(url);
+        // pendingValues 的列名 → 新列 id;解析期已匹配现有列的 p.values 原样合并
+        const values: Record<string, string> = { ...p.values };
+        for (const [title, value] of Object.entries(p.pendingValues)) {
+          const colId = titleToColId.get(title);
+          if (colId) values[colId] = value;
+        }
+        addedRows.push({
+          id: freshId(),
+          repoUrl: url,
+          name: p.name,
+          highlights: p.highlights,
+          insights: p.insights,
+          output: p.output,
+          values,
+          createdAt: now,
+          updatedAt: now,
+        });
+      }
+
+      if (addedRows.length === 0 && newColumns.length === 0) {
+        // 无可写入内容(全部重复 / 全部缺链接)→ 不动 doc
+        return { rowsAdded: 0, columnsCreated: 0, rowsSkipped, errors: [...parsed.errors] };
+      }
+
+      // 3. 单次 mutate 提交:一次 setDoc + 一次 600ms debounce save
+      mutate((cur) => ({
+        ...cur,
+        meta: { ...cur.meta, updatedAt: now },
+        columns: [...cur.columns, ...newColumns],
+        rows: [...cur.rows, ...addedRows],
+      }));
+
+      return {
+        rowsAdded: addedRows.length,
+        columnsCreated: newColumns.length,
+        rowsSkipped,
+        errors: [...parsed.errors],
+      };
+    },
+    [mutate, publicParams],
+  );
+
   // ── 公开分享信息(供 UI 顶部 banner / 「复制分享链接」按钮)────────────
   const readOnly = publicParams !== null;
   const shareUrl = useMemo(
@@ -353,6 +437,7 @@ export function useGithubShow() {
     deleteColumn,
     toggleColumnVisibility,
     setCellValue,
+    importProjects,
     retrySave,
   };
 }
