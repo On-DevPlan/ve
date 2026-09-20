@@ -45,7 +45,11 @@ export interface SecretUnlockState {
  * 的 state.password,React 重渲时会刷新闭包。clear 时同步 clearSecretPassword。
  */
 export function useSecretUnlock(): SecretUnlockState {
-  const store = useUserSpaceStore();
+  // 注意: useUserSpaceStore() 返回的是 { groups, defaultGroupId, loading,
+  // error, reload, store } 这个聚合对象,真正的 store 句柄在 .store 字段。
+  // 之前写成 `const store = useUserSpaceStore()` —— store 变成聚合对象,
+  // store.unlockSecret 恒 undefined → 运行期报 "store.unlockSecret is not a function"。
+  const { store } = useUserSpaceStore();
   const [password, setPassword] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
