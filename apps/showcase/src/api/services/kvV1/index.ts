@@ -32,6 +32,7 @@ import type {
   KvUnlockSecretArgs,
   KvResetSecretArgs,
   KvResetSecretResponse,
+  KvSecretStatusResponse,
 } from './types';
 
 export { ApiError } from '../base';
@@ -52,6 +53,7 @@ export type {
   KvUnlockSecretArgs,
   KvResetSecretArgs,
   KvResetSecretResponse,
+  KvSecretStatusResponse,
 } from './types';
 
 // ───── X-Secret-Password 注入(per-request 派生 KEK)────────────────────
@@ -221,6 +223,12 @@ export class KvV1Service extends HttpService {
       oldPassword: args.oldPassword,
       newPassword: args.newPassword,
     });
+  }
+
+  /** GET /kv/secret-status —— 探测当前用户是否已设置过二级密码(只看 salt 非空)。
+   *  不返回密码 / KEK / secret 内容。UI 顶栏用它区分「首次设置 / 改密」。 */
+  async secretStatus(): Promise<KvSecretStatusResponse> {
+    return this.reqGet<KvSecretStatusResponse>('/secret-status');
   }
 }
 

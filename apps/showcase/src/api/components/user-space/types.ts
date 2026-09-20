@@ -230,6 +230,8 @@ export interface UserSpaceStore {
   unlockSecret(password: string): Promise<void>;
   /** 改二级密码:验证旧密码 + 全表重加密;成功后新密码立即生效。 */
   resetSecret(oldPassword: string, newPassword: string): Promise<{ reEncrypted: number }>;
+  /** 探测当前用户是否已设置过二级密码(只读,不泄露任何 secret 内容)。 */
+  hasSecretPassword(): Promise<boolean>;
 
   // ── 文件(本期为公开图床) ─────────────────────────
   // upload 固定 accessLevel='public';tags replace 语义。displayName 由后端

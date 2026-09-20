@@ -343,6 +343,18 @@
 }
 .sl-us-btn--danger-ghost:hover:not([disabled]) { background: var(--danger-soft); }
 
+/* 二级密码三态按钮:未设置(ghost)=>已设置但锁(warning 黄)=>已解锁(success 绿) */
+.sl-us-btn--success {
+  background: #ecfdf5; border-color: #10b981;
+  color: #065f46;
+}
+.sl-us-btn--success:hover:not([disabled]) { background: #d1fae5; }
+.sl-us-btn--warning {
+  background: #fef3c7; border-color: #f59e0b;
+  color: #92400e;
+}
+.sl-us-btn--warning:hover:not([disabled]) { background: #fde68a; }
+
 .sl-us-btn--sm { height: 22px; padding: 0 8px; font-size: 12px; }
 .sl-us-btn--icon { width: 26px; padding: 0; justify-content: center; }
 .sl-us-btn--icon-sm { width: 22px; padding: 0; justify-content: center; }

@@ -639,6 +639,8 @@ export default function UserSpace() {
         setSecretReEncryptedToast(res.reEncrypted);
         setTimeout(() => setSecretReEncryptedToast(null), 4000);
         await loadKv(kvPage, kvTag);
+        // reset 后刷新探测(状态会从 unlocked/set-locked 不变,但新密码已生效)
+        await secret.refresh();
       }
     } else if (input.password) {
       await secret.unlock(input.password);
@@ -755,13 +757,27 @@ export default function UserSpace() {
               <div className="sl-us-topbar__crumb">{VIEW_TABS.find((t) => t.key === view)?.label}</div>
               <span className="sl-us-topbar__spacer" />
               <button
-                className="sl-us-btn sl-us-btn--ghost sl-us-btn--sm"
-                onClick={() => { setSecretModalMode(secret.unlocked ? 'reset' : 'unlock'); setSecretModalOpen(true); }}
-                title={secret.unlocked
-                  ? '二级密码已生效;点击可修改密码'
-                  : '设置 / 输入二级密码:用于加密 KV 与解锁查看'}
+                className={
+                  secret.status === 'unlocked'
+                    ? 'sl-us-btn sl-us-btn--success sl-us-btn--sm'
+                    : secret.status === 'set-locked'
+                      ? 'sl-us-btn sl-us-btn--warning sl-us-btn--sm'
+                      : 'sl-us-btn sl-us-btn--ghost sl-us-btn--sm'
+                }
+                onClick={() => { setSecretModalMode(secret.status === 'unlocked' ? 'reset' : 'unlock'); setSecretModalOpen(true); }}
+                title={
+                  secret.status === 'unlocked'
+                    ? '二级密码已生效,本会话已解锁;点击可修改密码'
+                    : secret.status === 'set-locked'
+                      ? '已设置过二级密码,本会话未解锁;点击输入密码解锁'
+                      : '首次点击可设置二级密码(用于加密 KV)'
+                }
               >
-                {secret.unlocked ? '二级密码(已解锁)' : '二级密码'}
+                {secret.status === 'unlocked'
+                  ? '已生效'
+                  : secret.status === 'set-locked'
+                    ? '已设置(锁)'
+                    : '未设置'}
               </button>
               <span className={`sl-us-chip sl-us-chip--${selectedGroup.myRole}`}>
                 {selectedGroup.myRole.toUpperCase()}

@@ -152,3 +152,9 @@ export interface KvResetSecretResponse {
   message: string;
   reEncrypted: number;
 }
+
+/** GET /kv/secret-status —— 仅 MustAuth,查询「当前用户是否已设置过二级密码」。
+ * 不返回密码 / 不返回 KEK / 不返回任何 secret 内容。 */
+export interface KvSecretStatusResponse {
+  hasPassword: boolean;
+}

@@ -463,6 +463,14 @@ export function createUserSpaceStore(): UserSpaceStore {
     return { reEncrypted: res.reEncrypted };
   }
 
+  /** 探测当前用户是否已设置过二级密码(后端仅检查 salt 非空,不返回密码/KEK)。
+   *  UI 顶栏用它区分「首次设置 / 改密 / 未知」三种状态。 */
+  async function hasSecretPassword(): Promise<boolean> {
+    requireAuth();
+    const res = await kvV1Service.secretStatus();
+    return !!res.hasPassword;
+  }
+
   // ── 文件 CRUD ──────────────────────────────────
   // 权限(后端 contract):upload → owner|admin|writer;delete → owner|admin;
   // patch → owner|admin|writer;list/info → 任意成员。
@@ -692,6 +700,7 @@ export function createUserSpaceStore(): UserSpaceStore {
     getKvPublicUrl,
     unlockSecret,
     resetSecret,
+    hasSecretPassword,
     uploadFile,
     uploadFileChunked,
     listFiles,
