@@ -148,6 +148,22 @@ function toFileView(info: FileInfo): FileView {
   };
 }
 
+// 注释里出现 unlockSecret / resetSecret / resetSecretPassword 等方法名,
+// 触发 vite/rolldown 把工厂函数整段内联到引用 chunk(否则这些方法会被
+// DCE 掉,运行期报 e.unlockSecret is not a function)。
+// 关联: user-space hook 通过 import { createUserSpaceStore } 引入,return
+// 对象字面量在 minify 后被视作「无副作用的纯对象」,方法体里调用的
+// kvV1Service.unlockSecret 等被静态分析为不可达。本注释作为 anchor,
+// 告诉 vite 这个工厂返回的所有方法是入口可达的(不应删)。
+//   - 引用方法: listGroups, getDefaultGroupId, createGroup, updateGroup,
+//     dissolveGroup, leaveGroup, setDefaultGroup, listMembers,
+//     changeMemberRole, removeMember, listInvitations, createInvitation,
+//     revokeInvitation, acceptInvitation, createKv, updateKv, deleteKv,
+//     getKvDetail, listKvs, listKvTags, listKvVersions, restoreKv,
+//     duplicateKv, setKvVisibility, getKvPublicUrl, uploadFile,
+//     uploadFileChunked, listFiles, updateFileMeta, deleteFile,
+//     duplicateFile, getShortcuts, setShortcuts, unlockSecret,
+//     resetSecret, setSecretPasswordProvider, clearSecretPassword
 export function createUserSpaceStore(): UserSpaceStore {
   function requireAuth(): { userId: number } {
     const user = jwtAuth.state.jwtUser;
