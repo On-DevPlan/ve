@@ -11,6 +11,42 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
+/**
+ * 二级密码输入框 —— 故意用 type="text"。
+ * 浏览器(Chrome/Edge)对 type="password" 会触发「保存到密码管理器 / 更新账号密码」弹窗;
+ * 二级密码不是账号凭据,会让用户点错覆盖登录密码。type="text" + 多种 data- 属性让
+ * 密码管理器/自动填充都跳过本字段。
+ */
+function SecretInput(props: {
+  value: string;
+  onChange: (v: string) => void;
+  disabled?: boolean;
+  autoFocus?: boolean;
+  placeholder?: string;
+  name: string;
+}) {
+  return (
+    <input
+      type="text"
+      autoComplete="off"
+      autoCorrect="off"
+      autoCapitalize="off"
+      spellCheck={false}
+      className="sl-us-input sl-us-secret-input"
+      value={props.value}
+      onChange={(e) => props.onChange(e.target.value)}
+      disabled={props.disabled}
+      autoFocus={props.autoFocus}
+      placeholder={props.placeholder}
+      data-1p-ignore="true"
+      data-bwignore="true"
+      data-form-type="other"
+      data-lpignore="true"
+      aria-label={props.name}
+    />
+  );
+}
+
 export type SecretUnlockMode = 'unlock' | 'reset';
 
 export interface SecretUnlockModalProps {
@@ -91,11 +127,10 @@ export default function SecretUnlockModal({ open, mode, busy, error, onSubmit, o
           {!isReset && (
             <div className="sl-us-field">
               <span className="sl-us-field__label">二级密码</span>
-              <input
-                type="password"
-                className="sl-us-input"
+              <SecretInput
+                name="二级密码"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={setPassword}
                 disabled={busy}
                 autoFocus
                 placeholder="至少 6 位"
@@ -106,33 +141,30 @@ export default function SecretUnlockModal({ open, mode, busy, error, onSubmit, o
             <>
               <div className="sl-us-field">
                 <span className="sl-us-field__label">旧二级密码</span>
-                <input
-                  type="password"
-                  className="sl-us-input"
+                <SecretInput
+                  name="旧二级密码"
                   value={oldPassword}
-                  onChange={(e) => setOldPassword(e.target.value)}
+                  onChange={setOldPassword}
                   disabled={busy}
                   autoFocus
                 />
               </div>
               <div className="sl-us-field">
                 <span className="sl-us-field__label">新二级密码</span>
-                <input
-                  type="password"
-                  className="sl-us-input"
+                <SecretInput
+                  name="新二级密码"
                   value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
+                  onChange={setNewPassword}
                   disabled={busy}
                   placeholder="至少 6 位"
                 />
               </div>
               <div className="sl-us-field">
                 <span className="sl-us-field__label">确认新二级密码</span>
-                <input
-                  type="password"
-                  className="sl-us-input"
+                <SecretInput
+                  name="确认新二级密码"
                   value={newPassword2}
-                  onChange={(e) => setNewPassword2(e.target.value)}
+                  onChange={setNewPassword2}
                   disabled={busy}
                 />
                 {newPwMismatch && <span className="sl-us-field__hint">两次新密码不一致</span>}

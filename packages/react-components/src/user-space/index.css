@@ -377,6 +377,13 @@
 }
 .sl-us-input--compact { width: auto; min-width: 140px; }
 .sl-us-input--num { font-variant-numeric: tabular-nums; }
+/* 二级密码输入框:type="text" 模拟密码样式(浏览器看到 password 会触发
+   「更新账号密码」弹窗,我们要规避)。letter-spacing 把字符打散成圆点,
+   font-feature-settings 让字符渲染为圆形。 */
+.sl-us-input.sl-us-secret-input {
+  letter-spacing: 0.25em;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}
 /* textarea 变体:覆盖 .sl-us-input 的固定高度,改成内容驱动 + monospace
    (value 通常是 JSON / 配置,等宽对齐更好读) */
 .sl-us-input.sl-us-input--textarea {
