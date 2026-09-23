@@ -9,6 +9,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { parseImportToml, type GithubShowImportParseResult } from '../engine/import-parser';
 import { FORMAT_PROMPT, buildGhReposPrompt, type GhPromptOptions } from '../engine/import-prompts';
+import { SharedMount } from '@/shared/components/runtime/SharedMount';
+import FileDropZone from '@/shared/components/FileDropZone';
 
 export interface ImportStats {
   rowsAdded: number;
@@ -48,7 +50,6 @@ export default function ImportModal({ onImport, columns, onClose }: Props) {
   const [promptCopied, setPromptCopied] = useState(false);
   const [formatCopied, setFormatCopied] = useState(false);
   const copyTimerRef = useRef<number | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -74,12 +75,15 @@ export default function ImportModal({ onImport, columns, onClose }: Props) {
     setParseResult(val.trim() ? parseImportToml(val, columns) : null);
   }
 
-  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+  // 文件选择走 shared/components 的共享 FileDropZone（Vue 实现，React 树里由
+  // SharedMount 挂载）。zone 形态：虚线框由共享层提供，这里不再自己画
+  // （原来 .sl-gh-import__file-zone 上的 1px dashed 已删）。
+  // input.value 的清空由共享组件内部负责，这里不再手写。
+  function handleFile(picked: File[]) {
+    const file = picked[0];
     if (!file) return;
     if (file.size > MAX_BYTES) {
       window.alert('文件过大,请控制在 1MB 以内');
-      e.target.value = '';
       return;
     }
     const reader = new FileReader();
@@ -91,7 +95,6 @@ export default function ImportModal({ onImport, columns, onClose }: Props) {
     };
     reader.onerror = () => window.alert('无法读取文件');
     reader.readAsText(file);
-    e.target.value = '';
   }
 
   /** 写剪贴板;clipboard API 不可用时降级 textarea + execCommand */
@@ -212,20 +215,14 @@ export default function ImportModal({ onImport, columns, onClose }: Props) {
           />
         ) : (
           <div className="sl-gh-import__file-zone">
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".toml"
-              onChange={handleFile}
-              style={{ display: 'none' }}
+            <SharedMount
+              module={FileDropZone}
+              componentProps={{
+                variant: 'zone',
+                accept: '.toml',
+                onSelect: handleFile,
+              }}
             />
-            <button
-              type="button"
-              className="sl-gh-btn sl-gh-btn--primary"
-              onClick={() => fileRef.current?.click()}
-            >
-              选择 .toml 文件
-            </button>
             {text && <p className="sl-gh-import__file-name">已加载 {text.length} 字符</p>}
           </div>
         )}
