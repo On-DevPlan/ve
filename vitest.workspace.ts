@@ -80,10 +80,35 @@ export default defineWorkspace([
       environment: 'jsdom',
       include: ['__tests__/**/*.test.{ts,tsx}'],
     },
+    // react-components 现在会**间接**导入 .vue —— 共享组件层
+    // (apps/showcase/src/shared/components) 的实现是 Vue SFC，由 SharedMount
+    // 在 React 树里挂载。所以本工程也必须挂 plugin-vue，否则 import analysis
+    // 会以 "content contains invalid JS syntax" 报错（11 个 suite 一起挂过）。
+    plugins: [vuePlugin()],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, 'apps/showcase/src'),
         '@api': path.resolve(__dirname, 'apps/showcase/src/api'),
+
+        // 装了 plugin-vue 之后还有第二道坎：**裸包解析**。
+        // vitest 每个 project 都按自己的 root 解析裸导入，本工程 root 是
+        // packages/react-components，而共享层需要的两个包都不在它的解析半径内：
+        //   - `vue`：共享层 SFC 与 SharedMount.tsx 的直接依赖，仓库里只装在
+        //     apps/showcase 与 packages/mount-adapters 下；
+        //   - `@style-library/mount-adapters/style-adoption`：package.json 未声明。
+        // 结果是 11 个 suite 以 "Failed to resolve import \"vue\"" 挂掉。
+        // 这里显式指路 —— 目标选 mount-adapters：共享层的 vue / react / react-dom
+        // 运行时依赖本来就由这个包声明（见其 package.json），语义最贴近，也避免
+        // 依赖 pnpm 是否把包装到根 node_modules 的运气。
+        vue: path.resolve(__dirname, 'packages/mount-adapters/node_modules/vue'),
+
+        // 长 key 必须写在包名 key 前面：alias 是前缀匹配、先命中先用，而包根下
+        // 并没有 style-adoption.ts（真实文件在 src/ 下，原本靠 package.json 的
+        // exports 子路径映射，alias 会绕过 exports）。
+        '@style-library/mount-adapters/style-adoption': path.resolve(
+          __dirname,
+          'packages/mount-adapters/src/style-adoption.ts',
+        ),
       },
     },
   },
