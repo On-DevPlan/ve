@@ -1,9 +1,16 @@
 <!-- game-skin-admin/src/views/ReplaceTab.vue — 单资源替换（仅 owner/admin）。
-     点击资源格 -> 模态选新图 -> 上传(fileV1 带 3 级 tag) + 写 KV + 清理旧文件。 -->
+     点击资源格 -> 模态选新图（共享 FileDropZone 的 zone 形态：虚线拖放区，整块可点
+     + 拖拽填入）-> 上传(fileV1 带 3 级 tag) + 写 KV + 清理旧文件。 -->
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { assetTags } from '../composables/useSkinAdmin';
 import type { UseSkinAdmin } from '../composables/useSkinAdmin';
+// 文件选择统一走 shared/components 的共享组件（Vue 实现，React 树里同样能用）。
+// 这里只 import descriptor，不 import FileDropZone.vue —— 直接渲染组件会绕过
+// SharedMount，descriptor.css 没人注入，组件会以裸样式出现。
+import SharedMount from '@/shared/components/runtime/SharedMount.vue';
+import FileDropZone, { formatRejectInfo } from '@/shared/components/FileDropZone';
+import type { RejectInfo } from '@/shared/components/FileDropZone';
 
 const props = defineProps<{
   admin: UseSkinAdmin;
@@ -13,6 +20,27 @@ const target = ref<{ skinId: string; assetKey: string } | null>(null);
 const file = ref<File | null>(null);
 const submitting = ref(false);
 const status = ref<{ ok: boolean; text: string } | null>(null);
+// 共享组件拒绝文件（类型不符 / 超体积 / 拖进目录）时的提示，只作用于当前弹窗。
+const pickError = ref<string | null>(null);
+
+// 交给 FileDropZone 的提示行：拒绝提示 > 已选文件名 > 默认说明。
+// 用 hint 承载文件名，是因为共享组件刻意不内置「已选文件」展示 ——
+// 不同消费点的展示位置不同（弹窗用提示行、网格里用格子本身），由调用方决定。
+// 默认说明不再重复「可点击选择也可拖拽到此处」—— zone 形态的主文案已经写了这件事。
+const dropHint = computed(() => {
+  if (pickError.value) return pickError.value;
+  if (file.value) return `已选择：${file.value.name}`;
+  return '透明底 webp 或 png';
+});
+
+function onPickFiles(files: File[]): void {
+  file.value = files[0] ?? null;
+  pickError.value = null;
+}
+
+function onRejectFile(info: RejectInfo): void {
+  pickError.value = formatRejectInfo(info);
+}
 
 function getAssetMap(m: (typeof props.admin.index.value)[number]): Record<string, { fileId?: string }> {
   // KV schema 字段名全游戏统一 `pieces`（与 fr GameSkinMeta 对齐）
@@ -23,6 +51,7 @@ function open(skinId: string, assetKey: string) {
   if (!props.admin.canEdit.value) return;
   target.value = { skinId, assetKey };
   file.value = null;
+  pickError.value = null;
   status.value = null;
 }
 
@@ -137,12 +166,17 @@ async function submit() {
           <p class="csa-modal__desc">
             透明底 webp 或 png。上传自动打三级 tag：<code>{{ assetTags(props.admin.entry, target.skinId, target.assetKey).join(' ') }}</code>
           </p>
-          <input
-            class="csa-modal__file"
-            type="file"
-            accept="image/*"
-            @change="(e) => (file = (e.target as HTMLInputElement).files?.[0] ?? null)"
-          >
+          <SharedMount
+            :module="FileDropZone"
+            :component-props="{
+              variant: 'zone',
+              accept: 'image/*',
+              hint: dropHint,
+              disabled: submitting,
+              onSelect: onPickFiles,
+              onReject: onRejectFile,
+            }"
+          />
           <div class="csa-modal__actions">
             <button
               class="csa-btn"

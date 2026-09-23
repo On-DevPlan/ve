@@ -226,6 +226,9 @@ const gameCount = Object.values(GAME_SKIN_REGISTRY).filter((g) => !g.hiddenInGam
 .sl-csa *::before,
 .sl-csa *::after { box-sizing: border-box; }
 .sl-csa h2, .sl-csa h3, .sl-csa p, .sl-csa figure { margin: 0; }
+/* 通配式 button reset，特异性 (0,1,1) —— 压得过共享组件内置的 .sl-file-drop__btn
+   (0,1,0)，会让 FileDropZone 的 button / bare 形态被擦成裸文字。取舍与禁忌
+   （别加 :not() carve-out，那会反压 .sl-csa .csa-btn）见 index.css 同处注释。 */
 .sl-csa button { font: inherit; cursor: pointer; background: none; border: none; padding: 0; color: inherit; }
 .sl-csa input, .sl-csa select, .sl-csa textarea { font: inherit; color: inherit; }
 .sl-csa ul, .sl-csa ol { margin: 0; padding: 0; list-style: none; }
@@ -702,8 +705,9 @@ const gameCount = Object.values(GAME_SKIN_REGISTRY).filter((g) => !g.hiddenInGam
   opacity: 1;
   border-radius: 0 0 7px 7px;
 }
+/* 格子外壳。点击目标已经收窄到内部共享 FileDropZone 的方格本身（.csa-up__tile），
+   所以这里不再给整格 cursor: pointer。 */
 .sl-csa .csa-up {
-  cursor: pointer;
   text-align: center;
   position: relative;
 }
@@ -734,7 +738,6 @@ const gameCount = Object.values(GAME_SKIN_REGISTRY).filter((g) => !g.hiddenInGam
   color: var(--csa-success);
   font-weight: 600;
 }
-.sl-csa .csa-up input[type="file"] { display: none; }
 .sl-csa .csa-up__key {
   display: block;
   margin-top: 5px;
@@ -803,19 +806,9 @@ const gameCount = Object.values(GAME_SKIN_REGISTRY).filter((g) => !g.hiddenInGam
   border-color: var(--csa-primary);
   box-shadow: var(--csa-ring);
 }
-.sl-csa .csa-modal__file::file-selector-button {
-  font: inherit;
-  font-size: 12px;
-  margin-right: 10px;
-  padding: 4px 10px;
-  border: 1px solid var(--csa-border-strong);
-  border-radius: 6px;
-  background: var(--csa-hover);
-  color: var(--csa-fg-2);
-  cursor: pointer;
-  transition: background 0.12s;
-}
-.sl-csa .csa-modal__file::file-selector-button:hover { background: var(--csa-border); }
+/* 原来这里有两条 `.csa-modal__file::file-selector-button` 规则，用于美化 EmojiUploadModal
+   里那个原生 file input。选图改走共享 FileDropZone 后该 input 已删除，::file-selector-button
+   不再匹配任何元素（.csa-modal__file 现在只剩 PreviewTab 的重命名文本输入在用），故移除。 */
 .sl-csa .csa-modal__actions {
   display: flex;
   justify-content: flex-end;

@@ -1,5 +1,4 @@
 <script setup>
-import { ref } from 'vue'
 import PointList from './PointList.vue'
 import LocationSearch from './LocationSearch.vue'
 import {
@@ -9,6 +8,11 @@ import {
   importFromJson,
   getPresetData
 } from './StorageManager.js'
+// 文件选择（导入 JSON）统一走 shared/components 的共享组件 —— 与 game-skin-admin
+// 同一条链路：只 import descriptor，不 import FileDropZone.vue（直接渲染会绕过
+// SharedMount，descriptor.css 没人注入，组件会以裸样式出现）。
+import SharedMount from '@/shared/components/runtime/SharedMount.vue'
+import FileDropZone, { formatRejectInfo } from '@/shared/components/FileDropZone'
 
 const props = defineProps({
   // 记录点数据
@@ -59,9 +63,6 @@ const emit = defineEmits([
   'importData'
 ])
 
-// 文件输入引用
-const fileInput = ref(null)
-
 // 搜索地点
 const handleSearchLocation = (place) => {
   emit('searchLocation', place)
@@ -109,28 +110,25 @@ const handleImportPreset = async () => {
   }
 }
 
-// 导入文件
-const handleImportFile = () => {
-  fileInput.value?.click()
-}
-
-// 文件选择处理
-const handleFileChange = async (event) => {
-  const file = event.target.files?.[0]
+// 导入文件：类型 / 体积 / 目录这些校验由共享组件做完再回调，这里只处理业务。
+// 不必再手动重置 input.value —— FileDropZone 内部已经做了（否则连选同一个文件
+// 不会触发 change）。
+const onImportFile = async (picked) => {
+  const file = picked[0]
   if (!file) return
 
   try {
     const jsonData = await readJsonFile(file)
     const imported = importFromJson(jsonData)
     emit('importData', imported)
-
-    // 重置文件输入
-    if (fileInput.value) {
-      fileInput.value.value = ''
-    }
   } catch (error) {
     alert('导入失败: ' + error.message)
   }
+}
+
+// 被共享组件拒掉的拖拽内容（不是 .json / 拖进了文件夹）
+const onRejectImport = (info) => {
+  alert(formatRejectInfo(info))
 }
 </script>
 
@@ -268,21 +266,21 @@ const handleFileChange = async (event) => {
         >
           加载预设
         </button>
-        <button
-          class="data-btn import-btn"
-          @click="handleImportFile"
-        >
-          导入文件
-        </button>
+        <!-- 「导入文件」统一走共享组件（bare 形态）：外观仍是 .data-btn.import-btn，
+             额外获得拖拽填入与统一的类型 / 体积 / 目录校验。 -->
+        <SharedMount
+          class="import-file"
+          :module="FileDropZone"
+          :component-props="{
+            variant: 'bare',
+            buttonClass: 'data-btn import-btn',
+            accept: '.json',
+            label: '导入文件',
+            onSelect: onImportFile,
+            onReject: onRejectImport,
+          }"
+        />
       </div>
-      <!-- 隐藏的文件输入 -->
-      <input
-        ref="fileInput"
-        type="file"
-        accept=".json"
-        style="display: none"
-        @change="handleFileChange"
-      >
       <p class="data-hint">
         导出的 JSON 文件可用于备份和分享数据
       </p>
@@ -494,7 +492,24 @@ const handleFileChange = async (event) => {
   gap: 8px;
 }
 
-.data-btn {
+.data-hint {
+  margin-top: 12px;
+  font-size: 11px;
+  color: #9ca3af;
+  text-align: center;
+  line-height: 1.4;
+}
+</style>
+
+<style>
+/* ── 非 scoped 块 ────────────────────────────────────────────────────
+   只有「导入文件」需要它。该按钮已统一交给 shared/components 的
+   FileDropZone（bare 形态）—— 外观由消费方提供的类名决定，而那个
+   <button> 是共享组件内部渲染的，scoped 的 [data-v-*] 属性加不到它身上。
+   作用域改用 .control-panel 前缀收敛（本组件的根类名）；选择器特异度与
+   原来的 .xxx[data-v-*] 一致，都是 (0,2,0)，观感不变。
+   ──────────────────────────────────────────────────────────────────── */
+.control-panel .data-btn {
   padding: 12px 16px;
   border: 2px solid #fce7f3;
   border-radius: 12px;
@@ -508,44 +523,46 @@ const handleFileChange = async (event) => {
   gap: 8px;
 }
 
-.export-btn {
+.control-panel .export-btn {
   background: linear-gradient(135deg, #34d399, #10b981);
   border-color: #10b981;
   color: #fff;
 }
 
-.export-btn:hover {
+.control-panel .export-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
 }
 
-.preset-btn {
+.control-panel .preset-btn {
   background: linear-gradient(135deg, #60a5fa, #3b82f6);
   border-color: #3b82f6;
   color: #fff;
 }
 
-.preset-btn:hover {
+.control-panel .preset-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
 }
 
-.import-btn {
+.control-panel .import-btn {
   background: #fdf2f8;
   border-color: #fce7f3;
   color: #6b7280;
 }
 
-.import-btn:hover {
+.control-panel .import-btn:hover {
   border-color: #f9a8d4;
   background: #fce7f3;
 }
 
-.data-hint {
-  margin-top: 12px;
-  font-size: 11px;
-  color: #9ca3af;
-  text-align: center;
-  line-height: 1.4;
+/* SharedMount 的壳（<div class="import-file">）只是布局中转，不参与视觉。
+   原来「导入文件」是 .data-buttons 的直接 flex item，靠 align-items: stretch
+   铺满整行；加壳后要显式补回这个行为，否则按钮会退化成内容宽度。
+   用 `> *` 而不是点共享组件的内部类名 —— 宿主不该伸进共享组件实现里。 */
+.control-panel .data-buttons > .import-file,
+.control-panel .data-buttons > .import-file > * {
+  display: block;
+  width: 100%;
 }
 </style>

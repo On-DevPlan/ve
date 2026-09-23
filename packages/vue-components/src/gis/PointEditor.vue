@@ -1,5 +1,10 @@
 <script setup>
 import { ref, watch, computed } from 'vue'
+// 图片选择统一走 shared/components 的共享组件 —— 与 game-skin-admin 同一条链路：
+// 只 import descriptor，不 import FileDropZone.vue（直接渲染会绕过 SharedMount，
+// descriptor.css 没人注入，组件会以裸样式出现）。
+import SharedMount from '@/shared/components/runtime/SharedMount.vue'
+import FileDropZone from '@/shared/components/FileDropZone'
 
 const props = defineProps({
   point: {
@@ -54,10 +59,11 @@ watch(() => props.point, (newPoint) => {
   }
 }, { immediate: true })
 
-// 处理图片上传
-const handleImageUpload = (event) => {
-  const file = event.target.files[0]
-  if (file) {
+// 处理图片添加：类型 / 目录这些校验由共享组件做完再回调。
+// 注意行为修正：原实现写的是 event.target.files[0]，只取第一个 —— 而 input 上
+// 明明声明了 multiple，多选会被静默丢掉。这里按 multiple 的语义逐个读入。
+const onAddImages = (picked) => {
+  for (const file of picked) {
     const reader = new FileReader()
     reader.onload = (e) => {
       formData.value.images.push(e.target.result)
@@ -154,16 +160,18 @@ const handleClose = () => {
         >
           <label>图片</label>
           <div class="image-upload">
-            <label class="upload-btn">
-              <span>添加图片</span>
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                style="display: none"
-                @change="handleImageUpload"
-              >
-            </label>
+            <SharedMount
+              class="upload-mount"
+              :module="FileDropZone"
+              :component-props="{
+                variant: 'bare',
+                buttonClass: 'upload-btn',
+                accept: 'image/*',
+                multiple: true,
+                label: '添加图片',
+                onSelect: onAddImages,
+              }"
+            />
           </div>
 
           <div
@@ -368,23 +376,6 @@ const handleClose = () => {
   margin-bottom: 12px;
 }
 
-.upload-btn {
-  display: inline-block;
-  padding: 12px 20px;
-  background: #fce7f3;
-  color: #ec4899;
-  border-radius: 12px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 600;
-  transition: all 0.2s;
-}
-
-.upload-btn:hover {
-  background: #fbcfe8;
-  transform: translateY(-2px);
-}
-
 .image-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
@@ -462,5 +453,35 @@ const handleClose = () => {
 .btn-save:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(236, 72, 153, 0.4);
+}
+</style>
+
+<style>
+/* ── 非 scoped 块 ────────────────────────────────────────────────────
+   「添加图片」已统一走 shared/components 的 FileDropZone（bare 形态）：按钮外观
+   交给消费方，而那个 <button> 是共享组件内部渲染的，scoped 的 [data-v-*] 属性加
+   不到它身上 —— 所以这几条必须留在非 scoped 块，用 .editor-overlay 前缀收敛
+   作用域（本组件弹窗的根类名）。
+
+   比原来多了两条复位：元素从 <label> 换成了 <button>，UA 样式表会给 button 加
+   自己的边框和字体，不显式复位就跟改前的观感对不上。
+   ──────────────────────────────────────────────────────────────────── */
+.editor-overlay .upload-btn {
+  display: inline-block;
+  padding: 12px 20px;
+  border: none;
+  background: #fce7f3;
+  color: #ec4899;
+  border-radius: 12px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.editor-overlay .upload-btn:hover {
+  background: #fbcfe8;
+  transform: translateY(-2px);
 }
 </style>

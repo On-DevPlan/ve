@@ -39,6 +39,14 @@
 .sl-csa *::before,
 .sl-csa *::after { box-sizing: border-box; }
 .sl-csa h2, .sl-csa h3, .sl-csa p, .sl-csa figure { margin: 0; }
+/* 通配式 button reset，特异性 (0,1,1) —— 压得过共享组件内置的
+   .sl-file-drop__btn (0,1,0)。后果：FileDropZone 的 button / bare 形态在本组件
+   里会被擦成一行裸文字（不报错，纯静默失败）。所以本组件的选文件点一律用
+   zone / tile（框内没有 button）；Modal 里的 .csa-btn 走 .sl-csa .csa-btn (0,2,0)，
+   照常生效。
+   注意不要给这条加 `:not([class*="sl-file-drop"])` 之类的 carve-out：那会把特异性
+   抬到 (0,2,1)，反过来压过 .sl-csa .csa-btn (0,2,0)，把整个后台的按钮全擦掉。
+   要在这里用共享的 button / bare，得改成「作用域收敛」写法而不是加 :not()。 */
 .sl-csa button { font: inherit; cursor: pointer; background: none; border: none; padding: 0; color: inherit; }
 .sl-csa input, .sl-csa select, .sl-csa textarea { font: inherit; color: inherit; }
 .sl-csa ul, .sl-csa ol { margin: 0; padding: 0; list-style: none; }
@@ -337,7 +345,6 @@
   color: var(--csa-success);
   font-weight: 600;
 }
-.sl-csa .csa-up input[type="file"] { display: none; }
 .sl-csa .csa-up__key {
   display: block;
   margin-top: 4px;

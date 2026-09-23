@@ -1,6 +1,12 @@
-<!-- EmojiUploadModal — 轻量上传弹窗：选图 + emojiId + 可选 displayName。 -->
+<!-- EmojiUploadModal — 轻量上传弹窗：选图（共享 FileDropZone 的 zone 形态：虚线拖放区，
+     整块可点 + 拖拽填入）+ emojiId + 可选 displayName。 -->
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
+// 文件选择统一走 shared/components 的共享组件。只 import descriptor —— 直接渲染
+// FileDropZone.vue 会绕过 SharedMount，descriptor.css 无人注入，组件裸样式。
+import SharedMount from '@/shared/components/runtime/SharedMount.vue';
+import FileDropZone, { formatRejectInfo } from '@/shared/components/FileDropZone';
+import type { RejectInfo } from '@/shared/components/FileDropZone';
 
 const props = defineProps<{
   open: boolean;
@@ -16,6 +22,17 @@ const emit = defineEmits<{
 const file = ref<File | null>(null);
 const emojiId = ref('');
 const displayName = ref('');
+// 共享组件拒绝文件（类型不符 / 超体积 / 拖进目录）时的提示。
+const pickError = ref<string | null>(null);
+
+// 提示行优先级：拒绝提示 > 已选文件名 > 默认说明。
+// 共享组件不内置「已选文件」展示，由调用方按自己的版式决定放哪。
+// 默认说明不再重复「可点击选择也可拖拽到此处」—— zone 形态的主文案已经写了这件事。
+const dropHint = computed(() => {
+  if (pickError.value) return pickError.value;
+  if (file.value) return `已选择：${file.value.name}`;
+  return '透明底 webp / png / gif';
+});
 
 watch(
   () => props.open,
@@ -24,16 +41,23 @@ watch(
       file.value = null;
       emojiId.value = '';
       displayName.value = '';
+      pickError.value = null;
     }
   },
 );
 
-function onFileChange(e: Event) {
-  file.value = (e.target as HTMLInputElement).files?.[0] ?? null;
-  if (file.value && !emojiId.value) {
-    const base = file.value.name.replace(/\.[^.]+$/, '').toLowerCase().replace(/[^a-z0-9-_]/g, '-').replace(/^-+|-+$/g, '');
-    if (base) emojiId.value = base.slice(0, 32).replace(/^-/, 'a');
-  }
+function onSelect(files: File[]): void {
+  const picked = files[0] ?? null;
+  file.value = picked;
+  pickError.value = null;
+  if (!picked || emojiId.value) return;
+  // 从文件名推导 emojiId（原有的便利行为，保持不变）。
+  const base = picked.name.replace(/\.[^.]+$/, '').toLowerCase().replace(/[^a-z0-9-_]/g, '-').replace(/^-+|-+$/g, '');
+  if (base) emojiId.value = base.slice(0, 32).replace(/^-/, 'a');
+}
+
+function onReject(info: RejectInfo): void {
+  pickError.value = formatRejectInfo(info);
 }
 
 function submit() {
@@ -63,15 +87,22 @@ function submit() {
         class="csa-form"
         style="grid-template-columns:1fr;"
       >
-        <label class="csa-field">
+        <!-- 外层必须是 div 而非 label：FileDropZone 内部有隐藏 input，用 label 包裹
+             会让点击 label 额外激活一次那个 input，与根节点的 click 叠加，弹出两次选择器。 -->
+        <div class="csa-field">
           <span class="csa-field__label">图片文件</span>
-          <input
-            class="csa-modal__file"
-            type="file"
-            accept="image/webp,image/png,image/gif"
-            @change="onFileChange"
-          >
-        </label>
+          <SharedMount
+            :module="FileDropZone"
+            :component-props="{
+              variant: 'zone',
+              accept: 'image/webp,image/png,image/gif',
+              hint: dropHint,
+              disabled: props.busy,
+              onSelect: onSelect,
+              onReject: onReject,
+            }"
+          />
+        </div>
         <label class="csa-field">
           <span class="csa-field__label">emoji id <code>^[a-z0-9][a-z0-9-_]{0,31}$</code></span>
           <input
