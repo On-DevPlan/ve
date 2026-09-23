@@ -105,6 +105,23 @@ export default defineConfig(() => ({
       output: {
         // manualChunks 函数:对每个 module id 决定要不要拆出去
         manualChunks(id: string) {
+          // 0) 共享组件层（shared/components —— 写一次、Vue 树与 React 树都用）必须
+          //    独立成 chunk，且**只能**有一个实例。
+          //    没有这条规则时 Rollup 会按默认算法把它并进第一个到达它的 *组件* chunk，
+          //    结果是 rc-color-studio / rc-github-show 等 React 组件 chunk 反过来
+          //    import vc-game-skin-admin —— 点开任意 React 组件都要多拉 108 KB 的
+          //    Vue 组件 chunk。实测过，不要删。
+          // 0a) React 侧挂载桥必须与共享组件本体分开。
+          //     SharedMount.tsx 里 `import * as React from 'react'`，若与本体同 chunk，
+          //     那么凡加载共享组件的 chunk（vc-game-skin-admin、连 DetailPage 也是）
+          //     都会顺着静态 import 拉起 react-vendor（192 KB）—— 而「React 不进首页 /
+          //     不被 Vue 组件拉进来」正是这套分包的核心目标。实测踩过，不要合并。
+          if (id.includes('/apps/showcase/src/shared/components/runtime/SharedMount.tsx')) {
+            return 'shared-bridge-react';
+          }
+          if (id.includes('/apps/showcase/src/shared/components/')) {
+            return 'shared-components';
+          }
           // 1) 每个 Vue 组件独立 chunk:id 形如 .../vue-components/src/<id>/...
           if (id.includes('/vue-components/src/')) {
             const m = id.match(/\/vue-components\/src\/([^/]+)\//);
