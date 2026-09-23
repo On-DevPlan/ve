@@ -19,6 +19,7 @@ description: Use when working on the ve project (this repository) — a Vue-host
 | 组件目录比较大(`index.{vue,tsx}` > 300 行),需要拆分子目录布局 | [[large-component-layout]] |
 | 组件需要后端 API(dev 代理 / 生产 nginx 路由 / 跨设备 API) | 在 `apps/showcase/src/api/registry.ts` 的 `apiPaths` 加一行 + 加 entry,写 `apps/showcase/src/api/services/<id>/index.ts` + `types.ts`(继承 `HttpService`,`BASE = apiPaths.<id>`),组件用 `import ... from '@api'` 引用。详见 [[protocol]] §4.4 |
 | 组件应用层怎么读登录态 / 调后端 / 新增业务封装(组件 ↔ host 跨包引用) | [[how-to-consume-api]] |
+| 消费 / 新增「Vue 树与 React 树共用」的共享组件(shared/components / SharedMount / FileDropZone / 样式注入 / 相关分包与 vitest 约束) | 载入 skill `shared-component-system`(独立 skill,含 references:作者侧 / 消费侧 / 构建测试约束)。shared 层整体分层见 [[shared-layer]] |
 | `apps/showcase/src/shared` 层是什么 / 怎么用 / 跟 api 分层怎么划 | [[shared-layer]] |
 | 线上 405 / 404 / 502,但本地正常 —— API 路由在 prod 没生效 | 检查 `vite build` 是否触发 gen-nginx 插件(生成 `nginx/api-locations/generated.conf`);检查 `default.conf` 是否 include `/etc/nginx/api-locations/*.conf` |
 | 组件不显示 / "No loader registered" / ShadowRoot 没样式 / mount 抛错 / 路由 404 / ESLint 报错——按决策树排查 | [[component-decision-tree]] |
@@ -46,6 +47,7 @@ description: Use when working on the ve project (this repository) — a Vue-host
 - nginx 站点配置(手写部分): `default.conf`(生成的 location 由它 include)
 - 运行时挂载适配器(ShadowRoot + 样式 adoption): `packages/mount-adapters/`
 - 组件 CSS 同步注入(`MountContext.cssReady` + `ShadowRootHost.injectCss` + `adoptCssTexts` + `ensureCss`):同帧落 ShadowRoot,消除 FOUC;远程组件 `loaderUrl` 走 `adoptStylesInto` 兜底
+- 跨框架共享组件白名单: `apps/showcase/src/shared/components/`(descriptor 契约 + SharedMount 壳。消费/扩展走 skill `shared-component-system`,别在该目录组件上依赖自动样式注入通道)
 - Vue scoped CSS 接入 Vite CSS 管线(`vue-style-collector` + `scoped-id-guard`):伪 `.css` 路径让 vite CSS 接管 postcss / url / @import;插件扫 SFC `import '*.css'` 自动把 ol.css 等第三方 CSS 也进 ShadowRoot;`scopedId` 算法复刻 plugin-vue,guard 在 build 期拦截漂移
 - 加载过渡(首次会话首屏骨架,0.6s ease):`apps/showcase/src/shared/LoadingSkeleton/`(框架无关核心 `skeleton.ts` + Vue/React 适配;sessionStorage 标记仅首次显)
 - 自定义 ESLint 规则: `eslint/rules/valid-component-config.js`
