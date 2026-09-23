@@ -661,14 +661,11 @@
   border-color: var(--sl-color-primary, #2563eb);
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 }
+/* 虚线框本身由共享组件的 zone 形态提供(唯一事实源),这里只管外边距。 */
 .sl-sl-modal__file-zone {
   margin: 24px;
-  padding: 32px;
-  border: 2px dashed var(--sl-color-border, #e4e4e7);
-  border-radius: 8px;
-  text-align: center;
 }
-.sl-sl-modal__file-name { font-size: 12px; color: var(--sl-color-text-mute, #9ca3af); margin-top: 12px; }
+.sl-sl-modal__file-name { font-size: 12px; color: var(--sl-color-text-mute, #9ca3af); margin-top: 12px; text-align: center; }
 .sl-sl-modal__preview {
   padding: 8px 24px;
   font-size: 13px;

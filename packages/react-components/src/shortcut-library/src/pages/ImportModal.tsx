@@ -4,6 +4,8 @@ import { useRef, useState } from 'react';
 import { parseImportToml, type ImportParseResult } from '../engine/import-parser';
 import type { Shortcut } from '../types';
 import { comboKey } from '../hooks/useShortcuts';
+import { SharedMount } from '@/shared/components/runtime/SharedMount';
+import FileDropZone from '@/shared/components/FileDropZone';
 
 interface Props {
   onImport: (data: ImportParseResult) => { groupsAdded: number; groupsAppended: number; shortcutsAdded: number; errors: string[] };
@@ -229,7 +231,6 @@ export default function ImportModal({ onImport, onClose, selectedGroupName, sele
   const [copied, setCopied] = useState(false);
   // AI 增量提示词按钮的「已复制」反馈(独立 state,避免和「复制格式提示词」冲突)
   const [incrementalCopied, setIncrementalCopied] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
   const copyTimerRef = useRef<number | null>(null);
 
   // 复制格式说明到剪贴板
@@ -332,8 +333,12 @@ export default function ImportModal({ onImport, onClose, selectedGroupName, sele
     setResultSummary(stats);
   }
 
-  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+  // 文件选择走 shared/components 的共享 FileDropZone（Vue 实现，React 树里由
+  // SharedMount 挂载）。zone 形态：整块虚线区即触发区与拖放目标，框的外观由共享层
+  // 提供，这里不再自己画虚线框（原来 .sl-sl-modal__file-zone 上那份已删）。
+  // input.value 的清空由共享组件内部负责，这里不再手写。
+  function handleFile(picked: File[]) {
+    const file = picked[0];
     if (!file) return;
     if (file.size > 1_000_000) {
       alert('文件过大,请控制在 1MB 以内');
@@ -350,7 +355,6 @@ export default function ImportModal({ onImport, onClose, selectedGroupName, sele
     };
     reader.onerror = () => alert('无法读取文件');
     reader.readAsText(file);
-    e.target.value = '';
   }
 
   // Re-parse when text changes in paste mode
@@ -407,19 +411,14 @@ export default function ImportModal({ onImport, onClose, selectedGroupName, sele
           />
         ) : (
           <div className="sl-sl-modal__file-zone">
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".toml"
-              onChange={handleFile}
-              style={{ display: 'none' }}
+            <SharedMount
+              module={FileDropZone}
+              componentProps={{
+                variant: 'zone',
+                accept: '.toml',
+                onSelect: handleFile,
+              }}
             />
-            <button
-              className="sl-sl-btn sl-sl-btn--primary"
-              onClick={() => fileRef.current?.click()}
-            >
-              选择 .toml 文件
-            </button>
             {text && (
               <p className="sl-sl-modal__file-name">
                 已加载 {text.length} 字节
