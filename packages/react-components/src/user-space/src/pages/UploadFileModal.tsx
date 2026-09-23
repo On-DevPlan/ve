@@ -3,8 +3,11 @@
 // 设计:复用 .sl-us-modal* 样式 + portal 模式,与 KvEditorModal / DuplicateKvModal
 // 同构。accessLevel 固定为 public(本期只做公开图床),无 UI 开关。
 //
-// 文件选择走 <input type="file">;提交时把 File 透传给父级 onUpload(浏览器原生
-// File extends Blob,父级 store.uploadFile 签名接收 Blob,兼容 File)。
+// 文件选择走 shared/components 的共享 FileDropZone(zone 形态,虚线拖放区):
+// 外观与三处 TOML 导入弹窗完全一致 —— 拖放区的唯一事实源是共享层的 style.css,
+// 这里不再自画框、也不再借用 sl-us-btn。白拿拖拽填入 + input.value 重置;
+// 分片 / 进度等上传逻辑仍在父级 store.uploadFile,本组件只透传 File
+// (浏览器原生 File extends Blob,兼容签名)。
 //
 // tags 逗号分隔输入,与 KV 创建表单一致;空数组 = 无 tag(replace 语义)。
 //
@@ -16,6 +19,8 @@ import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { CHUNKED_UPLOAD_MIN_SIZE } from '@api/components/user-space';
 import type { FileUploadProgress } from '@api/components/user-space';
+import { SharedMount } from '@/shared/components/runtime/SharedMount';
+import FileDropZone, { formatRejectInfo } from '@/shared/components/FileDropZone';
 
 export interface UploadFileModalProps {
   open: boolean;
@@ -120,12 +125,17 @@ export default function UploadFileModal({
         <div className="sl-us-modal__body">
           <div className="sl-us-field">
             <span className="sl-us-field__label">文件</span>
-            <input
-              className="sl-us-input"
-              type="file"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-              disabled={saving}
-              autoFocus
+            {/* 虚线拖放区:框由共享层提供(共享层不给 margin,四周留白交给这里的
+                .sl-us-field 的 gap 与 .sl-us-modal__body 的 padding)。
+                不传 accept —— 本弹窗对可上传类型无限制,不擅自收窄。 */}
+            <SharedMount
+              module={FileDropZone}
+              componentProps={{
+                variant: 'zone',
+                disabled: saving,
+                onSelect: (picked) => setFile(picked[0] ?? null),
+                onReject: (info) => setSubmitError(formatRejectInfo(info)),
+              }}
             />
             {file && (
               <span className="sl-us-field__hint">

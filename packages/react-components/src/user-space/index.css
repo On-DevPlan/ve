@@ -36,11 +36,14 @@
 
 /* 弹窗(portal 出 root 之外)也需要同样的 reset,否则按钮 / input
    会带浏览器默认 chrome(灰底 + 凸起边框),和 root 内样式不一致。
-   同样的 carve-out:放过 .sl-us-btn,否则弹窗内按钮也会被擦掉。
-   特异性说明:.sl-us-btn 及其修饰类 (0,1,0),本选择器 (0,2,1) 但不匹配
-   .sl-us-btn,所以 .sl-us-btn 的 layout 规则能正常生效。 */
+   carve-out 放过 .sl-us-btn 与共享组件 .sl-file-drop:前者是本组件自己的按钮
+   体系,必须放过;后者是**防御性**的 —— UploadFileModal 现在用 FileDropZone 的
+   zone 形态(虚线框,框内没有按钮),本条选择器目前不会命中它;留着是为了将来
+   若把该处换回 button / bare 形态,共享组件渲染的按钮不会在无声中变成一行裸文字。
+   特异性说明:.sl-us-btn / .sl-file-drop__btn 及其修饰类 (0,1,0),本选择器
+   不匹配它们,所以它们自己的 (0,1,0) layout 规则能正常生效。 */
 .sl-us-modal-backdrop * { box-sizing: border-box; }
-.sl-us-modal-backdrop button:not([class*="sl-us-btn"]) { font: inherit; cursor: pointer; background: none; border: none; padding: 0; color: inherit; }
+.sl-us-modal-backdrop button:not([class*="sl-us-btn"]):not([class*="sl-file-drop"]) { font: inherit; cursor: pointer; background: none; border: none; padding: 0; color: inherit; }
 .sl-us-modal-backdrop input, .sl-us-modal-backdrop select, .sl-us-modal-backdrop textarea { font: inherit; }
 .sl-us-modal-backdrop h1, .sl-us-modal-backdrop h2, .sl-us-modal-backdrop h3, .sl-us-modal-backdrop h4, .sl-us-modal-backdrop p { margin: 0; }
 
@@ -67,9 +70,11 @@
 /* 把 .sl-us-btn(包括 --primary / --ghost / --sm / --icon / --icon-sm /
    --danger-ghost 等修饰类)从全局 button reset 里排除,否则它们的 padding /
    border / background 会被 .sl-us-root button 这条规则全擦掉(P1 的根因)。
-   注:实际选择器特异性 (0,2,1) (class + element + :not([attr])),
-   因为不再匹配 .sl-us-btn,其 (0,1,0) 的 layout 规则可以正常生效。 */
-.sl-us-root button:not([class*="sl-us-btn"]) { font: inherit; cursor: pointer; background: none; border: none; padding: 0; color: inherit; }
+   共享组件的 .sl-file-drop 同理排除 —— 与上一条 backdrop reset 一样,这一个是
+   防御性的(UploadFileModal 现在走 zone,框内无按钮),不是当前必需的。
+   注:实际选择器元素 + 两个 :not([attr]),不匹配上面两类时对它们无影响,
+   其 (0,1,0) 的 layout 规则可以正常生效。 */
+.sl-us-root button:not([class*="sl-us-btn"]):not([class*="sl-file-drop"]) { font: inherit; cursor: pointer; background: none; border: none; padding: 0; color: inherit; }
 .sl-us-root input, .sl-us-root select, .sl-us-root textarea { font: inherit; }
 .sl-us-root h1, .sl-us-root h2, .sl-us-root h3, .sl-us-root h4, .sl-us-root p { margin: 0; }
 
