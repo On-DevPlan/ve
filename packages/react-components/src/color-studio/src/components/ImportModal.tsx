@@ -9,6 +9,8 @@ import { parseColorImportToml, type ImportParseResult } from '../engine/importPa
 import { COLOR_IMPORT_FORMAT_PROMPT } from '../prompts/colorImportPrompt';
 import { Icon } from './ui/Icon';
 import { Btn } from './ui/Btn';
+import { SharedMount } from '@/shared/components/runtime/SharedMount';
+import FileDropZone from '@/shared/components/FileDropZone';
 import type { ColorEntry, Palette } from '../../../../../../apps/showcase/src/api/components/color-studio/types';
 
 interface Props {
@@ -36,7 +38,6 @@ export function ImportModal({ open, onImport, onClose, activePalette }: Props) {
   const [showFormat, setShowFormat] = useState(false);
   const [copied, setCopied] = useState(false);
   const [incrementalCopied, setIncrementalCopied] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
   const copyTimerRef = useRef<number | null>(null);
 
   if (!open) return null;
@@ -123,8 +124,10 @@ export function ImportModal({ open, onImport, onClose, activePalette }: Props) {
     setResultSummary(stats);
   }
 
-  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+  // 文件选择走 shared/components 的共享 FileDropZone（zone 形态：整块虚线区即触发区
+  // 与拖放目标，框的外观由共享层提供）。input.value 的清空由共享组件内部负责。
+  function handleFile(picked: File[]) {
+    const file = picked[0];
     if (!file) return;
     if (file.size > 1_000_000) {
       alert('文件过大,请控制在 1MB 以内');
@@ -140,7 +143,6 @@ export function ImportModal({ open, onImport, onClose, activePalette }: Props) {
     };
     reader.onerror = () => alert('无法读取文件');
     reader.readAsText(file);
-    e.target.value = '';
   }
 
   // Re-parse when text changes in paste mode
@@ -204,16 +206,14 @@ export function ImportModal({ open, onImport, onClose, activePalette }: Props) {
           />
         ) : (
           <div className="sl-cs-import__file-zone">
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".toml,.txt"
-              onChange={handleFile}
-              style={{ display: 'none' }}
+            <SharedMount
+              module={FileDropZone}
+              componentProps={{
+                variant: 'zone',
+                accept: '.toml,.txt',
+                onSelect: handleFile,
+              }}
             />
-            <Btn variant="secondary" icon="upload" onClick={() => fileRef.current?.click()}>
-              选择 .toml 文件
-            </Btn>
             {text && (
               <p className="sl-cs-import__file-name">已加载 {text.length} 字节</p>
             )}

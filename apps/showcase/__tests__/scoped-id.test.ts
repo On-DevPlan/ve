@@ -11,11 +11,14 @@
 //    descriptor.id / scopedId)。任何 .vue 文件改动 + 算法不变 → 锁值也会变;
 //    届时必须 PR 同步更新。
 //
-//    这 5 个值(aed2660f / b3e18dfd / 492642e2 / 442c4847 / a89c26d1)就是 Task 2
+//    当前锁值(56d2f1e2 / 03e87072 / 9cb8b630 / 36c878e2 / eb53c1cb)就是 Task 2
 //    build 产物 dist/assets/vc-*.css 里真实出现的 scopedId,与运行时 __scopeId 对齐
 //    (Task 2 已铁证:7 个组件 chunk ALL ALIGNED)。
 //    早期用"仓根"当 root 锁出的 42b507f2 等从不匹配任何真实产物 —— 那是错的:
 //    root 用错,path.relative 的相对路径不同 → hash 不同(Fix round 1 修正)。
+//
+//    最近一次更新:gis/ControlPanel.vue 的文件选择按钮改用共享 FileDropZone
+//    (bare 形态),SFC 内容变化 → 3e275245 → eb53c1cb。
 
 import { describe, it, expect } from 'vitest';
 import path from 'node:path';
@@ -63,7 +66,7 @@ describe('scoped-id', () => {
       },
       {
         rel: 'packages/vue-components/src/gis/ControlPanel.vue',
-        expected: '3e275245',
+        expected: 'eb53c1cb',
       },
     ];
     for (const fx of fixtures) {

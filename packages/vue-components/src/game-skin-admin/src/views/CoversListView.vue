@@ -7,6 +7,11 @@
 import { computed, onMounted, ref } from 'vue';
 import { kvV1Service } from '@api/services';
 import { useSkinAdmin, type UseSkinAdmin } from '../composables/useSkinAdmin';
+// 文件选择统一走 shared/components 的共享组件（Vue 实现，React 树里同样能用）。
+// 只 import descriptor —— 绕过 SharedMount 直接渲染组件，descriptor.css 无人注入。
+import SharedMount from '@/shared/components/runtime/SharedMount.vue';
+import FileDropZone, { formatRejectInfo } from '@/shared/components/FileDropZone';
+import type { RejectInfo } from '@/shared/components/FileDropZone';
 
 interface CatalogEntry {
   slug: string;
@@ -84,10 +89,8 @@ function openManager(slug: string) {
   status.value = null;
 }
 
-async function onPick(slug: string, key: string, e: Event) {
-  const input = e.target as HTMLInputElement;
-  const file = input.files?.[0];
-  input.value = '';
+async function onPick(slug: string, key: string, picked: File[]) {
+  const file = picked[0];
   if (!file) return;
   uploading.value = key;
   status.value = null;
@@ -107,6 +110,10 @@ async function onPick(slug: string, key: string, e: Event) {
   } finally {
     uploading.value = null;
   }
+}
+
+function onRejectFile(info: RejectInfo) {
+  status.value = { ok: false, text: formatRejectInfo(info) };
 }
 </script>
 
@@ -288,21 +295,22 @@ async function onPick(slug: string, key: string, e: Event) {
             :key="k"
             class="csa-piece csa-piece--click"
           >
-            <label class="csa-piece__tile">
-              <img
-                :src="coverOf(manager, k)"
-                :alt="k"
-                loading="lazy"
-              >
-              <span class="csa-piece__hint">{{ uploading === k ? '上传中…' : '点击选择文件替换' }}</span>
-              <input
-                class="csa-cover-file"
-                type="file"
-                accept="image/*"
-                :disabled="uploading !== null"
-                @change="onPick(manager, k, $event)"
-              >
-            </label>
+            <!-- 整格由共享 FileDropZone（tile 形态）承担：点击选择 + 拖拽填入。
+                 预览图走 imageUrl，hover 提示条走 hint —— 共享组件刻意不引 slot，
+                 所以格内内容只能靠 props 描述，而不是塞子节点。 -->
+            <SharedMount
+              class="csa-piece__tile"
+              :module="FileDropZone"
+              :component-props="{
+                variant: 'tile',
+                accept: 'image/*',
+                imageUrl: coverOf(manager, k),
+                hint: uploading === k ? '上传中…' : '点击选择文件替换',
+                disabled: uploading !== null,
+                onSelect: (picked: File[]) => onPick(manager, k, picked),
+                onReject: onRejectFile,
+              }"
+            />
             <figcaption>
               <span class="csa-piece__key">{{ k }}</span>
               <span class="csa-piece__label">{{ admin.entry.labels[k] }}</span>
@@ -393,7 +401,6 @@ async function onPick(slug: string, key: string, e: Event) {
   margin-top: 4px;
 }
 .csa-cover-badges .csa-badge { box-shadow: none; }
-.csa-cover-file { display: none; }
 .csa-cover-modal {
   width: min(480px, 100%);
 }

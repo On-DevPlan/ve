@@ -756,18 +756,18 @@
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 }
 
+/* 虚线框由共享组件的 zone 形态提供(唯一事实源);
+   这里只留「框 + 框下文件名」的竖排。align-items 必须是 stretch,
+   否则 zone 会被缩成内容宽度。 */
 .sl-gh-import__file-zone {
   display: flex;
   flex-direction: column;
-  align-items: center;
   gap: 8px;
-  padding: 28px 16px;
-  border: 1px dashed var(--sl-color-border, #e5e7eb);
-  border-radius: 8px;
 }
 .sl-gh-import__file-name {
   margin: 0;
   font-size: 12px;
+  text-align: center;
   color: var(--sl-color-text-secondary, #6b7280);
 }
 

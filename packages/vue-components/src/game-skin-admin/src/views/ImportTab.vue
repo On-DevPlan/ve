@@ -5,6 +5,12 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import type { UseSkinAdmin } from '../composables/useSkinAdmin';
+// 文件选择统一走 shared/components 的共享组件。
+// 只 import descriptor，不 import FileDropZone.vue —— 直接渲染组件会绕过 SharedMount，
+// descriptor.css 没人注入，组件会以裸样式出现。
+import SharedMount from '@/shared/components/runtime/SharedMount.vue';
+import FileDropZone, { formatRejectInfo } from '@/shared/components/FileDropZone';
+import type { RejectInfo } from '@/shared/components/FileDropZone';
 
 const props = defineProps<{
   admin: UseSkinAdmin;
@@ -13,6 +19,8 @@ const props = defineProps<{
 const promptText = ref('');
 const files = ref<Record<string, File>>({});
 const copied = ref(false);
+// 共享组件拒绝文件（类型不符 / 超体积 / 拖进目录）时的提示。
+const pickError = ref<string | null>(null);
 
 function buildDefaultPrompt(): string {
   // 用看板默认 skinId/displayName 生成一份可编辑模板
@@ -29,6 +37,7 @@ watch(
   () => {
     promptText.value = buildDefaultPrompt();
     files.value = {};
+    pickError.value = null;
   },
   { immediate: true },
 );
@@ -44,10 +53,15 @@ async function copyPrompt() {
   }
 }
 
-function pick(k: string, e: Event) {
-  const f = (e.target as HTMLInputElement).files?.[0];
+function pick(k: string, picked: File[]) {
+  const f = picked[0];
   if (!f) return;
   files.value = { ...files.value, [k]: f };
+  pickError.value = null;
+}
+
+function onRejectFile(info: RejectInfo) {
+  pickError.value = formatRejectInfo(info);
 }
 
 function refreshPrompt() {
@@ -102,27 +116,39 @@ function refreshPrompt() {
         class="csa-grid"
         :style="{ gridTemplateColumns: `repeat(${props.admin.entry.gridColumns}, 1fr)` }"
       >
-        <label
+        <!-- 原来这里是 <label> 包一个隐藏 input。现在整格由共享 FileDropZone 承担：
+             点击选择 + 拖拽填入两种入口都有，且 accept 会真实校验拖进来的文件。
+             `is-set` 仍加在格子上，`.csa-up.is-set .csa-up__tile` 的高亮样式照旧生效。 -->
+        <div
           v-for="k in props.admin.assetKeys"
           :key="k"
           class="csa-up"
-          :class="{ 'is-set': files[k] }"
+          :class="{ 'is-set': !!files[k] }"
         >
-          <div class="csa-up__tile">
-            {{ files[k] ? files[k]!.name : props.admin.fileNames[k] }}
-          </div>
+          <SharedMount
+            class="csa-up__tile"
+            :module="FileDropZone"
+            :component-props="{
+              variant: 'tile',
+              accept: 'image/webp,image/png',
+              text: files[k] ? files[k]!.name : props.admin.fileNames[k],
+              onSelect: (picked: File[]) => pick(k, picked),
+              onReject: onRejectFile,
+            }"
+          />
           <span class="csa-up__key">{{ k }}</span>
           <span
             v-if="props.admin.entry.labels[k]"
             class="csa-piece__label"
           >{{ props.admin.entry.labels[k] }}</span>
-          <input
-            type="file"
-            accept="image/webp,image/png"
-            @change="(e) => pick(k, e)"
-          >
-        </label>
+        </div>
       </div>
+      <p
+        v-if="pickError"
+        class="csa-status csa-status--err"
+      >
+        {{ pickError }}
+      </p>
     </div>
   </section>
 </template>

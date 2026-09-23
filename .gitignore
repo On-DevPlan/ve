@@ -62,3 +62,5 @@ apps/showcase/vite.config.ts.timestamp-*.mjs
 # drift from the registry it is derived from.
 nginx/api-locations/
 apps/showcase/temp/
+
+.workbuddy/

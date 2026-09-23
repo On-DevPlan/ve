@@ -409,8 +409,10 @@
 
 /* ImportModal */
 .sl-cs-import__textarea { min-height: 200px; }
+/* 虚线框由共享组件的 zone 形态提供(唯一事实源);
+   这里保留与弹窗边缘的留白,align-items 用默认的 stretch 让 zone 撑满。 */
 .sl-cs-import__file-zone {
-  display: flex; flex-direction: column; align-items: flex-start; gap: 8px;
+  display: flex; flex-direction: column; gap: 8px;
   padding: 12px 16px;
 }
 .sl-cs-import__file-name { margin: 0; font-size: 11px; color: var(--sl-color-text-secondary, #6b7280); }

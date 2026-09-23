@@ -1,24 +1,29 @@
 // packages/react-components/src/color-studio/src/components/ImageColorPicker.tsx
 //
 // 上传图片 → 缩放 max 256 → canvas hover 取色 + K-means 主色按钮。
+//
+// 文件选择走 shared/components 的共享组件（Vue 实现）。这是跨框架消费：React 树里
+// 用 SharedMount 挂一个 Vue 组件，样式由 host-env 策略注入当前 ShadowRoot。
+// 按钮外观仍由本包的 Btn 类名（sl-cs-btn-*）提供，所以用 variant: 'bare'。
 
 import { useCallback, useRef, useState } from 'react';
 import { extractDominantColors } from '../engine/colorExtraction';
 import { toHex } from '../engine/colorMath';
 import { Btn } from './ui/Btn';
+import { SharedMount } from '@/shared/components/runtime/SharedMount';
+import FileDropZone from '@/shared/components/FileDropZone';
 
 interface Props { onPick: (hex: string) => void; }
 
 const MAX_SIDE = 256;
 
 export function ImageColorPicker({ onPick }: Props) {
-  const fileRef = useRef<HTMLInputElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [hoverHex, setHoverHex] = useState<string | null>(null);
 
-  const onFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const onFiles = useCallback(async (picked: File[]) => {
+    const file = picked[0];
     if (!file) return;
     const url = URL.createObjectURL(file);
     setImageUrl(url);
@@ -64,17 +69,15 @@ export function ImageColorPicker({ onPick }: Props) {
 
   return (
     <div className="sl-cs-imagepicker">
-      <input
-        ref={fileRef}
-        type="file"
-        accept="image/*"
-        onChange={onFile}
-        style={{ display: 'none' }}
-        aria-label="选择取色图片"
+      <SharedMount
+        module={FileDropZone}
+        componentProps={{
+          variant: 'bare',
+          accept: 'image/*',
+          label: '上传图片取色',
+          onSelect: (picked: File[]) => { void onFiles(picked); },
+        }}
       />
-      <Btn variant="secondary" icon="upload" onClick={() => fileRef.current?.click()}>
-        上传图片取色
-      </Btn>
       {imageUrl && (
         <div className="sl-cs-imagepicker__preview">
           <canvas

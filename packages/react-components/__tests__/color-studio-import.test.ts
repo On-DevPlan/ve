@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { parseColorImportToml } from '../src/color-studio/src/engine/importParser';
 import { mergePalettesIntoDoc } from '../src/color-studio/src/engine/importMerge';
 import { exportToml } from '../src/color-studio/src/engine/exporters';
-import { emptyDoc, type ColorStudioDocument } from '../../apps/showcase/src/api/components/color-studio/types';
+import { emptyDoc, type ColorStudioDocument } from '../../../apps/showcase/src/api/components/color-studio/types';
 
 function baseDoc(): ColorStudioDocument {
   return emptyDoc('tester@example.com', 1000);
