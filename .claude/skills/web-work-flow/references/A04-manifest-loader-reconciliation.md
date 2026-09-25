@@ -12,7 +12,7 @@ parent: architecture
 > 2. 指向**当前实际代码**(替代原来的示例代码段,§4)
 > 3. 标注**剩余改进点**(slug 中文 fallback 之外的边界场景,§6)
 >
-> 新人优先读 [[protocol]] §5 校验链 + `framework-architecture-review.md` §4.3(下面 §7 关联) —— 后者反映最新状态。
+> 新人优先读 [[A02-protocol]] §5 校验链 + `framework-architecture-review.md` §4.3(下面 §7 关联) —— 后者反映最新状态。
 
 ---
 
@@ -147,6 +147,6 @@ production build      同样走 buildStart → 对账 → throw 即 build 失败
 ## 7. 关联文档
 
 - 审计与 P0/P1/P2 完整清单: [`docs/architecture/framework-architecture-review.md`](../../../docs/architecture/framework-architecture-review.md)
-- 契约图(字段状态 + 校验链): [[protocol]]
-- 加组件教程: [[how-to-add-component]]
-- Dev-only proxy 模式: [[component-level-dev-proxy]]
+- 契约图(字段状态 + 校验链): [[A02-protocol]]
+- 加组件教程: [[B01-how-to-add-component]]
+- Dev-only proxy 模式: [[A07-component-level-dev-proxy]]

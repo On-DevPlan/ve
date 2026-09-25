@@ -162,6 +162,6 @@ gaussian-splat-viewer/
 
 ## 7. 何时**不**读这个 ref
 
-- 单文件组件(整组件 < 300 行,模板内 < 3 个子视图)— 直接按 [[how-to-add-component]] §1 平铺即可。
+- 单文件组件(整组件 < 300 行,模板内 < 3 个子视图)— 直接按 [[B01-how-to-add-component]] §1 平铺即可。
 - 远程 loader 组件(`loaderUrl` 在 config 里)— 远程 URL 不归本仓库管,跟目录结构无关。
-- Host 应用本身(`apps/showcase/`)的目录约定——那是另一套(见 [[architecture-and-design-philosophy]] §9)。
+- Host 应用本身(`apps/showcase/`)的目录约定——那是另一套(见 [[A01-architecture-and-design-philosophy]] §9)。

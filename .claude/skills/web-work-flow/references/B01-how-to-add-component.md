@@ -35,7 +35,7 @@ packages/react-components/src/<id>/
 
 **关键约束**:`import.meta.glob` 的字面量路径只匹配**顶层** `index.{vue,tsx}`,不会扫子目录。组件内部怎么拆,只要 `index.{vue,tsx}` 还在,外层零感知。
 
-> **组件比较大**(`index.{vue,tsx}` > 300 行 / 模板 ≥ 3 个子视图 / 业务逻辑层 ≥ 2 个模块) → 读 [[large-component-layout]] 拿目录模板。本文件只覆盖单文件组件。
+> **组件比较大**(`index.{vue,tsx}` > 300 行 / 模板 ≥ 3 个子视图 / 业务逻辑层 ≥ 2 个模块) → 读 [[B02-large-component-layout]] 拿目录模板。本文件只覆盖单文件组件。
 
 ## 2. component.config.ts 模板
 

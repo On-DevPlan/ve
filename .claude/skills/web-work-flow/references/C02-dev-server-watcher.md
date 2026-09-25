@@ -43,7 +43,7 @@ curl -s http://localhost:5173/__component-manifest.json | jq '.components | leng
 
 # 3. 添加一个临时组件(Write 工具创建,避免 cat heredoc 竞态)
 mkdir -p packages/vue-components/src/temp-test
-# 写合法的 component.config.ts + index.vue(参考 how-to-add-component)
+# 写合法的 component.config.ts + index.vue(参考 B01-how-to-add-component)
 
 # 4. 等 1 秒,查 manifest
 sleep 1

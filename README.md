@@ -267,6 +267,6 @@ B 静默过期直到下一次部署。
 
 - [`packages/component-contract/src/types.ts`](packages/component-contract/src/types.ts) —— 组件协议类型源
 - [`docs/architecture/framework-architecture-review.md`](docs/architecture/framework-architecture-review.md) —— 整体架构评审
-- [`docs/architecture/manifest-loader-reconciliation.md`](docs/architecture/manifest-loader-reconciliation.md) —— manifest 与 loader 的对齐
+- [`.claude/skills/web-work-flow/references/A04-manifest-loader-reconciliation.md`](.claude/skills/web-work-flow/references/A04-manifest-loader-reconciliation.md) —— manifest 与 loader 的对齐(原 `docs/architecture/` 下的同名文档已收拢进 skill ref)
 - [`docker-entrypoint.sh`](docker-entrypoint.sh) —— 容器内 TLS 证书解码 + 自检入口
 - [`nginx/default.conf`](nginx/default.conf) —— 80 跳 443 + HTTPS server 块

@@ -27,7 +27,7 @@ pnpm lint
 # 报错来自 valid-component-config 时,这条命中
 ```
 
-**修复**: 写/修 `component.config.ts`(参考 `web-work-flow` skill 的 how-to-add-component)。`pnpm lint` 通过即可。
+**修复**: 写/修 `component.config.ts`(参考 `web-work-flow` skill 的 B01-how-to-add-component)。`pnpm lint` 通过即可。
 
 ### 根因 2 — dev server 监听没生效
 

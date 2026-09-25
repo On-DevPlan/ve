@@ -113,4 +113,4 @@
 - `../http/request.ts` —— 唯一 fetch 出口(传输层,不依赖业务状态)
 - `../to-vite-proxy.ts` —— dev:vite plugin `apiGateway()` 长前缀匹配
 - `../gen-nginx.ts` —— prod:`pnpm gen:nginx` 生成 nginx location
-- `.claude/skills/web-work-flow/references/component-level-dev-proxy.md` —— **已废弃** 的旧"组件级 api 字段"设计,作历史档案
+- `.claude/skills/web-work-flow/references/A07-component-level-dev-proxy.md` —— **已废弃** 的旧"组件级 api 字段"设计,作历史档案
