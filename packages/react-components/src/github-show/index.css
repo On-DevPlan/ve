@@ -1,32 +1,85 @@
 /* index.css —— GithubShow 样式
    约定:类名用 sl-gh- 前缀,颜色/间距全部走 var(--sl-*, fallback) token
-   风格:扁平、白色背景、单一强调色 —— 数据库表格,清晰优先 */
+   v1.6.32 设计稿「墨线·列格」(minimal-3b-rule-cols)落地:
+   - 极简黑白:纸白底,结构全部由「线」承担 —— 零卡片 / 零圆角 / 零投影 / 零渐变;
+   - 线分三级:规则线 rgba(17,18,20,.42) 切区块与表头,发丝线 .14/.07 分横排,
+     列分割线 .10(行内)/ .24(表头)—— 竖线让"表格"成为真正的"格子";
+   - 唯一毛玻璃 = 吸顶工具栏(白 .8 + blur 16px),内容从底下滚过时被磨砂;
+   - 绿(#177F37)只留 4 处:主按钮 / 输入焦点 1px 描边 / 提交总数 / 热力图四阶;
+   - 表格用 border-collapse:separate —— sticky 表头下的竖线才不会被合并吞掉。
+   v1.6.33:focus 高亮框宽度统一 —— 各列可编辑控件一律左右 8px 落在格子内容盒上
+   (URL 格 12→8,显示态让位挪进 .sl-gh-linkcell;多选 .sl-gh-multisel 补 width:100%)。
+   v1.6.37 一屏布局:编辑/展示/分享三视图统一不出整页竖向滚动条 ——
+   顶栏固定,视图 flex:1,表格容器由「固定 560px」改为 flex:1 吃剩余高度
+   (--sl-gh-table-h / --sl-gh-dtable-h 仍可覆盖回定高);展示视图里的
+   工具栏/统计栏/图表区/热力图/分页条全部 flex:none 不参与压缩。 */
 
 /* ===== Root ===== */
 /* 宿主把组件放进 fixed + 100vh + overflow:hidden 的容器;
    ShadowRoot 内 portalTarget 高度为 auto,height:100% 的百分比会塌缩,
    必须用视口高度 100vh 定高,再由 root 自己滚动(与 shortcut-library 同解法)。 */
+/* v1.6.37 一屏布局:整页不再出现竖向滚动条(编辑/展示/分享三种视图一致)。
+   做法:root 是 100vh 的 flex column,顶栏固定、当前视图 flex:1 吃剩余高度,
+   表格容器再由「固定高」改为 flex:1(自适应剩余空间,行多时表格内滚)。
+   这样内容总高恒定 = 视口高,root 的 overflow-y:auto 只剩兜底语义
+   (极端小屏时固定区块之和超过视口才回退整页滚动)。 */
 .sl-gh-root {
+  /* 墨线色板 token:取值落这里的声明,宿主想换主题直接覆盖 */
+  --sl-color-primary: #177F37;
+  --sl-color-on-primary: #FFF;
+  --sl-color-ink: #111214;
+  --sl-color-text: #15171A;
+  --sl-color-text-secondary: #5C6169;
+  --sl-color-text-tertiary: #9AA0A8;
+  --sl-color-text-dim: #9AA0A8;
+  --sl-color-rule: rgba(17, 18, 20, 0.42);      /* 区块/表头:黑规则线 */
+  --sl-color-line: rgba(17, 18, 20, 0.24);      /* 控件描边 + 表头列竖线 */
+  --sl-color-hair: rgba(17, 18, 20, 0.14);      /* 横向发丝线 */
+  --sl-color-hair-soft: rgba(17, 18, 20, 0.07); /* 行分隔(最轻) */
+  --sl-color-col: rgba(17, 18, 20, 0.10);       /* 行内列分割线 */
+  /* 兼容别名:历史样式统一引用 --sl-color-border,语义即"控件描边" */
+  --sl-color-border: rgba(17, 18, 20, 0.24);
+  --sl-color-surface: #FFF;
+  --sl-color-surface-alt: #F4F5F7;
+  --sl-color-surface-muted: #FAFAFB;
+  --sl-color-scrollbar-track: rgba(17, 18, 20, 0.04);
+  --sl-color-scrollbar-thumb: rgba(17, 18, 20, 0.28);
+  /* v1.6.37 一屏预算:矮屏(≤820px 视口)自动收紧区块内边距与图表高度,
+     把空间让给内容 —— 图表 tab 在 1280×720 下正好不再溢出。 */
+  --sl-gh-vpad: clamp(10px, 1.8vh, 18px);
+  --sl-gh-chart-h: clamp(150px, 24vh, 220px);
+  /* v1.6.43 控件微圆角:只给"可按的按钮",卡片/弹窗/输入框/标签仍是直角
+     (v1.6.11 全直角基调不变,只是按钮不再锐到扎手)。3px 与热力图格子同档。 */
+  --sl-gh-radius-ctl: 3px;
   display: flex;
   flex-direction: column;
   height: 100vh;
   overflow-y: auto;
+  /* 纸白底:没有光斑、没有渐变 —— 极简的底片就是一张白纸 */
   background: var(--sl-color-surface, #fff);
-  color: var(--sl-color-text, #1f2328);
+  color: var(--sl-color-text, #15171a);
   font-family: var(--sl-font-family, system-ui, -apple-system, "Segoe UI", "PingFang SC", sans-serif);
   font-size: 14px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
 
-/* ===== 顶栏 ===== */
+/* ===== 顶栏(全页唯一毛玻璃)=====
+   白 .8 + blur 16px + 1px 黑规则线下沿;内容从底下滚过时被磨砂。
+   不做圆角/投影 —— 它只是"一张压在纸上方的磨砂条"。 */
 .sl-gh-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20; /* 压过表格 sticky th(1) 与吸底横滚条(5) */
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--sl-color-border, #e5e7eb);
+  padding: 11px 22px;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--sl-color-rule, rgba(17, 18, 20, 0.42));
   flex-wrap: wrap;
 }
 .sl-gh-topbar__left {
@@ -36,13 +89,15 @@
   min-width: 0;
 }
 .sl-gh-title {
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
   white-space: nowrap;
 }
 .sl-gh-meta {
-  font-size: 12px;
-  color: var(--sl-color-text-secondary, #6b7280);
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  color: var(--sl-color-text-tertiary, #9aa0a8);
   white-space: nowrap;
 }
 .sl-gh-topbar__right {
@@ -52,182 +107,405 @@
   flex-wrap: wrap;
 }
 
+/* 搜索:不是"盒子",是一条下划线(墨线语汇:输入即"在纸上划线") */
 .sl-gh-search {
   font: inherit;
-  font-size: 13px;
-  padding: 6px 10px;
-  border: 1px solid var(--sl-color-border, #e5e7eb);
-  border-radius: 6px;
-  background: var(--sl-color-surface, #fff);
-  color: var(--sl-color-text, #1f2328);
+  font-size: 12px;
+  line-height: 1;
+  height: 28px;
+  padding: 0 10px;
+  border: none;
+  border-bottom: 1px solid var(--sl-color-rule, rgba(17, 18, 20, 0.42));
+  border-radius: 0;
+  background: transparent;
+  color: var(--sl-color-text, #15171a);
   outline: none;
-  width: 220px;
+  width: 200px;
   box-sizing: border-box;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: border-color 0.15s;
 }
 .sl-gh-search:focus {
-  border-color: var(--sl-color-primary, #2563eb);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  /* 焦点只换线色(1px),不加光晕 —— 与表格输入框同一套焦点语汇 */
+  border-bottom-color: var(--sl-color-primary, #177f37);
 }
 
-/* ===== 按钮 ===== */
+/* ===== 按钮 =====
+   墨线:微圆角(3px)+ 1px 规则线描边 + 透明底;hover 整块反白为墨(黑底白字)。
+   主按钮是全页唯一的绿色实体块;公开分享不再用柠黄,回归次级按钮规格。
+   v1.6.43:导出 PDF 从主按钮降为次级(绿只留给数据本身:统计数字/热力图/图表)。 */
 .sl-gh-btn {
   font: inherit;
-  font-size: 13px;
-  padding: 6px 14px;
-  border: 1px solid transparent;
-  border-radius: 6px;
+  font-size: 11.5px;
+  line-height: 1;
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--sl-color-rule, rgba(17, 18, 20, 0.42));
+  border-radius: var(--sl-gh-radius-ctl, 3px);
   cursor: pointer;
-  background: var(--sl-color-surface-alt, #f3f4f6);
-  color: var(--sl-color-text, #1f2328);
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  background: transparent;
+  color: var(--sl-color-text, #15171a);
+  letter-spacing: 0.04em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
   white-space: nowrap;
+  box-sizing: border-box;
+}
+.sl-gh-btn:hover:not([disabled]) {
+  background: var(--sl-color-ink, #111214);
+  border-color: var(--sl-color-ink, #111214);
+  color: #fff;
+}
+/* v1.6.43:导出 PDF 降级为次级按钮后,禁用态(导出中)需要自己的弱化规则 */
+.sl-gh-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 .sl-gh-btn--primary {
-  background: var(--sl-color-primary, #2563eb);
+  background: var(--sl-color-primary, #177F37);
+  border-color: var(--sl-color-primary, #177F37);
   color: var(--sl-color-on-primary, #fff);
 }
-.sl-gh-btn--primary:hover { background: #1d4ed8; }
-.sl-gh-btn--ghost {
-  background: transparent;
-  border-color: var(--sl-color-border, #e5e7eb);
+.sl-gh-btn--primary:hover:not([disabled]) {
+  background: #12652B;
+  border-color: #12652B;
+  color: #fff;
 }
-.sl-gh-btn--ghost:hover { background: var(--sl-color-surface-alt, #f3f4f6); }
+/* --ghost / --public 与基准按钮同规格:墨线语汇里"次级按钮"只有一种,
+   公开分享按钮的柠黄点缀在 v1.6.32 移除(绿只留 4 处)。 */
 
 /* ===== 同步状态条 ===== */
 .sl-gh-pill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: var(--sl-color-surface-alt, #f3f4f6);
-  color: var(--sl-color-text-secondary, #6b7280);
-  border: 1px solid var(--sl-color-border, #e5e7eb);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  padding: 3px 8px;
+  border-radius: 0;
+  background: transparent;
+  color: var(--sl-color-text-secondary, #5c6169);
+  border: 1px solid var(--sl-color-hair, rgba(17, 18, 20, 0.14));
   white-space: nowrap;
 }
-.sl-gh-pill--ok { color: #15803d; }
+.sl-gh-pill--ok { color: var(--sl-color-primary, #177f37); }
 .sl-gh-pill--error {
   color: #b91c1c;
   cursor: pointer;
 }
 .sl-gh-pill--error:hover { background: #fef2f2; }
-.sl-gh-pill--guest { color: var(--sl-color-text-secondary, #6b7280); }
+.sl-gh-pill--guest { color: var(--sl-color-text-tertiary, #9aa0a8); }
 .sl-gh-pill__btn {
   font: inherit;
-  font-size: 12px;
-  padding: 1px 8px;
-  border-radius: 999px;
-  border: 1px solid var(--sl-color-primary, #2563eb);
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: var(--sl-gh-radius-ctl, 3px);
+  border: 1px solid var(--sl-color-primary, #177f37);
   background: transparent;
-  color: var(--sl-color-primary, #2563eb);
+  color: var(--sl-color-primary, #177f37);
   cursor: pointer;
 }
-.sl-gh-pill__btn:hover { background: rgba(37, 99, 235, 0.08); }
+.sl-gh-pill__btn:hover { background: rgba(23, 127, 55, 0.08); }
 
-/* ===== 表格 ===== */
+/* ===== 表格 =====
+   grid track 由 CSS 变量 + 一个弹性 track 驱动(v1.6.10):
+   - 内建列 repoUrl / name / highlights / insights 默认 300 / 170 / 280 / 280px,
+     被 .sl-gh-col-w-* 覆盖后跟随用户的拖拽结果;拖某列只改它自己的 track。
+   - 弹性列 = 最后一个可拖列(有自定义列时是最后一个自定义列,否则是「产出」),
+     值 `minmax(80px, 1fr)`:容器有余量时它全部吸收 ⇒ 表格铺满 100%;固定列总和
+     顶满容器后它收到 80px 下限,总宽溢出本容器(overflow-x:auto)出横向滚动条。
+   - 自定义列由 .sl-gh-table--has-custom 类下额外追加的 var() track 控制。
+   - 操作列固定 44px,不参与弹性。
+   列宽调整:handle 写 inline style `--sl-gh-col-w-<id>: Npx` 到 .sl-gh-table root。 */
 .sl-gh-table {
   display: grid;
-  grid-template-columns: 300px 170px 1fr 1fr 160px repeat(var(--sl-gh-custom-cols, 0), 160px) 44px;
+  /* v1.6.37b:行高必须由内容决定(35px),不能用默认 align-content:stretch ——
+     表格容器 flex:1 被拉高后,stretch 会把 auto 行轨道均分拉伸填满整块,
+     行与行之间撑出大空隙(v1.6.37 实测 900px 视口下行距 ~76px)。start 让
+     行紧凑排列,多余留白留在「添加一行」按钮下方,由底部规则线收口。 */
+  align-content: start;
+  /* v1.6.10 弹性末列:与 JSX buildGridTemplate 一致。JSX 总会写 inline
+     gridTemplateColumns(按实际列数拼),这条是无自定义列时的等价兜底。 */
+  grid-template-columns:
+    var(--sl-gh-col-w-__builtin_repoUrl, 300px)
+    var(--sl-gh-col-w-__builtin_name, 170px)
+    var(--sl-gh-col-w-__builtin_highlights, 280px)
+    var(--sl-gh-col-w-__builtin_insights, 280px)
+    minmax(80px, 1fr)
+    44px;
   overflow-x: auto;
+  /* v1.6.37:固定高(560px)→ flex:1 吃剩余高度 —— 表格高度 = 视口 − 顶栏 −
+     分页条,始终刚好填满一屏,整页不出竖向滚动条(v1.6.36 的 560px 定高在
+     1080p 下会留白、在矮屏下又超屏)。行少时表格区照旧占满整块(下方留白由
+     规则线收口),行多时表格内滚,表头/合计行 sticky 不受影响。
+     想恢复定高:给 root 写 --sl-gh-table-h,下面的 max-height 会接管。 */
+  flex: 1 1 auto;
+  /* 160px 兜底:矮屏放不下固定区块时表格不再继续塌陷,root 回退整页滚动 */
+  min-height: 160px;
+  max-height: var(--sl-gh-table-h, none);
+  overflow-y: auto;
+  /* 零卡片(v1.6.32):没有面板底/圆角/投影 —— 表格直接长在纸面上,
+     下沿一条黑规则线收口;分页条是它的兄弟节点,共用同一条 gutter */
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  border-bottom: 1px solid var(--sl-color-rule, rgba(17, 18, 20, 0.42));
+  margin: 18px 22px 0;
+  /* 横向滚动条(v1.6.13):自绘 12px 常显样式。旧 thin + 浅灰 thumb + 透明轨道
+     在白底上几乎隐形,溢出时读者找不到滚动入口(分享页尤其致命)。
+     注意:不能同时声明 scrollbar-width/scrollbar-color 标准属性 —— 一旦声明,
+     浏览器会禁用 ::-webkit-scrollbar 自绘,回退到系统 thin 滚动条。 */
+}
+.sl-gh-table::-webkit-scrollbar { height: 12px; }
+.sl-gh-table::-webkit-scrollbar-track {
+  background: var(--sl-color-scrollbar-track, rgba(17, 18, 20, 0.04));
+  border-top: 1px solid var(--sl-color-border, rgba(17, 18, 20, 0.24));
+}
+.sl-gh-table::-webkit-scrollbar-thumb {
+  background: var(--sl-color-scrollbar-thumb, #9aa0a8);
+  border: 3px solid var(--sl-color-scrollbar-track, rgba(17, 18, 20, 0.04));
+  border-radius: 0;
+}
+.sl-gh-table::-webkit-scrollbar-thumb:hover { background: var(--sl-color-text-secondary, #5c6169); }
+
+/* has-custom 在 JSX 拼 gridTemplateColumns 已自带自定义列段;这里留空规则占位,
+   防止历史 CSS 文件残留被严格 lint 警告。 */
+.sl-gh-table--has-custom {
 }
 
+/* 拖拽期间:屏蔽文本选择 + 强制 col-resize 光标(body 上) */
+.sl-gh-table.is-dragging,
+.sl-gh-table.is-dragging * {
+  user-select: none;
+  cursor: col-resize !important;
+}
+
+/* 编辑视图表头:纸白底 + 1px 黑规则线下沿 + 更重的列竖线;
+   排版承担层级 —— 小字号 + 字距,数字用表格数字对齐。 */
 .sl-gh-head {
   display: contents;
 }
 .sl-gh-head > .sl-gh-cell {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--sl-color-text-secondary, #6b7280);
-  background: var(--sl-color-surface-alt, #fafafa);
-  border-bottom: 1px solid var(--sl-color-border, #e5e7eb);
-  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sl-color-text-secondary, #5c6169);
+  background: var(--sl-color-surface, #fff);
+  border-bottom: 1px solid var(--sl-color-rule, rgba(17, 18, 20, 0.42));
+  /* 表头竖线比行内更重(.24 vs .10):列头成为"格子标题" */
+  border-right: 1px solid var(--sl-color-line, rgba(17, 18, 20, 0.24));
+  padding: 0 12px;
+  height: 30px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
   white-space: nowrap;
+  box-sizing: border-box;
+  /* v1.6.26:容器(.sl-gh-table)变为固定高度内滚后,表头单元格逐个 sticky
+     钉在滚动口顶缘(.sl-gh-head 是 display:contents,sticky 只能落在 cell 上)。
+     sticky 自身就是定位基准,resizer 手柄的 absolute 照常工作。
+     v1.6.32:去毛玻璃后底色改纸白 —— 行从底下滚过时由它遮住。 */
+  position: sticky;
+  top: 0;
+  z-index: 2;
 }
 
+/* 列宽拖拽手柄(v1.5.0):表头 cell 右侧 6px 透明 hover 区 */
+.sl-gh-resizer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  touch-action: none; /* 阻止移动端拖拽时页面横向滚动 */
+  background: transparent;
+  z-index: 2;
+  border-radius: 0;
+  transition: background 0.15s;
+}
+.sl-gh-resizer:hover,
+.sl-gh-resizer:focus-visible {
+  background: rgba(23, 127, 55, 0.35);
+  outline: none;
+}
+/* 公开模式:即使 handle 被渲染(防御性),也禁止交互 */
+.sl-gh-table.is-readonly .sl-gh-resizer {
+  pointer-events: none;
+}
+
+/* 展示视图列宽拖拽手柄(与 .sl-gh-resizer 同规格,类名独立便于按视图调样式) */
+.sl-gh-dresizer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  touch-action: none;
+  background: transparent;
+  /* th 是 sticky(z-index:1),手柄必须更高层才能盖住排序按钮的点击区右缘 */
+  z-index: 2;
+  border-radius: 0;
+  transition: background 0.15s;
+}
+.sl-gh-dresizer:hover,
+.sl-gh-dresizer:focus-visible {
+  background: rgba(23, 127, 55, 0.35);
+  outline: none;
+}
+/* 公开模式防御:display 视图 readOnly 时 handle 本就不渲染,这里兜底 */
+.sl-gh-dtable-wrap.is-readonly .sl-gh-dresizer {
+  pointer-events: none;
+}
+
+/* 拖拽中:全局禁止文本选择(body.classList 由 useColumnResize 挂) */
+body.is-dragging,
+body.is-dragging * {
+  user-select: none !important;
+}
+/* 编辑 Grid 表格拖拽时的光标兜底(展示页由 handle 自身 cursor 提供) */
+.sl-gh-table.is-dragging {
+  cursor: col-resize;
+}
+
+/* 编辑视图行高:35px / 12px,行内元素(输入框、链接、操作按钮)居中 */
 .sl-gh-row {
   display: contents;
 }
 .sl-gh-row:hover > .sl-gh-cell {
-  background: var(--sl-color-surface-alt, #fafafa);
+  /* 墨线 hover:绿 5% 淡染(黄叠冷灰会发浑,已弃用柠黄) */
+  background: rgba(23, 127, 55, 0.05);
 }
 .sl-gh-cell {
-  padding: 6px 8px;
-  border-bottom: 1px solid var(--sl-color-border, #e5e7eb);
+  padding: 0 8px;
+  /* 横:发丝线(最轻) / 纵:列分割线 —— 竖线比横线略重,
+     交叉处才不会糊成一片 */
+  border-bottom: 1px solid var(--sl-color-hair-soft, rgba(17, 18, 20, 0.07));
+  border-right: 1px solid var(--sl-color-col, rgba(17, 18, 20, 0.10));
   min-width: 0;
+  height: 35px;
+  line-height: 1;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
 }
-.sl-gh-cell--url { padding-left: 12px; }
+.sl-gh-cell:last-child {
+  border-right: none;
+}
+/* v1.6.33:padding 收回 8px —— 各列 focus 高亮框左右留白统一(此前 URL 编辑框
+   左缩进 12px、比其它列窄 4px);显示态链接的 4px 抓手让位改由 .sl-gh-linkcell 自带 */
+.sl-gh-cell--url { padding-left: 8px; }
 .sl-gh-cell--ops {
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-/* 单元格输入框:透明底,聚焦才出现边框 —— 表格感,不喧宾夺主 */
+/* 单元格输入框:透明底,聚焦才出现边框 —— 表格感,不喧宾夺主
+   v1.6.31:去圆角(与平面表格一体);焦点环改 inset(只画在输入框内部,
+   不再向格外溢出 3px);大小永不超出所在单元格。 */
 .sl-gh-input,
 .sl-gh-textarea {
   font: inherit;
-  font-size: 13px;
+  font-size: 12px;
+  line-height: 1.4;
   width: 100%;
   box-sizing: border-box;
-  padding: 4px 8px;
+  padding: 0 8px;
   border: 1px solid transparent;
-  border-radius: 5px;
+  border-radius: 0;
   background: transparent;
   color: var(--sl-color-text, #1f2328);
   outline: none;
   transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
 }
 .sl-gh-input:hover,
-.sl-gh-textarea:hover { background: var(--sl-color-surface, #fff); }
+.sl-gh-textarea:hover { background: var(--sl-color-surface-muted, #fafafb); }
 .sl-gh-input:focus,
 .sl-gh-textarea:focus {
   background: var(--sl-color-surface, #fff);
-  border-color: var(--sl-color-primary, #2563eb);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  /* 仅 1px 边框变色,不叠 inset 阴影(曾 1px border + 1px inset = 2px,用户嫌粗);
+     焦点视觉严格限制在输入框盒子内,不盖过单元格边框/溢出到相邻行 */
+  border-color: var(--sl-color-primary, #177f37);
 }
 .sl-gh-input::placeholder,
 .sl-gh-textarea::placeholder {
-  color: var(--sl-color-text-dim, #9ca3af);
+  color: var(--sl-color-text-dim, #9aa0a8);
+}
+
+/* v1.6.33b:格内控件的 focus 高亮框「高度」统一 ——
+   此前三档高度并存:input 类(项目名 / 链接 / 数字)只占内容高 18.8px、
+   多选 chip 编辑器 21px、textarea 撑满格 34px,焦点态一眼看出参差。
+   textarea 要容纳多行、高度无法再压,故以它为基准:
+   `height: 100%` = cell 内容盒(35px 行高 - 1px 下边框 = 34px),
+   于是所有可编辑列的 focus 框都是「左右 8px 内缩、上下撑满」的同一只盒子。 */
+.sl-gh-cell > .sl-gh-input,
+.sl-gh-cell > .sl-gh-multisel {
+  height: 100%;
+}
+.sl-gh-cell > .sl-gh-multisel {
+  /* 格高被钳死后,chip 折行可能超高 —— 允许内部纵向滚动,
+     避免多出的标签被裁掉后不可达(单行时无滚动条,视觉无变化) */
+  overflow-y: auto;
 }
 
 .sl-gh-textarea {
   resize: none;
+  /* v1.6.31:高度钳制在单元格内 ——
+     - min-height 35px→0:原值比 cell 内容区(35px - 1px 下边框)高 1px,平时就溢出;
+     - max-height 200px→100%:AutoTextarea 的 JS 撑高(inline height)被钳在
+       cell 内容高内,多行内容不再纵向突破 35px 行高压到下一行;
+     - 平时 overflow 裁剪,聚焦才出滚动条(内容超出可见行高时)。 */
   overflow: hidden;
-  min-height: 30px;
-  line-height: 1.45;
+  height: 100%;
+  min-height: 0;
+  max-height: 100%;
+  line-height: 1.4;
+  padding: 8px 8px;
   display: block;
+  box-sizing: border-box;
+}
+.sl-gh-textarea:focus {
+  overflow-y: auto;
 }
 
-/* 多选列单元格(chip 编辑器):已选标签 + 内联输入 */
+/* 多选列单元格(chip 编辑器):已选标签 + 内联输入
+   v1.6.33:width:100% 撑满整格 —— 此前是内容宽,内容短时 focus-within 高亮框
+   明显窄于其它列的 input 高亮框(宽不一致);border-box 防止 padding 溢出格子 */
 .sl-gh-multisel {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 4px;
+  width: 100%;
   min-width: 0;
+  box-sizing: border-box;
   padding: 2px 4px;
   border: 1px solid transparent;
-  border-radius: 5px;
+  border-radius: 0;
   transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
 }
-.sl-gh-multisel:hover { background: var(--sl-color-surface, #fff); }
+.sl-gh-multisel:hover { background: var(--sl-color-surface-muted, #fafafb); }
 .sl-gh-multisel:focus-within {
   background: var(--sl-color-surface, #fff);
-  border-color: var(--sl-color-primary, #2563eb);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  /* 同 input:focus:仅 1px 边框变色,不叠 inset 阴影 */
+  border-color: var(--sl-color-primary, #177f37);
 }
 .sl-gh-multisel__tag {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  font-size: 12px;
+  font-size: 11.5px;
   padding: 1px 4px 1px 8px;
-  border: 1px solid #dbe3ee;
-  border-radius: 999px;
-  background: #f3f6fb;
-  color: #374151;
+  border: 1px solid var(--sl-color-hair, rgba(17, 18, 20, 0.14));
+  border-radius: 0;
+  background: transparent;
+  color: var(--sl-color-text-secondary, #5c6169);
   white-space: nowrap;
 }
 .sl-gh-multisel__x {
@@ -236,25 +514,25 @@
   line-height: 1;
   font-size: 13px;
   border: none;
-  border-radius: 50%;
+  border-radius: var(--sl-gh-radius-ctl, 3px);
   background: transparent;
-  color: #9ca3af;
+  color: var(--sl-color-text-tertiary, #9aa0a8);
   cursor: pointer;
   padding: 0;
 }
-.sl-gh-multisel__x:hover { background: #e5e9f0; color: #dc2626; }
+.sl-gh-multisel__x:hover { background: rgba(17, 18, 20, 0.06); color: #dc2626; }
 .sl-gh-multisel__input {
   flex: 1;
   min-width: 60px;
   font: inherit;
-  font-size: 13px;
+  font-size: 12px;
   border: none;
   background: transparent;
   color: var(--sl-color-text, #1f2328);
   outline: none;
-  padding: 3px 2px;
+  padding: 0 2px;
 }
-.sl-gh-multisel__input::placeholder { color: var(--sl-color-text-dim, #9ca3af); }
+.sl-gh-multisel__input::placeholder { color: var(--sl-color-text-dim, #9aa0a8); }
 
 /* URL 单元格:可点击链接(LinkCell)+ 编辑按钮 */
 .sl-gh-linkcell {
@@ -262,10 +540,15 @@
   align-items: center;
   gap: 6px;
   min-width: 0;
+  /* 抓手(左缘 13px)让位:显示态链接整体右移 4px(编辑态 input 不加,保证
+     focus 高亮框与其它列同样落在 8px 网格上) */
+  padding-left: 4px;
 }
 .sl-gh-linkcell__a {
-  font-size: 13px;
-  color: var(--sl-color-primary, #2563eb);
+  font-size: 12px;
+  /* 墨线:链接是黑字(绿只留 4 处配额),hover 才加下划线 */
+  color: var(--sl-color-text, #15171a);
+  font-weight: 600;
   text-decoration: none;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -280,10 +563,10 @@
   font: inherit;
   font-size: 11px;
   padding: 1px 7px;
-  border-radius: 999px;
-  border: 1px solid var(--sl-color-border, #e5e7eb);
+  border-radius: var(--sl-gh-radius-ctl, 3px);
+  border: 1px solid var(--sl-color-border, rgba(17, 18, 20, 0.24));
   background: transparent;
-  color: var(--sl-color-text-secondary, #6b7280);
+  color: var(--sl-color-text-secondary, #5c6169);
   cursor: pointer;
   visibility: hidden;
 }
@@ -292,12 +575,58 @@
   visibility: visible;
 }
 .sl-gh-linkcell__edit:hover {
-  color: var(--sl-color-primary, #2563eb);
-  border-color: var(--sl-color-primary, #2563eb);
+  color: var(--sl-color-ink, #111214);
+  border-color: var(--sl-color-ink, #111214);
 }
 .sl-gh-cell--custom.is-multi {
   /* 多选类自定义列:列头无额外元素 */
 }
+
+/* 行拖拽(v1.6.30):URL 格左缘 hover 显出抓手 ⠿,指针拖拽整行换位。
+   行是 display:contents(无盒子,无 hover 盒),抓手必须挂在真实 cell 上 ——
+   给 body 行的 URL 格开 position:relative 作定位基准(表头行不受影响)。 */
+.sl-gh-row .sl-gh-cell--url {
+  position: relative;
+}
+.sl-gh-grip {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--sl-gh-radius-ctl, 3px);
+  padding: 0;
+  background: transparent;
+  color: var(--sl-color-text-dim, #9aa0a8);
+  font-size: 10px;
+  line-height: 1;
+  cursor: grab;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+  touch-action: none; /* 触屏拖行,别让浏览器接管滚动手势 */
+  z-index: 1;
+}
+.sl-gh-row:hover .sl-gh-grip { opacity: 0.55; }
+.sl-gh-row .sl-gh-grip:hover,
+.sl-gh-grip.is-active {
+  opacity: 1;
+  color: var(--sl-color-primary, #177f37);
+}
+.sl-gh-grip.is-active { cursor: grabbing; }
+
+/* 拖拽进行中:禁选字;源行淡出;落点行沿插入方向画 2px 主色线(逐格 inset 阴影) */
+.sl-gh-table.is-row-dragging {
+  cursor: grabbing;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.sl-gh-row.is-dragging > .sl-gh-cell { opacity: 0.4; }
+.sl-gh-row.is-over-before > .sl-gh-cell { box-shadow: inset 0 2px 0 var(--sl-color-primary, #177f37); }
+.sl-gh-row.is-over-after > .sl-gh-cell { box-shadow: inset 0 -2px 0 var(--sl-color-primary, #177f37); }
 
 /* 操作列:上移 / 下移 + 删除(× → ? 两步确认) */
 .sl-gh-ops {
@@ -310,17 +639,17 @@
   width: 24px;
   height: 26px;
   border: none;
-  border-radius: 5px;
+  border-radius: var(--sl-gh-radius-ctl, 3px);
   background: transparent;
-  color: var(--sl-color-text-dim, #9ca3af);
+  color: var(--sl-color-text-dim, #9aa0a8);
   font-size: 13px;
   line-height: 1;
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
 }
 .sl-gh-move:hover:not(:disabled) {
-  background: var(--sl-color-surface-alt, #f3f4f6);
-  color: var(--sl-color-primary, #2563eb);
+  background: var(--sl-color-surface-alt, rgba(17, 18, 20, 0.04));
+  color: var(--sl-color-primary, #177f37);
 }
 .sl-gh-move:disabled {
   opacity: 0.28;
@@ -343,17 +672,17 @@
   align-items: center;
   gap: 4px;
   font-size: 12px;
-  color: var(--sl-color-text-dim, #9ca3af);
+  color: var(--sl-color-text-dim, #9aa0a8);
   cursor: pointer;
   white-space: nowrap;
   user-select: none;
 }
 .sl-gh-colmgr__vis input {
   margin: 0;
-  accent-color: var(--sl-color-primary, #2563eb);
+  accent-color: var(--sl-color-primary, #177f37);
 }
 .sl-gh-colmgr__type.is-num {
-  color: #0f766e;
+  color: var(--sl-color-text-secondary, #5c6169);
 }
 
 .sl-gh-del {
@@ -361,9 +690,9 @@
   width: 26px;
   height: 26px;
   border: none;
-  border-radius: 5px;
+  border-radius: var(--sl-gh-radius-ctl, 3px);
   background: transparent;
-  color: var(--sl-color-text-dim, #9ca3af);
+  color: var(--sl-color-text-dim, #9aa0a8);
   font-size: 15px;
   line-height: 1;
   cursor: pointer;
@@ -381,25 +710,228 @@
   50% { opacity: 0.55; }
 }
 
-/* 底部添加行 */
+/* 底部添加行:走表格体系高度,跟行 35px 视觉一致。
+   v1.6.32:虚线框改直角实线(墨线只用实线),margin 归到 gutter 内。 */
 .sl-gh-add-row {
   grid-column: 1 / -1;
   font: inherit;
-  font-size: 13px;
-  margin: 8px 12px;
-  padding: 8px 12px;
-  border: 1px dashed var(--sl-color-border, #d1d5db);
-  border-radius: 6px;
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  height: 32px;
+  margin: 10px 0;
+  padding: 0 12px;
+  border: 1px solid var(--sl-color-rule, rgba(17, 18, 20, 0.42));
+  border-radius: var(--sl-gh-radius-ctl, 3px);
   background: transparent;
-  color: var(--sl-color-text-secondary, #6b7280);
+  color: var(--sl-color-text-secondary, #5c6169);
   cursor: pointer;
-  text-align: left;
+  text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   transition: border-color 0.15s, color 0.15s, background 0.15s;
+  box-sizing: border-box;
 }
 .sl-gh-add-row:hover {
-  border-color: var(--sl-color-primary, #2563eb);
-  color: var(--sl-color-primary, #2563eb);
-  background: rgba(37, 99, 235, 0.04);
+  border-color: var(--sl-color-ink, #111214);
+  color: var(--sl-color-ink, #111214);
+  background: rgba(17, 18, 20, 0.03);
+}
+
+/* ===== 合计行(编辑视图 grid 版,v1.6.0)===== */
+.sl-gh-footrow {
+  display: contents;
+}
+.sl-gh-footrow > .sl-gh-cell {
+  /* 合计行:纸白底 + 上沿黑规则线(v1.6.32,与表头下沿同规格,首尾封口) */
+  background: var(--sl-color-surface, #fff);
+  border-top: 1px solid var(--sl-color-rule, rgba(17, 18, 20, 0.42));
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sl-color-text, #15171a);
+  height: 35px;
+  padding: 0 8px;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  /* v1.6.26:合计行逐格 sticky 钉在滚动口底缘(行少未出滚动时 no-op) */
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+}
+.sl-gh-footrow > .sl-gh-cell--url {
+  padding-left: 12px;
+}
+.sl-gh-footrow > .sl-gh-cell.is-sum {
+  /* 数字列合计:右对齐 + 等宽数字,与列内数字单元格对齐 */
+  justify-content: flex-end;
+  padding-right: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ===== 分页条(v1.6.2,严格复刻中后台原型)=====
+   布局:左段留空(原型为「已选 N 行」开关,github-show 无勾选概念)
+        | 右段整体靠右:共 N 条 → ‹ 页码 › → [10 条/页] → 跳转至 [ ] 页。
+   墨线(v1.6.32):页码仍是裸数字无边框,仅 active 由绿底改黑底白字 ——
+   绿只留给 4 处配额,分页属于"结构",用墨色。 */
+.sl-gh-pagination {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  color: var(--sl-color-text-secondary, #5c6169);
+}
+/* 编辑视图 v1.6.26:分页条已移出 .sl-gh-table(内滚容器),成为兄弟节点 ——
+   与表格共用同一条水平 gutter(v1.6.32 由 16px → 22px);
+   v1.6.36 补 margin-top 与表格留呼吸 gap;v1.6.37 补 margin-bottom:
+   编辑视图没有 padding 容器,分页条是 root 的最后一个 flex 子项,不补底距
+   会紧贴视口下沿。 */
+.sl-gh-table + .sl-gh-pagination {
+  margin: 8px 22px 18px;
+}
+/* 展示视图 v1.6.36:表格 wrap 改严格固定高,分页条(可能在自绘横滚条之后)
+   与表格区之间同样留 gap,分页条位置随固定表格恒定。 */
+.sl-gh-dtable-wrap + .sl-gh-pagination,
+.sl-gh-dhscroll + .sl-gh-pagination {
+  margin-top: 8px;
+}
+/* 展示视图:nav 已在 .sl-gh-display(自体 padding:16px)内,与上方表格卡对齐 ——
+   不需要额外水平 padding(之前给 2px 反而让它比卡片缩进更多,观感"右侧无留白") */
+.sl-gh-display > .sl-gh-pagination {
+  padding: 0 0;
+  flex: none; /* v1.6.37:分页条恒定高,不参与压缩 */
+}
+.sl-gh-pagination__side {
+  min-width: 0;
+  overflow: hidden;
+}
+/* 右段:共 N 条 + 页码 + 条数 + 跳转,靠右成一组 */
+.sl-gh-pagination__right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-self: end;
+  justify-content: flex-end;
+}
+.sl-gh-pagination__total {
+  white-space: nowrap;
+  color: var(--sl-color-text-secondary, #5c6169);
+}
+.sl-gh-pager {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+/* 页码:裸文字,无边框;hover 墨色淡底;active 黑底白字。
+   分页内所有交互件(页码钮 / ‹› / 条数下拉 / 跳转输入)统一 height:28px。 */
+.sl-gh-pager__btn {
+  min-width: 28px;
+  height: 28px;
+  padding: 0 4px;
+  border: none;
+  border-radius: var(--sl-gh-radius-ctl, 3px);
+  background: transparent;
+  color: var(--sl-color-text-secondary, #5c6169);
+  font: inherit;
+  font-size: 11.5px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  font-variant-numeric: tabular-nums;
+  transition: background 0.15s, color 0.15s;
+}
+.sl-gh-pager__btn:hover:not(:disabled):not(.is-active) {
+  background: rgba(17, 18, 20, 0.06);
+  color: var(--sl-color-ink, #111214);
+}
+.sl-gh-pager__btn.is-active {
+  background: var(--sl-color-ink, #111214);
+  color: #fff;
+  cursor: default;
+  font-weight: 600;
+}
+.sl-gh-pager__btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+/* ‹ › 裸导航符:比数字按钮更轻量,无背景,hover 才蘸色 */
+.sl-gh-pager__nav {
+  min-width: 24px;
+  height: 28px;
+  padding: 0 2px;
+  border: none;
+  border-radius: var(--sl-gh-radius-ctl, 3px);
+  background: transparent;
+  color: var(--sl-color-text-tertiary, #9aa0a8);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  transition: background 0.15s, color 0.15s;
+}
+.sl-gh-pager__nav:hover:not(:disabled) {
+  background: rgba(17, 18, 20, 0.06);
+  color: var(--sl-color-ink, #111214);
+}
+.sl-gh-pager__nav:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.sl-gh-pager__ellipsis {
+  min-width: 18px;
+  text-align: center;
+  color: var(--sl-color-text-dim, #9aa0a8);
+}
+/* 每页条数:原型里是带边框白底小下拉。
+   注意:必须给显式宽度 —— select 的原生下拉箭头占位在 Chrome 里是
+   从"内容+padding"里抠的,padding 仅 4px 时「100 条/页」会被截成「100 条/」。
+   width 里显式预留箭头 + 左右呼吸空间。 */
+.sl-gh-pagination__size {
+  width: 72px;
+  height: 28px;
+  padding: 0 18px 0 6px;
+  font-size: 11.5px;
+  border: 1px solid var(--sl-color-border, rgba(17, 18, 20, 0.24));
+  border-radius: 0;
+  background: transparent;
+  color: var(--sl-color-text, #15171a);
+}
+/* 跳转:原型是「条 跳转至 [浅底输入] 页」 */
+.sl-gh-pagination__jump {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  color: var(--sl-color-text-secondary, #5c6169);
+}
+.sl-gh-pagination__jump-input {
+  width: 44px;
+  height: 28px;
+  padding: 0 4px;
+  border: 1px solid var(--sl-color-border, rgba(17, 18, 20, 0.24));
+  border-radius: 0;
+  background: transparent;
+  color: var(--sl-color-text, #15171a);
+  font: inherit;
+  font-size: 11.5px;
+  outline: none;
+  box-sizing: border-box;
+  text-align: center;
+}
+.sl-gh-pagination__jump-input:focus {
+  /* 焦点只换线色(1px),不加外扩光晕 */
+  border-color: var(--sl-color-primary, #177f37);
 }
 
 /* ===== 空态 / 底栏 ===== */
@@ -423,7 +955,7 @@
   margin: 0;
   max-width: 420px;
   font-size: 13px;
-  color: var(--sl-color-text-secondary, #6b7280);
+  color: var(--sl-color-text-secondary, #5c6169);
 }
 .sl-gh-empty__actions {
   display: flex;
@@ -432,26 +964,35 @@
 }
 
 .sl-gh-foot {
-  padding: 8px 16px;
+  padding: 10px 22px;
   font-size: 11px;
-  color: var(--sl-color-text-dim, #9ca3af);
-  border-top: 1px solid var(--sl-color-border, #e5e7eb);
+  letter-spacing: 0.04em;
+  color: var(--sl-color-text-tertiary, #9aa0a8);
+  background: transparent;
+  border-top: 1px solid var(--sl-color-rule, rgba(17, 18, 20, 0.42));
 }
 
 /* ===== 公开分享模式 banner(readOnly 时挂载)—— 极简一条 ===== */
+/* 公开分享 banner(v1.6.0 起并入顶栏右侧 .sl-gh-topbar__right):
+   收窄为自然内容宽的直角小条(类名沿用 pill,视觉已非胶囊),不再占满一行
+   (去掉 border-bottom / flex:1 label)。 */
+/* 公开分享 banner(v1.6.0 起并入顶栏右侧 .sl-gh-topbar__right):
+   v1.6.32 去胶囊改方角墨线小条(1px 发丝线 + 透明底)。 */
 .sl-gh-public-banner {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 4px 12px;
-  background: #f8fafc;
-  border-bottom: 1px solid #e5e7eb;
-  color: #6b7280;
+  gap: 8px;
+  padding: 2px 8px;
+  background: transparent;
+  border: 1px solid var(--sl-color-hair, rgba(17, 18, 20, 0.14));
+  border-radius: 0;
+  color: var(--sl-color-text-secondary, #5c6169);
   font-size: 11px;
+  letter-spacing: 0.04em;
   line-height: 1.4;
+  white-space: nowrap;
 }
 .sl-gh-public-banner__label {
-  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -467,12 +1008,11 @@
   text-decoration: none;
 }
 
-/* sl-gh-btn--sm —— 小尺寸按钮(banner 内联用) */
+/* sl-gh-btn--sm —— 历史命名(banner 内联用);与主按钮规格对齐,保留类名以免动 JSX */
 .sl-gh-btn--sm {
-  height: 26px;
-  padding: 0 10px;
+  height: 28px;
+  padding: 0 12px;
   font-size: 11.5px;
-  border-radius: 5px;
 }
 
 /* ===== 公开分享按钮 + 弹层(ShareButton) ===== */
@@ -480,15 +1020,8 @@
   position: relative;
   display: inline-block;
 }
-.sl-gh-btn--public {
-  background: #e0f2fe;
-  color: #075985;
-  border-color: #bae6fd;
-}
-.sl-gh-btn--public:hover:not([disabled]) {
-  background: #bae6fd;
-  border-color: #7dd3fc;
-}
+/* v1.6.22:--public 柠黄样式统一声明在按钮段(见 .sl-gh-btn--public),
+   此处不再重复(旧浅蓝样式已移除)。 */
 .sl-gh-share__popover {
   position: absolute;
   top: calc(100% + 6px);
@@ -497,16 +1030,16 @@
   width: 360px;
   max-width: calc(100vw - 24px);
   padding: 12px 14px;
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  /* 墨线气泡:实心纸白 + 1px 规则线边框,零圆角零投影(压在纸面上即"浮起") */
+  background: var(--sl-color-surface, #fff);
+  border: 1px solid var(--sl-color-rule, rgba(17, 18, 20, 0.42));
+  border-radius: 0;
   display: flex;
   flex-direction: column;
   gap: 10px;
   text-align: left;
-  font-size: 12.5px;
-  color: #111827;
+  font-size: 12px;
+  color: var(--sl-color-text, #15171a);
 }
 .sl-gh-share__row {
   display: flex;
@@ -515,45 +1048,46 @@
 }
 .sl-gh-share__row--toggle,
 .sl-gh-share__row--link {
-  border-top: 1px solid #f3f4f6;
+  border-top: 1px solid var(--sl-color-hair-soft, rgba(17, 18, 20, 0.07));
   padding-top: 10px;
 }
 .sl-gh-share__row--foot {
   margin-top: -2px;
 }
 .sl-gh-share__label {
-  font-size: 11px;
-  font-weight: 500;
-  color: #6b7280;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--sl-color-text-tertiary, #9aa0a8);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.1em;
 }
 .sl-gh-share__status {
   font-weight: 500;
-  color: #1f2937;
-  font-size: 12.5px;
+  color: var(--sl-color-text, #15171a);
+  font-size: 12px;
 }
 .sl-gh-share__status.is-public {
-  color: #075985;
+  color: var(--sl-color-ink, #111214);
+  font-weight: 600;
 }
 .sl-gh-share__hint {
   font-size: 11px;
-  color: #9ca3af;
+  color: var(--sl-color-text-tertiary, #9aa0a8);
   line-height: 1.5;
 }
 .sl-gh-share__hint code {
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 10.5px;
-  background: #f3f4f6;
+  background: rgba(17, 18, 20, 0.05);
   padding: 0 4px;
-  border-radius: 3px;
-  color: #4b5563;
+  border-radius: 0;
+  color: var(--sl-color-text-secondary, #5c6169);
 }
 .sl-gh-share__error {
   padding: 8px 10px;
   background: #fef2f2;
   color: #b91c1c;
-  border-radius: 5px;
+  border-radius: 0;
   font-size: 11.5px;
   line-height: 1.5;
 }
@@ -568,42 +1102,68 @@
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 11px;
   padding: 6px 8px;
-  border: 1px solid #e5e7eb;
-  border-radius: 5px;
-  background: #f9fafb;
-  color: #374151;
+  border: 1px solid var(--sl-color-border, rgba(17, 18, 20, 0.24));
+  border-radius: 0;
+  background: transparent;
+  color: var(--sl-color-text-secondary, #5c6169);
   outline: none;
 }
 .sl-gh-share__url:focus {
-  border-color: #93c5fd;
-  background: #ffffff;
+  border-color: var(--sl-color-primary, #177f37);
+  background: var(--sl-color-surface, #ffffff);
 }
 
-/* ===== 视图切换 ===== */
+/* ===== 视图切换(墨线:方角连体按钮组,激活 = 墨底白字)=====
+   同一组类同时服务顶栏「编辑页/展示页」与展示页「表格/图表」。 */
 .sl-gh-viewswitch {
   display: inline-flex;
-  padding: 2px;
-  border-radius: 8px;
-  background: var(--sl-color-surface-alt, #f3f4f6);
-  border: 1px solid var(--sl-color-border, #e5e7eb);
+  gap: 0;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  border: none;
 }
 .sl-gh-viewswitch__btn {
   font: inherit;
-  font-size: 13px;
-  padding: 4px 14px;
-  border: none;
-  border-radius: 6px;
+  font-size: 11.5px;
+  line-height: 1;
+  height: 28px;
+  padding: 0 14px;
+  border: 1px solid var(--sl-color-rule, rgba(17, 18, 20, 0.42));
+  border-radius: 0; /* 连体组:只圆外角(见下方 :first-child / :last-child) */
   background: transparent;
-  color: var(--sl-color-text-secondary, #6b7280);
+  color: var(--sl-color-text-secondary, #5c6169);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
-.sl-gh-viewswitch__btn:hover { color: var(--sl-color-text, #1f2328); }
+/* 连体:相邻按钮共用一条边,不出现双线 */
+.sl-gh-viewswitch__btn + .sl-gh-viewswitch__btn {
+  margin-left: -1px;
+}
+/* v1.6.43 微圆角:整组当作一个胶囊 —— 只圆最外两侧,中缝保持直角相接 */
+.sl-gh-viewswitch__btn:first-child {
+  border-top-left-radius: var(--sl-gh-radius-ctl, 3px);
+  border-bottom-left-radius: var(--sl-gh-radius-ctl, 3px);
+}
+.sl-gh-viewswitch__btn:last-child {
+  border-top-right-radius: var(--sl-gh-radius-ctl, 3px);
+  border-bottom-right-radius: var(--sl-gh-radius-ctl, 3px);
+}
+.sl-gh-viewswitch__btn:hover {
+  background: rgba(17, 18, 20, 0.05);
+  color: var(--sl-color-ink, #111214);
+}
 .sl-gh-viewswitch__btn.is-active {
-  background: var(--sl-color-surface, #fff);
-  color: var(--sl-color-primary, #2563eb);
+  background: var(--sl-color-ink, #111214);
+  border-color: var(--sl-color-ink, #111214);
+  color: #fff;
   font-weight: 600;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 
 /* ===== 列设置弹窗 ===== */
@@ -622,11 +1182,12 @@
   max-width: 100%;
   max-height: 80vh;
   overflow-y: auto;
+  /* 墨线弹窗:实心纸白 + 1px 规则线,零圆角零投影(遮罩已提供层级) */
   background: var(--sl-color-surface, #fff);
-  border-radius: 10px;
+  border: 1px solid var(--sl-color-rule, rgba(17, 18, 20, 0.42));
+  border-radius: 0;
   padding: 16px;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
-  color: var(--sl-color-text, #1f2328);
+  color: var(--sl-color-text, #15171a);
 }
 .sl-gh-modal__head {
   display: flex;
@@ -643,17 +1204,22 @@
   width: 28px;
   height: 28px;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--sl-gh-radius-ctl, 3px);
   background: transparent;
-  color: var(--sl-color-text-secondary, #6b7280);
+  color: var(--sl-color-text-secondary, #5c6169);
   font-size: 16px;
+  line-height: 1;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
 }
-.sl-gh-modal__close:hover { background: var(--sl-color-surface-alt, #f3f4f6); }
+.sl-gh-modal__close:hover { background: var(--sl-color-surface-alt, rgba(17, 18, 20, 0.04)); }
 .sl-gh-modal__hint {
   margin: 0 0 12px;
   font-size: 12px;
-  color: var(--sl-color-text-dim, #9ca3af);
+  color: var(--sl-color-text-dim, #9aa0a8);
   line-height: 1.5;
 }
 .sl-gh-colmgr {
@@ -668,21 +1234,24 @@
 }
 .sl-gh-colmgr__type {
   flex: none;
-  font-size: 11px;
-  color: var(--sl-color-text-secondary, #6b7280);
-  background: var(--sl-color-surface-alt, #f3f4f6);
-  border-radius: 999px;
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  color: var(--sl-color-text-tertiary, #9aa0a8);
+  background: transparent;
+  border: 1px solid var(--sl-color-hair, rgba(17, 18, 20, 0.14));
+  border-radius: 0;
   padding: 2px 8px;
 }
-.sl-gh-colmgr__type.is-multi { color: #7c3aed; }
+/* 类型标签不再用紫/青点缀(墨线只有黑白 + 4 处绿) */
+.sl-gh-colmgr__type.is-multi { color: var(--sl-color-text-secondary, #5c6169); }
 .sl-gh-colmgr__del {
   flex: none;
   width: 26px;
   height: 26px;
   border: none;
-  border-radius: 5px;
+  border-radius: var(--sl-gh-radius-ctl, 3px);
   background: transparent;
-  color: var(--sl-color-text-dim, #9ca3af);
+  color: var(--sl-color-text-dim, #9aa0a8);
   font-size: 15px;
   cursor: pointer;
 }
@@ -693,17 +1262,17 @@
   gap: 8px;
   margin-top: 4px;
   padding-top: 12px;
-  border-top: 1px dashed var(--sl-color-border, #e5e7eb);
+  border-top: 1px solid var(--sl-color-hair, rgba(17, 18, 20, 0.14));
 }
 .sl-gh-colmgr__add .sl-gh-input { flex: 1; }
 .sl-gh-select {
   font: inherit;
-  font-size: 13px;
+  font-size: 12px;
   padding: 5px 8px;
-  border: 1px solid var(--sl-color-border, #e5e7eb);
-  border-radius: 6px;
-  background: var(--sl-color-surface, #fff);
-  color: var(--sl-color-text, #1f2328);
+  border: 1px solid var(--sl-color-border, rgba(17, 18, 20, 0.24));
+  border-radius: 0;
+  background: transparent;
+  color: var(--sl-color-text, #15171a);
 }
 
 /* ===== 导入弹窗(列设置弹窗容器的宽版 + 导入专属元素) ===== */
@@ -714,25 +1283,25 @@
 .sl-gh-import__tabs {
   display: flex;
   gap: 4px;
-  border-bottom: 1px solid var(--sl-color-border, #e5e7eb);
+  border-bottom: 1px solid var(--sl-color-hair, rgba(17, 18, 20, 0.14));
   margin-bottom: 10px;
 }
 .sl-gh-import__tab {
   font: inherit;
-  font-size: 13px;
+  font-size: 12px;
   padding: 6px 12px;
   border: none;
   background: transparent;
-  color: var(--sl-color-text-secondary, #6b7280);
+  color: var(--sl-color-text-secondary, #5c6169);
   cursor: pointer;
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
   transition: color 0.15s, border-color 0.15s;
 }
-.sl-gh-import__tab:hover { color: var(--sl-color-text, #1f2328); }
+.sl-gh-import__tab:hover { color: var(--sl-color-ink, #111214); }
 .sl-gh-import__tab.is-active {
-  color: var(--sl-color-primary, #2563eb);
-  border-bottom-color: var(--sl-color-primary, #2563eb);
+  color: var(--sl-color-ink, #111214);
+  border-bottom-color: var(--sl-color-ink, #111214);
   font-weight: 600;
 }
 
@@ -740,20 +1309,19 @@
   width: 100%;
   box-sizing: border-box;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 12.5px;
+  font-size: 12px;
   line-height: 1.55;
   padding: 10px;
-  border: 1px solid var(--sl-color-border, #e5e7eb);
-  border-radius: 8px;
-  background: var(--sl-color-surface, #fff);
-  color: var(--sl-color-text, #1f2328);
+  border: 1px solid var(--sl-color-border, rgba(17, 18, 20, 0.24));
+  border-radius: 0;
+  background: transparent;
+  color: var(--sl-color-text, #15171a);
   resize: vertical;
   min-height: 180px;
 }
 .sl-gh-import__textarea:focus {
   outline: none;
-  border-color: var(--sl-color-primary, #2563eb);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  border-color: var(--sl-color-primary, #177f37);
 }
 
 /* 虚线框由共享组件的 zone 形态提供(唯一事实源);
@@ -768,17 +1336,21 @@
   margin: 0;
   font-size: 12px;
   text-align: center;
-  color: var(--sl-color-text-secondary, #6b7280);
+  color: var(--sl-color-text-secondary, #5c6169);
 }
 
 .sl-gh-import__preview {
   margin-top: 10px;
-  font-size: 12.5px;
-  color: var(--sl-color-text-secondary, #6b7280);
+  font-size: 12px;
+  color: var(--sl-color-text-secondary, #5c6169);
   line-height: 1.6;
 }
-.sl-gh-import__preview-newcols { color: var(--sl-color-primary, #2563eb); }
-.sl-gh-import__preview-warn { color: #d97706; }
+/* 新增列提示:加重为墨色(绿只留 4 处配额) */
+.sl-gh-import__preview-newcols {
+  color: var(--sl-color-ink, #111214);
+  font-weight: 600;
+}
+.sl-gh-import__preview-warn { color: var(--sl-color-text-tertiary, #9aa0a8); }
 
 .sl-gh-import__errors {
   margin-top: 8px;
@@ -786,7 +1358,7 @@
   overflow-y: auto;
   padding: 8px 10px;
   background: #fef2f2;
-  border-radius: 6px;
+  border-radius: 0;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -810,17 +1382,18 @@
 }
 .sl-gh-import__prompt-copy {
   font: inherit;
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 600;
   padding: 5px 12px;
-  border: none;
-  border-radius: 6px;
-  background: var(--sl-color-primary, #2563eb);
+  border: 1px solid var(--sl-color-primary, #177f37);
+  border-radius: var(--sl-gh-radius-ctl, 3px);
+  background: var(--sl-color-primary, #177f37);
   color: #fff;
   cursor: pointer;
   transition: background 0.15s;
 }
-.sl-gh-import__prompt-copy:hover { background: #1d4ed8; }
+/* v1.6.32:原 hover 是遗留的旧主色蓝 #2B36A8,改深一档绿 */
+.sl-gh-import__prompt-copy:hover { background: #12652B; }
 .sl-gh-import__prompt-copy.is-copied {
   background: #ecfdf5;
   color: #065f46;
@@ -831,13 +1404,13 @@
   flex-basis: 100%;
   margin: 0;
   font-size: 11.5px;
-  color: var(--sl-color-text-dim, #9ca3af);
+  color: var(--sl-color-text-dim, #9aa0a8);
   line-height: 1.5;
 }
 
 .sl-gh-import__format {
   margin-top: 12px;
-  border-top: 1px dashed var(--sl-color-border, #e5e7eb);
+  border-top: 1px solid var(--sl-color-hair, rgba(17, 18, 20, 0.14));
   padding-top: 8px;
 }
 .sl-gh-import__format-head {
@@ -851,26 +1424,26 @@
   font-size: 12px;
   border: none;
   background: transparent;
-  color: var(--sl-color-text-secondary, #6b7280);
+  color: var(--sl-color-text-secondary, #5c6169);
   cursor: pointer;
   padding: 4px 0;
 }
-.sl-gh-import__format-toggle:hover { color: var(--sl-color-primary, #2563eb); }
+.sl-gh-import__format-toggle:hover { color: var(--sl-color-ink, #111214); }
 .sl-gh-import__format-copy {
   font: inherit;
   font-size: 12px;
   padding: 4px 10px;
   background: transparent;
-  border: 1px solid var(--sl-color-border, #e5e7eb);
-  border-radius: 6px;
-  color: var(--sl-color-text-secondary, #6b7280);
+  border: 1px solid var(--sl-color-border, rgba(17, 18, 20, 0.24));
+  border-radius: var(--sl-gh-radius-ctl, 3px);
+  color: var(--sl-color-text-secondary, #5c6169);
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 .sl-gh-import__format-copy:hover {
-  background: var(--sl-color-surface-alt, #f3f4f6);
-  border-color: var(--sl-color-primary, #2563eb);
-  color: var(--sl-color-primary, #2563eb);
+  background: rgba(17, 18, 20, 0.04);
+  border-color: var(--sl-color-ink, #111214);
+  color: var(--sl-color-ink, #111214);
 }
 .sl-gh-import__format-copy.is-copied {
   background: #ecfdf5;
@@ -880,8 +1453,8 @@
 }
 .sl-gh-import__format-body {
   margin-top: 8px;
-  background: var(--sl-color-surface-alt, #f3f4f6);
-  border-radius: 6px;
+  background: rgba(17, 18, 20, 0.04);
+  border-radius: 0;
   padding: 10px;
   max-height: 260px;
   overflow-y: auto;
@@ -892,22 +1465,22 @@
   font-size: 11.5px;
   line-height: 1.55;
   white-space: pre-wrap;
-  color: var(--sl-color-text-secondary, #6b7280);
+  color: var(--sl-color-text-secondary, #5c6169);
 }
 
 .sl-gh-import__result {
   margin-top: 10px;
-  font-size: 12.5px;
+  font-size: 12px;
   color: #065f46;
   background: #ecfdf5;
-  border-radius: 6px;
+  border-radius: 0;
   padding: 8px 10px;
   line-height: 1.5;
 }
 .sl-gh-import__result-warn {
   margin-top: 2px;
   font-size: 12px;
-  color: #d97706;
+  color: var(--sl-color-text-secondary, #5c6169);
 }
 
 .sl-gh-import__actions {
@@ -917,102 +1490,533 @@
   gap: 8px;
 }
 
-/* ===== 展示视图 ===== */
+/* ===== 展示视图 =====
+   v1.6.32 区块化:不用卡片,区块之间用黑规则线切分,横向 gutter 与顶栏对齐(22px)。 */
 .sl-gh-display {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 16px;
+  gap: 0;
+  /* v1.6.37:底部呼吸改为视口自适应(矮屏 32 → 16),给内容让位 */
+  padding: 0 22px clamp(16px, 3vh, 32px);
   min-width: 0;
+  /* v1.6.37:min-height:0 让内部表格容器能被压缩 —— flex 子项默认
+     min-height:auto(按内容高)会顶破视口,表格就吃不到剩余空间了。 */
+  min-height: 0;
 }
+/* 展示页工具栏(v1.6.3):左 tab(表格/图表)+ 右工具按钮(导出 PDF)。 */
 .sl-gh-dtoolbar {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 0;
+  flex: none; /* v1.6.37:固定区块不参与压缩,余量全部留给表格 */
 }
+/* 统计:印刷式分栏 —— 无卡片,竖发丝线分列,底部一条黑规则线收口 */
 .sl-gh-dstats {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
+  gap: 0;
+  padding: var(--sl-gh-vpad, 18px) 0;
+  border-bottom: 1px solid var(--sl-color-rule, rgba(17, 18, 20, 0.42));
+  flex: none; /* v1.6.37:固定区块不参与压缩 */
 }
 .sl-gh-dstat {
-  padding: 12px 16px;
-  background: var(--sl-color-surface, #fff);
-  border: 1px solid var(--sl-color-border, #e5e7eb);
-  border-radius: 8px;
+  padding: 0 0 0 18px;
+  background: transparent;
+  border: none;
+  border-left: 1px solid var(--sl-color-hair, rgba(17, 18, 20, 0.14));
+  border-radius: 0;
+  box-shadow: none;
+}
+.sl-gh-dstat:first-child {
+  border-left: none;
+  padding-left: 0;
 }
 .sl-gh-dstat b {
   display: block;
-  font-size: 22px;
-  line-height: 1.2;
-  color: var(--sl-color-text, #1f2328);
+  font-size: 26px;
+  line-height: 1.1;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  color: var(--sl-color-text, #15171a);
+}
+/* 全页唯一的绿数字:第一个统计(项目总数)—— 4 处绿配额之一 */
+.sl-gh-dstat:first-child b {
+  color: var(--sl-color-primary, #177f37);
 }
 .sl-gh-dstat span {
-  font-size: 12px;
-  color: var(--sl-color-text-secondary, #6b7280);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--sl-color-text-tertiary, #9aa0a8);
 }
+/* 图表区:两块并排,中间一条竖发丝线;底部黑规则线收口 */
 .sl-gh-dcharts {
   display: grid;
   grid-template-columns: 1.6fr 1fr;
-  gap: 10px;
+  gap: 0;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--sl-color-rule, rgba(17, 18, 20, 0.42));
+  flex: none; /* v1.6.37:固定区块不参与压缩(图表 canvas 是等轴内容) */
 }
 .sl-gh-dchart {
-  background: var(--sl-color-surface, #fff);
-  border: 1px solid var(--sl-color-border, #e5e7eb);
-  border-radius: 8px;
-  padding: 10px 12px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
   min-width: 0;
 }
+.sl-gh-dchart + .sl-gh-dchart {
+  border-left: 1px solid var(--sl-color-hair, rgba(17, 18, 20, 0.14));
+  padding-left: 18px;
+}
 .sl-gh-dchart__title {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--sl-color-text-secondary, #6b7280);
-  margin-bottom: 4px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--sl-color-text-secondary, #5c6169);
+  margin-bottom: 14px;
 }
 .sl-gh-dchart__canvas {
   width: 100%;
-  height: 220px;
+  /* v1.6.37:固定 220px → 视口自适应(clamp 150–220)
+     —— 矮屏把高度让出来,图表 tab 与热力图一起塞进一屏 */
+  height: var(--sl-gh-chart-h, 220px);
 }
 
-/* 展示表格:只读、吸顶表头、斑马纹 */
-.sl-gh-dtable-wrap {
+/* ── 提交统计热力图(v1.6.21):GitHub 主页同款贡献格子,嵌在「图表」tab
+   底部与「表格」tab 顶部。v1.6.32 墨线:去卡片改区块,标题走大写小标签;
+   热力图四阶绿保留(数据语义 + 4 处绿配额之一)。 */
+.sl-gh-gstat {
+  padding: var(--sl-gh-vpad, 16px) 0;
+  border-bottom: 1px solid var(--sl-color-rule, rgba(17, 18, 20, 0.42));
   overflow-x: auto;
-  border: 1px solid var(--sl-color-border, #e5e7eb);
-  border-radius: 8px;
-  background: var(--sl-color-surface, #fff);
+  flex: none; /* v1.6.37:固定区块不参与压缩(热力图是 53×7 等轴格子) */
 }
-.sl-gh-dtable {
+.sl-gh-gstat__head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.sl-gh-gstat__title {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--sl-color-text-secondary, #5c6169);
+  white-space: nowrap;
+}
+.sl-gh-gstat__title b {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--sl-color-text, #15171a);
+}
+/* 统计日期标注:数据是 KV 快照,明确「统计于哪天」避免读者误以为是实时值 */
+.sl-gh-gstat__asof {
+  font-size: 10px;
+  color: var(--sl-color-text-tertiary, #9aa0a8);
+  white-space: nowrap;
+}
+.sl-gh-gstat__cover {
+  font-weight: 400;
+  font-size: 11px;
+  color: var(--sl-color-text-tertiary, #9aa0a8);
+}
+.sl-gh-gstat__note {
+  padding: 6px 0 0;
+  font-size: 11px;
+  color: var(--sl-color-text-secondary, #5c6169);
+}
+/* v1.6.40 覆盖诚实化:浅纹格的口径说明 —— 是「口径提示」而非报错,
+   贴着热力图脚注,上间距比常规 note 再紧一档。 */
+.sl-gh-gstat__note--partial {
+  padding-top: 4px;
+}
+/* v1.6.35 失败提示条目化:每仓库一行(仓库名左 · 原因右),
+   替代原先把 N 个仓库揉成一行的长句;>4 条时列表内部滚动。 */
+.sl-gh-gstat__fails {
+  margin: 2px 0 0;
+  padding: 0;
+  list-style: none;
+  max-height: 96px; /* 4 行 × ~22px + 留白 */
+  overflow-y: auto;
+}
+.sl-gh-gstat__fail {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 11px;
+  line-height: 1.4;
+}
+/* 状态点:gone 空心(需人工修链接) / retry 实心墨(可自动恢复) —— 方角贴合墨线风格 */
+.sl-gh-gstat__fail-dot {
+  flex: none;
+  width: 5px;
+  height: 5px;
+  transform: translateY(-1px);
+}
+.sl-gh-gstat__fail.is-gone .sl-gh-gstat__fail-dot {
+  box-shadow: inset 0 0 0 1px var(--sl-color-rule, rgba(17, 18, 20, 0.42));
+}
+.sl-gh-gstat__fail.is-retry .sl-gh-gstat__fail-dot {
+  background: var(--sl-color-ink, #111214);
+}
+.sl-gh-gstat__fail-repo {
+  color: var(--sl-color-text, #15171a);
+}
+.sl-gh-gstat__fail-why {
+  margin-left: auto;
+  color: var(--sl-color-text-tertiary, #9aa0a8);
+  text-align: right;
+}
+/* footer:发丝线隔开,左侧自动重试说明、右侧「立即重试」 */
+.sl-gh-gstat__fail-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  padding-top: 5px;
+  border-top: 1px solid var(--sl-color-hair-soft, rgba(17, 18, 20, 0.07));
+}
+.sl-gh-gstat__fail-hint {
+  color: var(--sl-color-text-tertiary, #9aa0a8);
+  font-size: 10.5px;
+}
+/* v1.6.34 失败提示里的「立即重试」:墨线小按钮,与提示同一行基线 */
+.sl-gh-gstat__retry {
+  font: inherit;
+  font-size: 11px;
+  line-height: 1;
+  margin-left: auto;
+  padding: 3px 8px;
+  border: 1px solid var(--sl-color-line, rgba(17, 18, 20, 0.24));
+  border-radius: var(--sl-gh-radius-ctl, 3px);
+  background: transparent;
+  color: var(--sl-color-text-secondary, #5c6169);
+  cursor: pointer;
+  vertical-align: baseline;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.sl-gh-gstat__retry:hover:not(:disabled) {
+  border-color: var(--sl-color-ink, #111214);
+  color: var(--sl-color-ink, #111214);
+  background: rgba(17, 18, 20, 0.03);
+}
+.sl-gh-gstat__retry:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* 热力图:grid 四象限布局
+   [空]      [月份标尺 53 列]
+   [星期标尺] [格子 53 列 × 7 行]
+   [连续天数/图例      跨两列]
+   v1.6.24 宽度自适应:格子列 1fr 随容器伸缩(不再固定 10px),
+   面板多宽就铺多宽,格子用 aspect-ratio 保持正方形。
+   v1.6.26 撤掉 898px 上限:宽面板下格子允许大于 16px,完全铺满;
+   想恢复"格子封顶"可在宿主重声明 --sl-gh-heat-grid-max。 */
+.sl-gh-heat {
+  --sl-gh-heat-gap: 3px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto;
   width: 100%;
+  min-width: 0;
+}
+/* 月份标尺:与格子网格同列宽同列距,标签超宽自然溢出(GitHub 同款观感) */
+.sl-gh-heat__months {
+  grid-column: 2;
+  grid-row: 1;
+  display: grid;
+  grid-template-columns: repeat(53, minmax(0, 1fr));
+  gap: var(--sl-gh-heat-gap);
+  margin-bottom: 3px;
+  font-size: 10px;
+  line-height: 1;
+  color: var(--sl-color-text-secondary, #5c6169);
+}
+.sl-gh-heat__months span {
+  white-space: nowrap;
+  overflow: visible;
+}
+/* 星期标尺:行结构与格子网格逐行对齐(行 1 = 周日 … 行 7 = 周六),
+   只标一/三/五三行(GitHub 同款)。行高 1fr 拉伸,与格子行(内容撑开)
+   逐行等高对齐。 */
+.sl-gh-heat__weekdays {
+  grid-column: 1;
+  grid-row: 2;
+  display: grid;
+  grid-template-rows: repeat(7, 1fr);
+  row-gap: var(--sl-gh-heat-gap);
+  align-self: stretch;
+  margin-right: 5px;
+  font-size: 9px;
+  color: var(--sl-color-text-tertiary, #9aa0a8);
+}
+.sl-gh-heat__weekdays span {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  line-height: 1;
+}
+/* 格子网格:显式 53 列(v1.6.24)。注意不能用 grid-auto-flow:column +
+   grid-auto-columns:1fr —— Chrome 对隐式轨道的 fr 分配有 bug(全部塌成
+   min-content),必须显式 repeat(53, minmax(0,1fr)) + 逐格 gridColumn/gridRow;
+   行由格子内容(aspect-ratio 正方形)撑开 */
+.sl-gh-heat__grid {
+  grid-column: 2;
+  grid-row: 2;
+  display: grid;
+  grid-template-columns: repeat(53, minmax(0, 1fr));
+  gap: var(--sl-gh-heat-gap);
+}
+.sl-gh-heat__cell {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  border-radius: 3px;
+  /* level 0 = 无提交(墨线:冷中性空格,不用带绿的灰) */
+  background: #EDEFF2;
+  /* v1.6.38:骨架(is-ph)与数据(is-lN)同构、DOM 节点被 React 复用,
+     加背景色过渡让「灰格→绿格」渐变而不是瞬变;续期逐仓库点亮同理。
+     只过渡 background-color:不涉及布局/尺寸,371 格整片重绘无性能问题。 */
+  transition: background-color 0.45s ease;
+}
+.sl-gh-heat__cell.is-empty {
+  /* 快照日之后的未来格子:留空不画 */
+  background: transparent;
+}
+/* GitHub 官方贡献图四阶绿(v1.6.29):#9be9a8 → #40c463 → #30a14e → #216e39 */
+.sl-gh-heat__cell.is-l1 { background: #9BE9A8; }
+.sl-gh-heat__cell.is-l2 { background: #40C463; }
+.sl-gh-heat__cell.is-l3 { background: #30A14E; }
+.sl-gh-heat__cell.is-l4 { background: #216E39; }
+
+.sl-gh-heat__foot {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--sl-color-text-secondary, #5c6169);
+}
+.sl-gh-heat__streaks {
+  white-space: nowrap;
+}
+.sl-gh-heat__legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+.sl-gh-heat__legend .sl-gh-heat__cell {
+  /* 图例小方格固定尺寸,不跟随主图格子伸缩(width:100% 会塌缩) */
+  width: 11px;
+  height: 11px;
+  aspect-ratio: auto;
+  flex: none;
+  border-radius: 3px;
+}
+/* v1.6.36 占位骨架格子:空态/加载态与数据态同构渲染(等高不浮动),
+   用比空格(#EDEFF2)更浅一档的灰,弱化成背景纹理 */
+.sl-gh-heat__cell.is-ph {
+  background: #F0F1F4;
+}
+/* v1.6.40 覆盖诚实化:某些仓库的数据停在旧快照日,那几天它们的 days 键缺席、
+   被 `?? 0` 画成 0(事实是「不知道」)。叠一层 45° 浅斜纹标出「这段不全」——
+   底色不动,提交量信息不丢,只多一个「口径不全」的纹理提示。
+   ⚠ 必须排在 .is-l1..l4 之后:那几条用的是 background 简写(会顺带把
+   background-image 重置为 none),只能靠声明顺序让斜纹叠在底色之上;本条只设
+   background-image,底色仍由 .is-lN / 基类提供。 */
+.sl-gh-heat__cell.is-partial {
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent 0 3px,
+    rgba(17, 18, 20, 0.12) 3px 4.5px
+  );
+}
+
+
+/* 展示表格:只读、吸顶表头、斑马纹;表头 30px/12px/800,行 35px/12px */
+.sl-gh-dtable-wrap {
+  /* v1.6.37:与编辑视图 .sl-gh-table 同步 —— 固定高(560px)→ flex:1 吃
+     展示视图里热力图/工具栏/分页条之外的剩余高度,恰好填满一屏。
+     行少时占满整块、行多时内滚,thead/tfoot sticky 不受影响。
+     想恢复定高:给 root 写 --sl-gh-dtable-h,下面的 max-height 会接管。
+     横向滚动条的"够得着"问题由 .sl-gh-dhscroll 的自绘条继续承担,
+     纵向条出现时 wrap clientWidth 变窄,ResizeObserver 会自动重同步 thumb。 */
+  overflow-x: auto;
+  flex: 1 1 auto;
+  /* 160px 兜底:矮屏放不下热力图+分页条时表格不再继续塌陷,root 回退整页滚动 */
+  min-height: 160px;
+  max-height: var(--sl-gh-dtable-h, none);
+  overflow-y: auto;
+  /* 零卡片(v1.6.32):透明底,下沿一条黑规则线收口 */
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--sl-color-rule, rgba(17, 18, 20, 0.42));
+  border-radius: 0;
+  box-shadow: none;
+  /* 滚动条(v1.6.13):纵向自绘 12px。横向(v1.6.15)改由 .sl-gh-dhscroll 自绘
+     DOM 常显 —— ::-webkit-scrollbar 在新版 Chrome(Win11 Fluent overlay)下被
+     忽略(实测厚度 2px),原生横向条真机隐形,height:0 防它在经典渲染环境
+     (headless/旧版)里和自绘条叠出两条。同样不能声明
+     scrollbar-width/scrollbar-color,否则 ::-webkit-scrollbar 被禁用。 */
+}
+.sl-gh-dtable-wrap::-webkit-scrollbar { width: 12px; height: 0; }
+.sl-gh-dtable-wrap::-webkit-scrollbar-track {
+  background: var(--sl-color-scrollbar-track, rgba(17, 18, 20, 0.04));
+  border-top: 1px solid var(--sl-color-border, rgba(17, 18, 20, 0.24));
+}
+.sl-gh-dtable-wrap::-webkit-scrollbar-thumb {
+  background: var(--sl-color-scrollbar-thumb, #9aa0a8);
+  border: 3px solid var(--sl-color-scrollbar-track, rgba(17, 18, 20, 0.04));
+  border-radius: 0;
+}
+.sl-gh-dtable-wrap::-webkit-scrollbar-thumb:hover { background: var(--sl-color-text-secondary, #5c6169); }
+/* 自绘横向滚动条(v1.6.15):DOM 元素,不依赖任何原生滚动条机制。
+   动机:表格常比视口高,原生横滚条落在 wrap 底缘 —— 屏幕外;叠加 Win11
+   Chrome Fluent overlay 忽略 webkit 伪元素,真机连"滚动时闪现"都没有。
+   v1.6.16:position:sticky bottom:0 —— 表格高于视口时拇指条吸在视口底缘,
+   滚到表格底才落回自然位置;高度行为零改动(不用 max-height 压表格)。
+   sticky 的滚动基准是 .sl-gh-root(中间无 overflow 容器,已核)。
+   视觉与 .sl-gh-table 的自绘规格一致(12px / 轨道 rgba(17, 18, 20, 0.04) / 拇指 #9aa0a8)。 */
+.sl-gh-dhscroll {
+  position: sticky;
+  bottom: 0;
+  /* sticky 元素同时是 thumb(absolute)的包含块 */
+  z-index: 5;
+  height: 12px;
+  background: var(--sl-color-scrollbar-track, rgba(17, 18, 20, 0.04));
+  border: 1px solid var(--sl-color-border, rgba(17, 18, 20, 0.24));
+  border-top: none;
+  border-radius: 0;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  flex: none; /* v1.6.37:自绘横滚条恒定 12px,不参与 flex 压缩 */
+}
+.sl-gh-dhscroll__thumb {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  background: var(--sl-color-scrollbar-thumb, #9aa0a8);
+  border-radius: 0;
+  cursor: grab;
+  touch-action: none;
+}
+.sl-gh-dhscroll__thumb:active { cursor: grabbing; }
+.sl-gh-dhscroll__thumb:hover { background: var(--sl-color-text-secondary, #5c6169); }
+.sl-gh-dtable {
+  /* width 必须是定值(0 即可)才能激活 fixed 布局:width:auto 时浏览器退回
+     auto 布局算法,col 指定宽度被无视,拖拽 col.style.width 完全无效(实测)。
+     width:0 → fixed 算法取 max(0, 列宽总和) = 列宽总和,列宽精确生效;
+     min-width 双下限(v1.6.12):
+       - 100% 保底占满容器,差额由无宽度的"弹性列"(最后一个可拖列)吸收;
+       - fixed-sum + flex-min:固定列宽总和 + 弹性列下限(80px,与
+         useColumnResize.minWidth / DisplayView.MIN_COL_W 一致)。
+         fixed 布局下无宽度的 col 没有下限,容器不够时会把它压到 0 ——
+         此时表格总宽恰好 = 固定列之和,overflow 只剩几 px,表现为
+         "最后一列内容没了却几乎拉不出滚动条"。加这条下限后容器不足
+         就老老实实溢出,由 wrap 出滚动条(v1.6.12 修)。
+     总宽超出容器时,由 .sl-gh-dhscroll 自绘吸底滚动条承接横向滚动
+     (v1.6.16),列宽互不影响。 */
+  width: 0;
+  min-width: max(100%, calc(var(--sl-gh-fixed-sum, 0px) + 80px));
   border-collapse: collapse;
-  font-size: 13px;
-  min-width: 640px;
+  /* fixed 布局(v1.6.4):th/col 宽度决定列宽,不被 td 内容牵制 —— 拖拽实时生效。 */
+  table-layout: fixed;
+  font-size: 12px;
+}
+/* fixed 布局下,内容超出列宽会溢出换行/裁形 —— 需显式裁剪;
+   且要让「关键字列」的内容(链接/长文本)以省略号呈现而不是把列撑破 */
+.sl-gh-dtable td {
+  padding: 0 12px;
+  height: 44px;
+  line-height: 1.4;
+  /* 横:发丝线 / 纵:列分割线(与编辑表格同一套线值) */
+  border-bottom: 1px solid var(--sl-color-hair-soft, rgba(17, 18, 20, 0.07));
+  border-right: 1px solid var(--sl-color-col, rgba(17, 18, 20, 0.10));
+  vertical-align: middle;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* v1.6.17 行高锁定:td 的 height 在表格布局里是"最小高度",pre-wrap 长文本
+   折行会把行撑高 —— 拖窄列行就变高,违反「拖拽只改宽度」。内容一律装进
+   .sl-gh-dcell,块级 + max-height 裁剪在 2 行行边界(12px × 1.4 × 2),
+   行高恒为 44px,与列宽彻底解耦。
+   不用 -webkit-line-clamp:它要求 display:-webkit-box,会把 RichText 拆出的
+   行内片段(文本 span + 链接 a)逐个竖排,毁掉混排流。 */
+.sl-gh-dcell {
+  display: block;
+  max-height: 2.8em;
+  overflow: hidden;
+}
+/* 文本列(亮点/启发/自定义)pre-wrap:保留作者手写的换行(如 1./2./3. 分点),
+   超长自动折行;超长单词断行。折行高度由 .sl-gh-dcell 钳住(v1.6.17 起
+   拖拽只改列宽,行高不变)。 */
+.sl-gh-dtable td.sl-gh-dtext {
+  white-space: pre-wrap;
+  word-break: break-word;
+  vertical-align: top;
 }
 .sl-gh-dtable th {
   position: sticky;
   top: 0;
   z-index: 1;
-  background: var(--sl-color-surface-alt, #fafafa);
-  color: var(--sl-color-text-secondary, #6b7280);
-  font-size: 12px;
-  font-weight: 600;
-  text-align: left;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--sl-color-border, #e5e7eb);
+  /* 表头纸白底 + 下沿黑规则线:行从底下滚过时被遮住 */
+  background: var(--sl-color-surface, #fff);
+  color: var(--sl-color-text-secondary, #5c6169);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: center;
+  padding: 0 12px;
+  height: 36px;
+  line-height: 1;
+  border-bottom: 1px solid var(--sl-color-rule, rgba(17, 18, 20, 0.42));
+  /* 列分割线(v1.6.3):th/td 右缘竖线;表头比行内重(.24 vs .10),
+     末列除外,避免与 wrap 边框贴出双线 */
+  border-right: 1px solid var(--sl-color-line, rgba(17, 18, 20, 0.24));
   white-space: nowrap;
+  box-sizing: border-box;
+  /* sticky 本身就是定位基准(absolute 手柄的包含块) */
 }
-.sl-gh-dtable td {
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--sl-color-border, #e5e7eb);
-  vertical-align: top;
-}
-.sl-gh-dtable tbody tr:nth-child(even) { background: var(--sl-color-surface-alt, #fafafa); }
-.sl-gh-dtable tbody tr:hover { background: rgba(37, 99, 235, 0.04); }
+.sl-gh-dtable th:last-child,
+.sl-gh-dtable td:last-child { border-right: none; }
+/* 墨线 hover:绿 5% 淡染(柠黄叠冷灰会发浑,已弃用) */
+.sl-gh-dtable tbody tr:hover { background: rgba(23, 127, 55, 0.05); }
 .sl-gh-dtable tbody tr:last-child td { border-bottom: none; }
-.sl-gh-dname { font-weight: 600; }
-.sl-gh-dtext {
-  white-space: pre-wrap;
-  word-break: break-word;
+
+/* 合计行(v1.6.0):数字列右对齐求和;v1.6.26 sticky 钉在 wrap 滚动口底缘,
+   行多时合计始终可见(行少未出滚动时 no-op) */
+.sl-gh-dtable tfoot td {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  background: var(--sl-color-surface, #fff);
+  border-top: 1px solid var(--sl-color-rule, rgba(17, 18, 20, 0.42));
+  border-bottom: none;
+  font-weight: 600;
+  height: 40px;
 }
+.sl-gh-dname { font-weight: 600; }
 /* 多选标签(展示视图) */
 .sl-gh-dtags {
   display: inline-flex;
@@ -1021,25 +2025,29 @@
 }
 .sl-gh-dtag {
   display: inline-block;
-  font-size: 12px;
-  padding: 1px 9px;
-  border: 1px solid #dbe3ee;
-  border-radius: 999px;
-  background: #f3f6fb;
-  color: #374151;
+  font-size: 11px;
+  padding: 1px 8px;
+  border: 1px solid var(--sl-color-hair, rgba(17, 18, 20, 0.14));
+  border-radius: 0;
+  background: transparent;
+  color: var(--sl-color-text-secondary, #5c6169);
   white-space: nowrap;
 }
+/* 链接:墨线里链接不再是绿色(绿只留 4 处配额),黑字 + hover 下划线 */
 .sl-gh-dlink {
-  color: var(--sl-color-primary, #2563eb);
+  color: var(--sl-color-text, #15171a);
+  font-weight: 600;
   text-decoration: none;
   word-break: break-all;
 }
 .sl-gh-dlink:hover { text-decoration: underline; }
-.sl-gh-dim { color: var(--sl-color-text-dim, #9ca3af); }
+.sl-gh-dim { color: var(--sl-color-text-tertiary, #9aa0a8); }
 .sl-gh-dsort {
   font: inherit;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: inherit;
   background: transparent;
   border: none;
@@ -1049,15 +2057,29 @@
   align-items: center;
   gap: 3px;
 }
-.sl-gh-dsort:hover { color: var(--sl-color-primary, #2563eb); }
+.sl-gh-dsort:hover { color: var(--sl-color-ink, #111214); }
 .sl-gh-dsort__arrow { font-size: 11px; }
 
-/* 移动端:列收窄 */
+/* 移动端:列收窄 —— JSX 已用 buildGridTemplate(columns) 把每列 width 写成 inline style,
+   inline 优先级高于任何媒体查询,所以这里只调外边距、搜索框宽度与图表布局。 */
 @media (max-width: 768px) {
-  .sl-gh-table {
-    grid-template-columns: 240px 130px 1fr 1fr 130px repeat(var(--sl-gh-custom-cols, 0), 130px) 36px;
-  }
+  .sl-gh-table { margin: 12px 14px 0; }
+  .sl-gh-table + .sl-gh-pagination { margin: 0 14px; }
+  .sl-gh-display { padding: 0 14px 24px; }
+  .sl-gh-topbar { padding: 11px 14px; }
+  .sl-gh-foot { padding: 10px 14px; }
   .sl-gh-search { width: 160px; }
   .sl-gh-dstats { grid-template-columns: repeat(2, 1fr); }
+  /* 两列时纸面分栏的竖线会错位(第一行第 2 个、第二行第 1 个的 border-left),
+     行间距改用上边距承载 */
+  .sl-gh-dstat { padding-top: 12px; }
+  .sl-gh-dstat:nth-child(2n + 1) { border-left: none; padding-left: 0; }
   .sl-gh-dcharts { grid-template-columns: 1fr; }
+  .sl-gh-dchart + .sl-gh-dchart {
+    border-left: none;
+    padding-left: 0;
+    border-top: 1px solid var(--sl-color-hair, rgba(17, 18, 20, 0.14));
+    padding-top: 14px;
+    margin-top: 14px;
+  }
 }

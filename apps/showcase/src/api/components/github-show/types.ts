@@ -13,9 +13,30 @@
 //     渲染链接,可写说明,可修改可清空;旧数据读取时自动迁移
 //   - v1.4.0:自定义列新增 number(数字)类型,展示页按数字列排序可快速控制展示
 //     顺序;每列新增 hiddenInDisplay —— 控制该列是否在展示页显示(默认显示)
+//   - v1.5.0:列宽可拖拽 —— 顶层 widths: Record<columnId, px> 持久化列宽。
+//     5 个内建列有稳定 id(BUILTIN_COLUMN_IDS),自定义列沿用 c.id。
+//     旧文档迁移时 widths 默认空,fallback 到 CSS 默认列宽,无回归。
 //   - 整个文档序列化成一个 JSON blob,存单个 KV key('github-show')
 
 export type GithubShowColumnType = 'text' | 'multi-select' | 'number';
+
+/**
+ * 5 个内建列的稳定 id。设计要点:
+ * - 字段名(repoUrl/name/highlights/insights/output)与 GithubShowRow 字段名一致,
+ *   这样 future 重命名时所有引用点会一起改,减少"id 失效而代码不报错"的隐患。
+ * - 用 `__builtin_` 前缀避免与用户创建的自定义列 id 撞名(自定义列 id 由
+ *   `useGithubShow` 的 `freshId()` 生成,8 字符 base36,不太可能撞)。
+ * - 用 `as const` 让下游 switch/lookup 享受字面量类型推断。
+ */
+export const BUILTIN_COLUMN_IDS = {
+  repoUrl: '__builtin_repoUrl',
+  name: '__builtin_name',
+  highlights: '__builtin_highlights',
+  insights: '__builtin_insights',
+  output: '__builtin_output',
+} as const;
+
+export type BuiltinColumnId = (typeof BUILTIN_COLUMN_IDS)[keyof typeof BUILTIN_COLUMN_IDS];
 
 export interface GithubShowColumn {
   id: string;
@@ -46,12 +67,31 @@ export interface GithubShowRow {
 
 export interface GithubShowDoc {
   meta: {
-    schemaVersion: '1.4.0';
+    schemaVersion: '1.5.0';
     createdAt: number;
     updatedAt: number;
     authorEmail: string;
   };
   /** 用户扩展的自定义列(内建列固定,不在此列) */
+  columns: GithubShowColumn[];
+  rows: GithubShowRow[];
+  /**
+   * 列宽持久化(像素值)。key = 列稳定 id(BUILTIN_COLUMN_IDS.* 或自定义列 c.id);
+   * value = CSS px 数字。无值时 fallback 到 CSS 默认列宽(详见 index.css grid-template-columns)。
+   * 1fr 列(亮点/启发)不持久化:它们本就是自适应剩余空间,钉死会破坏响应式。
+   * 删除自定义列时同步 delete widths[colId](见 useGithubShow.deleteColumn)。
+   */
+  widths: Record<string, number>;
+}
+
+/** v1.4.0 旧文档形状 —— 仅用于迁移读取(无 widths)。 */
+export interface GithubShowDocV140 {
+  meta: {
+    schemaVersion: '1.4.0';
+    createdAt: number;
+    updatedAt: number;
+    authorEmail: string;
+  };
   columns: GithubShowColumn[];
   rows: GithubShowRow[];
 }
@@ -107,38 +147,54 @@ export interface GithubShowDocV100 {
   rows: Array<Omit<GithubShowRow, 'output' | 'values'>>;
 }
 
-/** 把 v1.3.0 旧文档升级到 v1.4.0:自定义列补 hiddenInDisplay:false。 */
+/** 把 v1.4.0 旧文档升级到 v1.5.0:顶层补 widths(默认空,沿用 CSS 默认列宽)。 */
+export function migrateDocV140(old: GithubShowDocV140): GithubShowDoc {
+  return {
+    meta: {
+      ...old.meta,
+      schemaVersion: '1.5.0',
+      updatedAt: Date.now(),
+    },
+    columns: old.columns,
+    rows: old.rows,
+    widths: {},
+  };
+}
+
+/** 把 v1.3.0 旧文档升级到 v1.5.0:自定义列补 hiddenInDisplay:false + 顶层补 widths。 */
 export function migrateDocV130(old: GithubShowDocV130): GithubShowDoc {
   return {
     meta: {
       ...old.meta,
-      schemaVersion: '1.4.0',
+      schemaVersion: '1.5.0',
       updatedAt: Date.now(),
     },
     columns: old.columns.map((c) => ({ ...c, hiddenInDisplay: false })),
     rows: old.rows,
+    widths: {},
   };
 }
 
-/** 把 v1.2.0 旧文档升级到 v1.4.0:demoUrl 字段更名为 output + 列补 hiddenInDisplay。 */
+/** 把 v1.2.0 旧文档升级到 v1.5.0:demoUrl 字段更名为 output + 列补 hiddenInDisplay + widths。 */
 export function migrateDocV120(old: GithubShowDocV120): GithubShowDoc {
   return {
     meta: {
       ...old.meta,
-      schemaVersion: '1.4.0',
+      schemaVersion: '1.5.0',
       updatedAt: Date.now(),
     },
     columns: old.columns.map((c) => ({ ...c, hiddenInDisplay: false })),
     rows: old.rows.map(({ demoUrl, ...rest }) => ({ ...rest, output: demoUrl })),
+    widths: {},
   };
 }
 
-/** 把 v1.1.0 旧文档升级到 v1.4.0:link 列收敛为 text + demoUrl 更名为 output。 */
+/** 把 v1.1.0 旧文档升级到 v1.5.0:link 列收敛为 text + demoUrl 更名为 output + widths。 */
 export function migrateDocV110(old: GithubShowDocV110): GithubShowDoc {
   return {
     meta: {
       ...old.meta,
-      schemaVersion: '1.4.0',
+      schemaVersion: '1.5.0',
       updatedAt: Date.now(),
     },
     columns: old.columns.map((c) => ({
@@ -147,15 +203,16 @@ export function migrateDocV110(old: GithubShowDocV110): GithubShowDoc {
       hiddenInDisplay: false,
     })),
     rows: old.rows.map(({ demoUrl, ...rest }) => ({ ...rest, output: demoUrl })),
+    widths: {},
   };
 }
 
-/** 把 v1.0.0 旧文档升级到 v1.4.0:补 output / values / columns。 */
+/** 把 v1.0.0 旧文档升级到 v1.5.0:补 output / values / columns / widths。 */
 export function migrateDocV100(old: GithubShowDocV100): GithubShowDoc {
   return {
     meta: {
       ...old.meta,
-      schemaVersion: '1.4.0',
+      schemaVersion: '1.5.0',
       updatedAt: Date.now(),
     },
     columns: [],
@@ -164,6 +221,7 @@ export function migrateDocV100(old: GithubShowDocV100): GithubShowDoc {
       output: '',
       values: {},
     })),
+    widths: {},
   };
 }
 
@@ -171,12 +229,13 @@ export function migrateDocV100(old: GithubShowDocV100): GithubShowDoc {
 export function emptyDoc(authorEmail = '', now = Date.now()): GithubShowDoc {
   return {
     meta: {
-      schemaVersion: '1.4.0',
+      schemaVersion: '1.5.0',
       createdAt: now,
       updatedAt: now,
       authorEmail,
     },
     columns: [],
     rows: [],
+    widths: {},
   };
 }

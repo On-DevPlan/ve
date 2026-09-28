@@ -244,6 +244,26 @@ export function useGithubShow() {
     [mutate, publicParams],
   );
 
+  /** 拖拽落点(v1.6.30):把 id 行移动到 toIdx(按「原始数组」下标语义,由调用方
+   *  按上/下沿插入方向换算好传入;内部先摘除再插入,越界钳制)。随保存同步。 */
+  const moveRowTo = useCallback(
+    (id: string, toIdx: number) => {
+      if (publicParams) return;
+      const now = Date.now();
+      mutate((prev) => {
+        const from = prev.rows.findIndex((r) => r.id === id);
+        if (from < 0) return prev;
+        const target = Math.max(0, Math.min(prev.rows.length - 1, toIdx));
+        if (target === from) return prev;
+        const rows = prev.rows.slice();
+        const [moved] = rows.splice(from, 1);
+        rows.splice(target, 0, moved);
+        return { ...prev, meta: { ...prev.meta, updatedAt: now }, rows };
+      });
+    },
+    [mutate, publicParams],
+  );
+
   // ── 自定义列 ──────────────────────────────────────────
 
   const addColumn = useCallback(
@@ -299,15 +319,39 @@ export function useGithubShow() {
     (colId: string) => {
       if (publicParams) return;
       const now = Date.now();
+      mutate((prev) => {
+        const widths = { ...prev.widths };
+        // 同步清宽度:防止删除自定义列后 widths 里残留孤儿键,下次 doc 落盘会一直带着
+        delete widths[colId];
+        return {
+          ...prev,
+          meta: { ...prev.meta, updatedAt: now },
+          columns: prev.columns.filter((c) => c.id !== colId),
+          rows: prev.rows.map((r) => {
+            const values = { ...r.values };
+            delete values[colId];
+            return { ...r, values, updatedAt: now };
+          }),
+          widths,
+        };
+      });
+    },
+    [mutate, publicParams],
+  );
+
+  /**
+   * 持久化某列宽(像素)。colId 用稳定 id(BUILTIN_COLUMN_IDS.* 或自定义列 c.id)。
+   * 公开分享模式不允许修改(守卫吞掉;展示页公开模式的拖拽是会话级存 ref,不经过这里)。
+   * v1.6.7:亮点/启发也参与固定宽度策略,放开旧守卫。
+   */
+  const setColumnWidth = useCallback(
+    (colId: string, width: number) => {
+      if (publicParams) return;
+      const now = Date.now();
       mutate((prev) => ({
         ...prev,
         meta: { ...prev.meta, updatedAt: now },
-        columns: prev.columns.filter((c) => c.id !== colId),
-        rows: prev.rows.map((r) => {
-          const values = { ...r.values };
-          delete values[colId];
-          return { ...r, values, updatedAt: now };
-        }),
+        widths: { ...prev.widths, [colId]: Math.round(width) },
       }));
     },
     [mutate, publicParams],
@@ -428,16 +472,19 @@ export function useGithubShow() {
     shareUrl,
     rows: doc.rows,
     columns: doc.columns,
+    widths: doc.widths,
     addRow,
     updateRow,
     deleteRow,
     moveRow,
+    moveRowTo,
     addColumn,
     renameColumn,
     deleteColumn,
     toggleColumnVisibility,
     setCellValue,
     importProjects,
+    setColumnWidth,
     retrySave,
   };
 }
