@@ -23,8 +23,7 @@ dist-ssr
 *.sln
 *.sw?
 
-# Docker
-.dockerignore
+# Docker / tooling
 .playwright-mcp
 
 # OMC tooling
