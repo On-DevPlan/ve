@@ -81,22 +81,22 @@ function tagsCell(raw: string): string {
 const PRINT_CSS = `
 @page { size: A4; margin: 16mm 14mm; }
 * { box-sizing: border-box; }
-body { font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; color: #15171a; font-size: 12px; line-height: 1.55; margin: 0; }
+body { font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; color: #1f2328; font-size: 12px; line-height: 1.55; margin: 0; }
 h1 { font-size: 20px; margin: 0 0 4px; }
-.meta { color: #5c6169; font-size: 11px; margin-bottom: 14px; }
-.stats { display: flex; gap: 28px; margin-bottom: 14px; padding: 10px 0; background: transparent; border: none; border-top: 1px solid rgba(17, 18, 20, 0.42); border-bottom: 1px solid rgba(17, 18, 20, 0.42); border-radius: 0; }
+.meta { color: #6b7280; font-size: 11px; margin-bottom: 14px; }
+.stats { display: flex; gap: 28px; margin-bottom: 14px; padding: 12px 16px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; }
 .stat b { display: block; font-size: 20px; }
-.stat span { font-size: 11px; color: #5c6169; }
-.chart { width: 100%; max-height: 280px; object-fit: contain; border: 1px solid rgba(17, 18, 20, 0.24); border-radius: 0; margin-bottom: 14px; }
+.stat span { font-size: 11px; color: #6b7280; }
+.chart { width: 100%; max-height: 280px; object-fit: contain; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 14px; }
 table { width: 100%; border-collapse: collapse; }
-th, td { border: 1px solid rgba(17, 18, 20, 0.24); padding: 7px 9px; vertical-align: top; text-align: left; }
-th { background: #f4f5f7; font-size: 11px; font-weight: 700; color: #15171a; white-space: nowrap; }
+th, td { border: 1px solid #e5e7eb; padding: 7px 9px; vertical-align: top; text-align: left; }
+th { background: #f9fafb; font-size: 11px; font-weight: 600; color: #374151; white-space: nowrap; }
 td.name { min-width: 96px; font-weight: 600; }
-a { color: #15171a; text-decoration: underline; word-break: break-all; }
-.dim { color: #9aa0a8; }
-.ptag { display: inline-block; margin: 1px 4px 1px 0; padding: 1px 8px; border: 1px solid rgba(17, 18, 20, 0.14); border-radius: 0; background: transparent; color: #5c6169; font-size: 11px; }
+a { color: #2563eb; text-decoration: none; word-break: break-all; }
+.dim { color: #9ca3af; }
+.ptag { display: inline-block; margin: 1px 4px 1px 0; padding: 1px 8px; border: 1px solid #dbe3ee; border-radius: 999px; background: #f3f6fb; color: #374151; font-size: 11px; }
 tr { break-inside: avoid; }
-.footer { margin-top: 16px; font-size: 10px; color: #9aa0a8; text-align: right; }
+.footer { margin-top: 16px; font-size: 10px; color: #9ca3af; text-align: right; }
 `;
 
 export function buildPrintParts(options: PrintDocOptions): PrintDocParts {

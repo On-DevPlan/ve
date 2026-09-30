@@ -2,7 +2,7 @@
 
 GitHub 项目展示数据库 —— Notion/Feishu 式表格,给面试官看项目介绍与开发启发(减少用人成本)。
 
-## 功能(v1.6.0)
+## 功能(v1.4.0)
 
 - **双视图**:编辑视图(维护数据)/ 展示视图(给面试官看),顶栏一键切换,记忆上次选择
 - **数据库表格**:第一列 GitHub 链接,后续列:项目名 / 亮点 / 启发 / 产出(可选文本列)+ 自定义列,全部内联可编辑
@@ -22,13 +22,6 @@ GitHub 项目展示数据库 —— Notion/Feishu 式表格,给面试官看项�
 - **游客降级**:未登录时数据保存在本机 localStorage,登录后无缝接管
 - **公开分享 URL**(2026-09 起):URL 带 `?groupId=N[&key=...]` 时进入只读分享模式,任何人(匿名)都能看别人公开的 github-show,详情见下文
 - **删除两步确认**:`×` → `?` → 删除,避免误删
-- **列宽可拖拽(v1.5.0)**:编辑视图与展示视图的每个表头(亮点/启发自适应列与操作列除外)右侧 6px 透明 hover 区,鼠标拖动调节该列宽;两视图共享同一份列宽;松手后 600ms 内 debounce 持久化到 doc;最小 80px,超出容器时表格自动横向滚动
-- **细滚动条(v1.5.0)**:横向滚动条变细到 6px(Firefox + webkit 双支持)
-- **底部合计行(v1.6.0)**:存在数字自定义列时,表格底部自动对数字列求和(千分位 + 2 位小数);编辑/展示双视图一致;合计范围 = 当前筛选/排序后的全部行
-- **分页(v1.6.0)**:10/20/50/100 条每页,页码省略号 + 跳转指定页;新增行自动跳到末页;搜索/排序变更回第 1 页
-- **中后台视觉风格(v1.6.0)**:浅灰页面背景 + 白色直角卡片容器;展示视图行高 44px、去斑马纹、hover 淡蓝(编辑视图保持 35px 密度)
-- **全直角(v1.6.11)**:所有交互件 / 卡片 / 弹窗 / 导出 PDF 统一 `border-radius: 0`,不再有圆角(含图表柱子);新增样式请勿再引入圆角
-- **按钮 3px 微圆角(v1.6.43)**:唯一的圆角例外 —— 可按的按钮(`.sl-gh-btn` / 页码 / 连体切换组 / 各弹窗小按钮)统一 `border-radius: var(--sl-gh-radius-ctl, 3px)`;连体切换组只圆最外两侧、中缝保持直角。输入框 / 卡片 / 弹窗 / 标签 / 热力图格子以外的元素仍保持直角。**导出 PDF 同步从主按钮绿降为次级墨线按钮**(展示页的绿只留给数据本身:项目总数 / 热力图 / 图表主序列)
 
 ## 公开分享 URL(v1.3.0+)
 
@@ -129,7 +122,7 @@ TOML,适合手工整理仓库清单的场景)。
 公开分享模式(URL 带 `?groupId=`)下导入按钮与弹窗整体隐藏,`importProjects` 内部再兜底
 返回只读错误(双保险)。
 
-## 数据模型(v1.5.0)
+## 数据模型(v1.4.0)
 
 ```ts
 interface GithubShowColumn {
@@ -139,11 +132,6 @@ interface GithubShowColumn {
   createdAt: number;
   hiddenInDisplay: boolean; // 是否在展示页隐藏(编辑页始终显示);默认 false
 }
-
-// 5 个内建列的稳定 id(列宽持久化与未来重命名迁移靠这些 id):
-//   __builtin_repoUrl | __builtin_name | __builtin_highlights |
-//   __builtin_insights | __builtin_output
-// 自定义列用 c.id。
 
 interface GithubShowRow {
   id: string;
@@ -158,11 +146,9 @@ interface GithubShowRow {
 }
 ```
 
-整份 `GithubShowDoc { meta, columns[], rows[], widths }` 序列化为一个 JSON,存 `kvV1` 单 key(模型二
+整份 `GithubShowDoc { meta, columns[], rows[] }` 序列化为一个 JSON,存 `kvV1` 单 key(模型二
 single-blob,不传 groupId,后端走 caller default_group_id),与 shortcut-library / color-studio
-同范式。`widths: Record<columnId, px>` 持久化列宽(5 个内建列用 `__builtin_*` id,自定义
-列用 `c.id`)。旧文档读取时自动迁移:v1.4.0 补 `widths: {}`;
-v1.3.0 补 `hiddenInDisplay:false`;
+同范式。旧文档读取时自动迁移:v1.3.0 补 `hiddenInDisplay:false`;
 v1.2.0 的 `demoUrl` 字段更名为 `output`(线上地址列 → 产出列);
 v1.1.0 的 link 列收敛为 text(自动渲染 http 等价);v1.0.0 补 output / values / columns。
 行顺序即 `rows` 数组序,编辑模式上移 / 下移后随保存同步;展示页可按数字列排序快速调整浏览顺序。

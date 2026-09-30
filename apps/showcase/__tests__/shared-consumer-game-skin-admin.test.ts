@@ -135,17 +135,6 @@ describe('game-skin-admin 四个选文件点的形态分工', () => {
     }
   });
 
-  // 网格 tile 换 SharedMount 后，尺寸类留在外壳上；内层 .sl-file-drop--tile 是
-  // 外壳的 flex item，宽度收缩到内容 —— 缺封面时无 img、hint 走 absolute 脱流，
-  // 内层会塌成 1×1（真实浏览器实测 198×198 外壳里内层 rect = 1×1），整格点击区
-  // 消失，「缺封面」的格子反而点不了，首次上传死锁。有封面时 img 给了内层内在
-  // 尺寸，恰好掩盖这条塌缩 —— 所以锁死「内层必须显式撑满外壳」。
-  it('网格 tile 内层共享 tile 显式撑满外壳（防 1×1 塌缩）', () => {
-    const css = read('packages/vue-components/src/game-skin-admin/index.vue');
-    expect(css).toContain('.csa-piece__tile > .sl-file-drop--tile');
-    expect(css).toContain('.csa-up__tile > .sl-file-drop--tile');
-  });
-
   // `.sl-csa button` (0,1,1) 压过共享的 `.sl-file-drop__btn` (0,1,0)：它会让 button /
   // bare 形态被擦成一行裸文字（本轮之前两个弹窗就是这样，改成 zone 后框内没有 button，
   // 天然躲开）。但它**不能**照 user-space 那样加 `:not([class*="sl-file-drop"])` ——

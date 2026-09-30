@@ -61,7 +61,5 @@ apps/showcase/vite.config.ts.timestamp-*.mjs
 # drift from the registry it is derived from.
 nginx/api-locations/
 apps/showcase/temp/
-.workbuddy/
 
-# 本地样式预览产物（真实浏览器截图 + 风格试验 html），只在开发机存在
-style-preview/
+.workbuddy/

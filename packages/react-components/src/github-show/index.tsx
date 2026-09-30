@@ -83,42 +83,31 @@ export default function GithubShow() {
     [store.rows, query],
   );
 
-  // ── 编辑视图分页(v1.6.0):状态提升到这里,顶栏「添加项目」加行后也能跳末页 ──
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-  // 搜索词变化 → 回第 1 页(过滤结果全变了,留在原页多半是空白)
-  useEffect(() => {
-    setPage(1);
-  }, [query]);
-
   function handleAddRow(partial?: Partial<Pick<GithubShowRow, 'repoUrl' | 'name' | 'highlights' | 'insights' | 'output'>>) {
     const row = store.addRow(partial);
-    if (row) {
-      setFocusRowId(row.id);
-      // 新行 append 在尾部 → 跳到包含它的末页
-      setPage(Math.max(1, Math.ceil((store.rows.length + 1) / pageSize)));
-    }
+    if (row) setFocusRowId(row.id);
   }
 
   const hasAnyRows = store.rows.length > 0;
 
   return (
     <div className="sl-gh-root">
+      {/* 公开分享模式顶部 banner —— 只读状态指示 + 「我也要分享」链接。
+          该 banner 只在 store.readOnly=true 时挂载(URL 带 groupId 参数)。 */}
+      {store.readOnly && store.publicParams && (
+        <PublicShareBanner
+          key={store.publicParams.key}
+          keyName={store.publicParams.key}
+          groupId={store.publicParams.groupId}
+        />
+      )}
+
       <header className="sl-gh-topbar">
         <div className="sl-gh-topbar__left">
           <span className="sl-gh-title">GitHub 项目数据库</span>
           <span className="sl-gh-meta">{store.rows.length} 个项目</span>
         </div>
         <div className="sl-gh-topbar__right">
-          {/* 公开分享模式:banner 并入顶栏右侧 —— 只读状态 + 复制链接 + 我也要分享,
-              一个横条完成指示与跳转,不再单独占一行 */}
-          {store.readOnly && store.publicParams && (
-            <PublicShareBanner
-              key={store.publicParams.key}
-              keyName={store.publicParams.key}
-              groupId={store.publicParams.groupId}
-            />
-          )}
           {/* 公开模式下隐藏视图切换 —— 强制 display,不让用户以为能编辑 */}
           {!store.readOnly && (
             <div className="sl-gh-viewswitch" role="tablist" aria-label="视图切换">
@@ -212,14 +201,7 @@ export default function GithubShow() {
           </p>
         </div>
       ) : view === 'display' ? (
-        <DisplayView
-          doc={store.doc}
-          widths={store.widths}
-          readOnly={store.readOnly}
-          publicParams={store.publicParams}
-          onSetColumnWidth={store.setColumnWidth}
-          onGoEdit={() => setView('edit')}
-        />
+        <DisplayView doc={store.doc} onGoEdit={() => setView('edit')} />
       ) : !hasAnyRows ? (
         <div className="sl-gh-empty">
           <h2 className="sl-gh-empty__title">还没有项目</h2>
@@ -256,23 +238,12 @@ export default function GithubShow() {
         <GithubShowTable
           rows={filtered}
           columns={store.columns}
-          widths={store.widths}
-          readOnly={store.readOnly}
-          onSetColumnWidth={store.setColumnWidth}
           focusRowId={focusRowId}
           onAddRow={() => handleAddRow()}
           onUpdateRow={store.updateRow}
           onDeleteRow={store.deleteRow}
           onMoveRow={store.moveRow}
-          onMoveRowTo={store.moveRowTo}
           onSetCellValue={store.setCellValue}
-          page={page}
-          pageSize={pageSize}
-          onPageChange={setPage}
-          onPageSizeChange={(n) => {
-            setPageSize(n);
-            setPage(1);
-          }}
         />
       )}
 

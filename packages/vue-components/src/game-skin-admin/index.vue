@@ -738,17 +738,6 @@ const gameCount = Object.values(GAME_SKIN_REGISTRY).filter((g) => !g.hiddenInGam
   color: var(--csa-success);
   font-weight: 600;
 }
-/* 内层共享 tile 撑满外壳。尺寸类（aspect-ratio:1 的方格）在 SharedMount 外壳上，
-   内层 .sl-file-drop--tile 只是外壳的 flex item，宽度收缩到内容 —— 缺封面时
-   无 img、hint 又走 absolute 脱流，内层会塌成 1×1（真实浏览器实测 198×198 外壳
-   里内层 rect = 1×1），整格点击区消失，「缺封面」的格子反而点不了，首次上传死锁；
-   有封面时 img 给了内层内在尺寸，恰好掩盖塌缩。显式 100%×100% 是共享层
-   ../README.md 的分工：格子尺寸由消费方定，(0,3,0) 压过 .sl-file-drop--tile 的 (0,1,0)。 */
-.sl-csa .csa-piece__tile > .sl-file-drop--tile,
-.sl-csa .csa-up__tile > .sl-file-drop--tile {
-  width: 100%;
-  height: 100%;
-}
 .sl-csa .csa-up__key {
   display: block;
   margin-top: 5px;

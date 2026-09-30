@@ -8,7 +8,7 @@ export default {
   name: 'GithubShow',
   title: 'GitHub 项目展示',
   description: 'Notion 式数据库表格:记录 GitHub 项目链接、亮点与开发启发;支持文本/多选列扩展,编辑/展示双视图,展示视图带统计图表与 PDF 下载。',
-  version: '1.6.0',
+  version: '1.3.0',
   framework: 'react',
   entry: './index.tsx',
   platform: 'both',
