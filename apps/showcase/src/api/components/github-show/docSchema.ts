@@ -1,11 +1,18 @@
 // apps/showcase/src/api/components/github-show/docSchema.ts
 //
-// Zod 校验 GithubShowDoc 的 load / save 边界 + v1.0.0 ~ v1.3.0 → v1.4.0 迁移。
+// Zod 校验 GithubShowDoc 的 load / save 边界 + v1.0.0 ~ v1.4.0 → v1.5.0 迁移。
 // 防止 KV 里读到脏数据(手改 / 旧版本 / 部分写入)时把 UI 打崩。
 
 import { z } from 'zod';
 import type { GithubShowDoc } from './types';
-import { emptyDoc, migrateDocV100, migrateDocV110, migrateDocV120, migrateDocV130 } from './types';
+import {
+  emptyDoc,
+  migrateDocV100,
+  migrateDocV110,
+  migrateDocV120,
+  migrateDocV130,
+  migrateDocV140,
+} from './types';
 
 const rowSchema = z.object({
   id: z.string().min(1),
@@ -27,6 +34,21 @@ const columnSchema = z.object({
   hiddenInDisplay: z.boolean(),
 });
 
+/** v1.5.0 当前形态:顶层 widths: Record<columnId, px>。
+ *  用 .default({}) 兼容外部手填漏字段的场景(老 1.5 doc 缺 widths 时不会炸)。 */
+const docV150Schema = z.object({
+  meta: z.object({
+    schemaVersion: z.literal('1.5.0'),
+    createdAt: z.number(),
+    updatedAt: z.number(),
+    authorEmail: z.string(),
+  }),
+  columns: z.array(columnSchema),
+  rows: z.array(rowSchema),
+  widths: z.record(z.string(), z.number()).default({}),
+});
+
+/** v1.4.0 输入校验:无 widths(升级时由 migrateDocV140 补 {} 默认值)。 */
 const docV140Schema = z.object({
   meta: z.object({
     schemaVersion: z.literal('1.4.0'),
@@ -108,16 +130,20 @@ const docV100Schema = z.object({
 
 /**
  * 解析 + 迁移一个未知的 KV 值。
- * - 合法 v1.4.0 → 原样返回
- * - 合法 v1.3.0 → 迁移到 v1.4.0(列补 hiddenInDisplay:false)
- * - 合法 v1.2.0 → 迁移到 v1.4.0(demoUrl 更名为 output + 列补 hiddenInDisplay)
- * - 合法 v1.1.0 → 迁移到 v1.4.0(link 列收敛为 text + demoUrl → output)
- * - 合法 v1.0.0 → 迁移到 v1.4.0(补 output / values / columns)
+ * - 合法 v1.5.0 → 原样返回(widths 缺省时 Zod .default({}) 兜底)
+ * - 合法 v1.4.0 → 迁移到 v1.5.0(顶层补 widths: {})
+ * - 合法 v1.3.0 → 迁移到 v1.5.0(列补 hiddenInDisplay:false + widths)
+ * - 合法 v1.2.0 → 迁移到 v1.5.0(demoUrl 更名为 output + 列补 hiddenInDisplay + widths)
+ * - 合法 v1.1.0 → 迁移到 v1.5.0(link 列收敛为 text + demoUrl → output + widths)
+ * - 合法 v1.0.0 → 迁移到 v1.5.0(补 output / values / columns / widths)
  * - 其它(脏数据 / 非 JSON)→ 空文档兜底,不抛异常
  */
 export function parseDoc(raw: unknown): GithubShowDoc {
+  const v15 = docV150Schema.safeParse(raw);
+  if (v15.success) return v15.data;
+
   const v14 = docV140Schema.safeParse(raw);
-  if (v14.success) return v14.data;
+  if (v14.success) return migrateDocV140(v14.data);
 
   const v13 = docV130Schema.safeParse(raw);
   if (v13.success) return migrateDocV130(v13.data);
