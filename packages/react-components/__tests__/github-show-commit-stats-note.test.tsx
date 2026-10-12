@@ -50,6 +50,11 @@ const { fetchMock, statsBlob } = vi.hoisted(() => {
           error: '仓库不存在、已改名或已转为私有,请检查链接',
           reason: 'gone',
         },
+        // v1.6.45:配额耗尽的批量失败(用来验证「>3 条收起成一行汇总」)
+        'rl/one': { ok: false, full: 'rl/one', attemptedAt: now - 60_000, error: '匿名配额已用尽', reason: 'rate-limit' },
+        'rl/two': { ok: false, full: 'rl/two', attemptedAt: now - 60_000, error: '匿名配额已用尽', reason: 'rate-limit' },
+        'rl/three': { ok: false, full: 'rl/three', attemptedAt: now - 60_000, error: '匿名配额已用尽', reason: 'rate-limit' },
+        'rl/four': { ok: false, full: 'rl/four', attemptedAt: now - 60_000, error: '匿名配额已用尽', reason: 'rate-limit' },
       },
     },
   };
@@ -88,6 +93,21 @@ const doc: GithubShowDoc = {
   columns: [],
 };
 
+// v1.6.45:7 行里 6 个失败(1 网络 + 1 链接无效 + 4 配额)—— 超过阈值,应折叠。
+const docMany: GithubShowDoc = {
+  version: 1,
+  rows: ['ok/repo', 'net/repo', 'gone/repo', 'rl/one', 'rl/two', 'rl/three', 'rl/four'].map((full, i) => ({
+    id: `m${i}`,
+    repoUrl: `https://github.com/${full}`,
+    name: full,
+    highlights: '',
+    insights: '',
+    output: '',
+    values: {},
+  })),
+  columns: [],
+};
+
 let container: HTMLDivElement;
 let root: Root;
 
@@ -108,6 +128,17 @@ afterEach(() => {
 async function mount(): Promise<HTMLElement> {
   await act(async () => {
     root.render(<CommitStats doc={doc} publicParams={null} />);
+  });
+  await act(async () => {
+    await Promise.resolve();
+  });
+  return container;
+}
+
+/** v1.6.45:用指定文档挂载(折叠阈值要换一份「失败更多」的输入)。 */
+async function mountDoc(d: GithubShowDoc): Promise<HTMLElement> {
+  await act(async () => {
+    root.render(<CommitStats doc={d} publicParams={null} />);
   });
   await act(async () => {
     await Promise.resolve();
@@ -156,5 +187,36 @@ describe('CommitStats 失败提示(v1.6.34)', () => {
 
     const called = fetchMock.mock.calls.map((c) => c[0]);
     expect(called.sort()).toEqual(['gone/repo', 'net/repo']);
+  });
+
+  // v1.6.45:失败一多只留一行汇总,明细收进默认关闭的 <details>
+  it('失败 >3:显示一行汇总(数量 + 原因分布),明细默认收起', async () => {
+    const el = await mountDoc(docMany);
+
+    const sum = el.querySelector('.sl-gh-gstat__failsum')?.textContent ?? '';
+    expect(sum).toContain('6 个仓库未统计');
+    expect(sum).toContain('1 个链接无效');
+    expect(sum).toContain('1 个网络连接失败');
+    expect(sum).toContain('4 个匿名配额已用尽');
+
+    const box = el.querySelector<HTMLDetailsElement>('details.sl-gh-gstat__failbox');
+    expect(box).not.toBeNull();
+    expect(box!.open).toBe(false); // 收起 = 不占高度
+
+    // 明细仍在 DOM(展开即见),v1.6.34 的「点名仓库 + 原因」契约没丢
+    expect(box!.textContent).toContain('net/repo');
+    expect(box!.textContent).toContain('gone/repo');
+    expect(box!.textContent).toContain('匿名配额已用尽');
+  });
+
+  it('失败 ≤3:同样收成一行汇总(默认关闭),不直接展开占高', async () => {
+    const el = await mount();
+    const box = el.querySelector<HTMLDetailsElement>('details.sl-gh-gstat__failbox');
+    expect(box).not.toBeNull();
+    expect(box!.open).toBe(false);
+    expect(el.querySelector('.sl-gh-gstat__failsum-lead')?.textContent).toContain('2 个仓库未统计');
+    // 明细仍在 DOM
+    expect(box!.querySelector('.sl-gh-gstat__fails')).not.toBeNull();
+    expect(box!.textContent).toContain('net/repo');
   });
 });

@@ -48,13 +48,13 @@ interface SortState {
   dir: 1 | -1;
 }
 
-// 墨线色板(v1.6.32):全页只有黑白灰 + 4 处绿 ——
+// 墨线色板(v1.6.32)+ v1.6.46 柔和激活态:
 //   主序列用绿(唯一强调),次序列转中性灰(原柠黄点缀已移除),
-//   环形图主体走墨色(与设计稿「墨线·列格」一致),网格/空档用冷灰。
+//   环形图主体改深灰(告别纯黑色块),网格/空档用冷灰。
 const PRIMARY = '#177F37';
 const SECONDARY = '#B9BFC7';
 const MUTED = '#EEF0F3';
-const INK = '#111214';
+const INK = '#3A3F45';
 
 /** 列最小渲染宽(px),与 useColumnResize 的 minWidth 一致 */
 const MIN_COL_W = 80;
@@ -422,8 +422,8 @@ export default function DisplayView(props: DisplayViewProps) {
             },
             yAxis: { type: 'value' as const, name: '字符数', nameTextStyle: { fontSize: 10 }, axisLabel: { fontSize: 10 } },
             series: [
-              { name: '亮点', type: 'bar' as const, data: chartData.map((d) => d.highlightsChars), itemStyle: { color: PRIMARY, borderRadius: [0, 0, 0, 0] }, barMaxWidth: 16 },
-              { name: '启发', type: 'bar' as const, data: chartData.map((d) => d.insightsChars), itemStyle: { color: SECONDARY, borderRadius: [0, 0, 0, 0] }, barMaxWidth: 16 },
+              { name: '亮点', type: 'bar' as const, data: chartData.map((d) => d.highlightsChars), itemStyle: { color: PRIMARY, borderRadius: [3, 3, 0, 0] }, barMaxWidth: 16 },
+              { name: '启发', type: 'bar' as const, data: chartData.map((d) => d.insightsChars), itemStyle: { color: SECONDARY, borderRadius: [3, 3, 0, 0] }, barMaxWidth: 16 },
             ],
           },
     [chartData],
@@ -620,8 +620,9 @@ export default function DisplayView(props: DisplayViewProps) {
         </>
       ) : (
         <>
-          {/* v1.6.19 提交统计表(表格 tab 顶部) */}
-          <CommitStats doc={doc} publicParams={publicParams ?? null} />
+          {/* v1.6.19 提交统计表(表格 tab 顶部);v1.6.44 改左右两卡片 ——
+              左热力图(限宽 ⇒ 整块变矮)/ 右文字统计,把高度让给下面的表格 */}
+          <CommitStats doc={doc} publicParams={publicParams ?? null} variant="split" />
           <div className="sl-gh-dtable-wrap" ref={wrapRef} onScroll={syncHscroll}>
         <table
           className="sl-gh-dtable"
@@ -685,12 +686,12 @@ export default function DisplayView(props: DisplayViewProps) {
           <tbody>
             {pageRows.map((row) => (
               <tr key={row.id}>
-                <td>
+                <td className="sl-gh-dtext">
                   <div className="sl-gh-dcell">
                     <RepoLink url={row.repoUrl} name="" />
                   </div>
                 </td>
-                <td className="sl-gh-dname">
+                <td className="sl-gh-dname sl-gh-dtext">
                   <div className="sl-gh-dcell">{row.name || '—'}</div>
                 </td>
                 <td className="sl-gh-dtext">
@@ -699,7 +700,7 @@ export default function DisplayView(props: DisplayViewProps) {
                 <td className="sl-gh-dtext">
                   <div className="sl-gh-dcell">{row.insights || <span className="sl-gh-dim">—</span>}</div>
                 </td>
-                <td>
+                <td className="sl-gh-dtext">
                   <div className="sl-gh-dcell">
                     {row.output ? <RichText value={row.output} /> : <span className="sl-gh-dim">—</span>}
                   </div>

@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>github-show 圆角方案原型 · v1.6.46-candidate</title>
+<style>
+/* ============================================================
+   github-show「去硬」圆角方案原型
+   基线:v1.6.45 墨线版式(对照 http://localhost:5183/components/github-show?groupId=24)
+   原型只动「形状」一个维度 —— 颜色 / 线档 / 间距 / 字号全部沿用真实 token。
+   ============================================================ */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --ink: #111214;
+  --text: #15171a;
+  --text-2: #5c6169;
+  --text-3: #9aa0a8;
+  --primary: #177F37;
+  --rule: rgba(17,18,20,.42);
+  --line: rgba(17,18,20,.24);
+  --hair: rgba(17,18,20,.14);
+  --hair-soft: rgba(17,18,20,.10);
+  --col: rgba(17,18,20,.14);
+  --surface: #fff;
+  --surface-alt: #F4F5F7;
+  --surface-muted: #FAFAFB;
+}
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", sans-serif;
+  font-size: 14px; line-height: 1.5; color: var(--text);
+  background: #EDEEF0; padding: 28px 20px 60px;
+  -webkit-font-smoothing: antialiased;
+}
+/* ============================================================
+   纯黑实心块用量(solid)三档 —— 与圆角方案正交的第二个维度
+   ink  : 现状。激活态 = 黑底白字,hover = 黑底反白,环形图深色 = 纯黑
+   soft : 柔化。实心块改浅灰底深字,黑只留在线条上;环形图深色 → 深灰
+   none : 去色块。激活态完全透明 + 内描边墨线 + 字加粗;环形图 → 中性灰
+   ============================================================ */
+body[data-solid="ink"]  { --solid-bg: var(--ink); --solid-fg: #fff; --solid-bd: var(--ink); --solid-shadow: none; --ring: #111214; }
+body[data-solid="soft"] { --solid-bg: #E9EBEE; --solid-fg: var(--text); --solid-bd: var(--line); --solid-shadow: none; --ring: #3A3F45; }
+body[data-solid="none"] { --solid-bg: transparent; --solid-fg: var(--text); --solid-bd: transparent; --solid-shadow: inset 0 0 0 1px var(--ink); --ring: #555B63; }
+.wrap { max-width: 1240px; margin: 0 auto; }
+
+/* ===== 原型自己的说明层(非组件复刻) ===== */
+.proto-head { margin-bottom: 18px; }
+.proto-head h1 { font-size: 18px; font-weight: 700; letter-spacing: .02em; }
+.proto-head p { font-size: 12.5px; color: var(--text-2); margin-top: 4px; }
+.proto-head code { font-size: 11.5px; background: #fff; border: 1px solid var(--hair); border-radius: 4px; padding: 1px 6px; }
+
+/* 方案切换器 */
+.scheme-bar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: #fff; border: 1px solid var(--hair); border-radius: 10px;
+  padding: 12px 14px; margin: 14px 0 0;
+}
+.solid-bar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: #fff; border: 1px solid var(--hair);
+  border-radius: 10px; padding: 12px 14px; margin-top: 10px;
+}
+.scheme-bar__label { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--text-2); margin-right: 2px; }
+.scheme-btn {
+  font: inherit; font-size: 12px; padding: 6px 14px; cursor: pointer;
+  border: 1px solid var(--line); background: #fff; color: var(--text-2); border-radius: 6px;
+  transition: all .15s;
+}
+.scheme-btn:hover { border-color: #3A4046; color: var(--text); }
+.scheme-btn.is-active { background: #3A4046; border-color: #3A4046; color: #fff; font-weight: 600; }
+.scheme-btn b { font-weight: inherit; }
+.scheme-desc { font-size: 11.5px; color: var(--text-3); margin-left: 4px; }
+
+/* 自定义滑杆 */
+.custom-row { display: none; gap: 22px; flex-wrap: wrap; align-items: center; padding: 4px 14px 12px; }
+.custom-row.is-show { display: flex; }
+.custom-row label { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-2); }
+.custom-row input[type=range] { width: 110px; accent-color: var(--primary); }
+.custom-row .val { font-variant-numeric: tabular-nums; font-size: 12px; color: var(--ink); font-weight: 600; min-width: 34px; }
+.custom-row .chk { display: flex; align-items: center; gap: 6px; }
+.custom-row input[type=checkbox] { accent-color: var(--primary); }
+
+/* ============================================================
+   组件复刻区 —— 形状全部由 --r-* 驱动
+   ============================================================ */
+.page {
+  background: var(--surface);
+  border: 1px solid var(--hair);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(17,18,20,.06);
+}
+
+/* ---- 顶栏 ---- */
+.gh-topbar {
+  position: relative; display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; padding: 12px 22px; border-bottom: 1px solid var(--rule); flex-wrap: wrap;
+  background: rgba(255,255,255,.8);
+}
+.gh-topbar__left { display: flex; align-items: baseline; gap: 8px; }
+.gh-title { font-size: 14px; font-weight: 700; letter-spacing: .04em; white-space: nowrap; }
+.gh-meta { font-size: 11.5px; letter-spacing: .04em; color: var(--text-3); white-space: nowrap; }
+.gh-topbar__right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* ---- 按钮(值随 --r-ctl) ---- */
+.gh-btn {
+  font: inherit; font-size: 11.5px; line-height: 1; height: 28px; padding: 0 12px;
+  border: 1px solid var(--rule); border-radius: var(--r-ctl, 4px);
+  cursor: pointer; background: transparent; color: var(--text);
+  letter-spacing: .04em; display: inline-flex; align-items: center; justify-content: center;
+  transition: background .12s, border-color .12s, color .12s; white-space: nowrap;
+}
+.gh-btn:hover { background: var(--solid-bg); border-color: var(--solid-bd); color: var(--solid-fg); box-shadow: var(--solid-shadow); }
+.gh-btn--primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+.gh-btn--primary:hover { background: #12652B; border-color: #12652B; color: #fff; box-shadow: none; }
+
+/* ---- pill / chip ---- */
+.gh-pill {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 11px; letter-spacing: .04em;
+  padding: 3px 8px; border-radius: var(--r-ctl, 4px); background: transparent;
+  color: var(--text-2); border: 1px solid var(--hair); white-space: nowrap;
+}
+.gh-pill--ok { color: var(--primary); }
+.gh-chip {
+  display: inline-flex; align-items: center; font-size: 11px; padding: 2px 9px;
+  border: 1px solid var(--line); border-radius: 999px; color: var(--text-2); background: var(--surface-muted);
+}
+
+/* ---- 连体视图切换(外角随 --r-tab) ---- */
+.gh-viewswitch { display: inline-flex; }
+.gh-viewswitch__btn {
+  font: inherit; font-size: 11.5px; line-height: 1; height: 28px; padding: 0 14px;
+  border: 1px solid var(--rule); border-radius: 0; background: transparent;
+  color: var(--text-2); letter-spacing: .06em; text-transform: uppercase; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; transition: all .15s;
+}
+.gh-viewswitch__btn + .gh-viewswitch__btn { margin-left: -1px; }
+.gh-viewswitch__btn:first-child { border-top-left-radius: var(--r-tab, 4px); border-bottom-left-radius: var(--r-tab, 4px); }
+.gh-viewswitch__btn:last-child { border-top-right-radius: var(--r-tab, 4px); border-bottom-right-radius: var(--r-tab, 4px); }
+.gh-viewswitch__btn:hover { background: rgba(17,18,20,.05); color: var(--ink); }
+.gh-viewswitch__btn.is-active {
+  background: var(--solid-bg); border-color: var(--solid-bd); color: var(--solid-fg);
+  font-weight: 600; box-shadow: var(--solid-shadow);
+}
+
+/* ---- 展示视图主体 ---- */
+.gh-display { padding: 0 22px 24px; }
+.gh-dtoolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; }
+
+/* ---- 统计区:卡片 vs 发丝线分栏,由 data-card 开关 ---- */
+.gh-gstat { display: grid; grid-template-columns: minmax(0, 700px) minmax(0, 1fr); align-items: start; padding: 4px 0 14px; }
+.gh-gstat__heatcard { min-width: 0; padding: 14px 18px; border-radius: var(--r-card, 0px); }
+.gh-gstat__textcard { min-width: 0; padding: 14px 18px; border-radius: var(--r-card, 0px); }
+/* 卡片关(当前/A):透明底 + 竖发丝线分栏 —— 贴近现状 */
+.page[data-card="off"] .gh-gstat__heatcard,
+.page[data-card="off"] .gh-gstat__textcard { background: transparent; border: none; }
+.page[data-card="off"] .gh-gstat__textcard { border-left: 1px solid var(--hair); }
+/* 卡片开(B/C):淡底 + hair 边 + 圆角 —— 版面获得「面」的柔软感 */
+.page[data-card="on"] .gh-gstat__heatcard,
+.page[data-card="on"] .gh-gstat__textcard { background: var(--surface-muted); border: 1px solid var(--hair); }
+.page[data-card="on"] .gh-gstat { gap: 16px; }
+.gh-gstat__title { font-size: 10.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--text-2); white-space: nowrap; }
+.gh-gstat__texttitle { font-size: 10.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--text-2); margin-bottom: 10px; }
+.gh-heat { display: grid; grid-template-columns: repeat(53, 1fr); gap: 2px; margin-top: 10px; }
+.gh-heat i { display: block; aspect-ratio: 1; border-radius: var(--r-xs, 4px); }
+.gh-heat-legend { display: flex; align-items: center; gap: 4px; margin-top: 8px; font-size: 10.5px; color: var(--text-3); }
+.gh-heat-legend i { width: 10px; height: 10px; border-radius: var(--r-xs, 4px); display: inline-block; }
+.gh-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 2px 24px; }
+.gh-fact { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 6px 0 5px; border-bottom: 1px solid var(--hair-soft); }
+.gh-fact dt { font-size: 11px; letter-spacing: .04em; color: var(--text-3); white-space: nowrap; }
+.gh-fact dd { display: flex; align-items: baseline; gap: 3px; font-variant-numeric: tabular-nums; }
+.gh-fact dd b { font-size: 18px; font-weight: 600; line-height: 1.1; letter-spacing: -.01em; color: var(--text); }
+.gh-fact dd i { font-style: normal; font-size: 11px; color: var(--text-3); }
+
+/* ---- 表格(容器圆角随 --r-panel) ---- */
+.gh-tablewrap {
+  border-radius: var(--r-panel, 0px);
+  border: 1px solid var(--panel-bd, transparent);
+  overflow: hidden;
+}
+.page[data-card="on"] .gh-tablewrap { --panel-bd: var(--hair); }
+.gh-table { display: grid; grid-template-columns: 240px 150px 1fr 170px 80px; }
+.gh-th {
+  font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--text-2); background: var(--surface);
+  border-bottom: 1px solid var(--rule); border-right: 1px solid var(--line);
+  padding: 0 12px; height: 30px; line-height: 1; display: flex; align-items: center; white-space: nowrap;
+}
+.gh-th:last-child { border-right: none; }
+.gh-td {
+  padding: 6px 12px; min-height: 35px; font-size: 12.5px; display: flex; align-items: center;
+  border-bottom: 1px solid var(--hair-soft); border-right: 1px solid var(--col);
+  background: #fff;
+}
+.gh-td:last-child { border-right: none; }
+.gh-tr:hover .gh-td { background: rgba(23,127,55,.05); }
+.gh-link { color: var(--text); font-weight: 600; text-decoration: none; }
+.gh-link:hover { text-decoration: underline; }
+.gh-dim { color: var(--text-3); }
+.gh-sum {
+  display: flex; align-items: center; padding: 0 12px; height: 30px;
+  font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--text-2);
+  border-top: 1px solid var(--rule); background: var(--surface);
+}
+
+/* ---- 分页 ---- */
+.gh-pagination { display: flex; align-items: center; justify-content: flex-end; gap: 6px; padding: 10px 0 0; font-size: 12px; color: var(--text-2); }
+.gh-pager {
+  min-width: 26px; height: 26px; padding: 0 6px; font-size: 12px; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--line); background: #fff; color: var(--text-2);
+  border-radius: var(--r-ctl, 4px); transition: all .12s;
+}
+.gh-pager:hover { background: var(--solid-bg); border-color: var(--solid-bd); color: var(--solid-fg); box-shadow: var(--solid-shadow); }
+.gh-pager.is-active {
+  background: var(--solid-bg); border-color: var(--solid-bd); color: var(--solid-fg);
+  font-weight: 600; box-shadow: var(--solid-shadow);
+}
+
+/* ---- 图表 tab:4 列印刷式统计 ---- */
+.gh-dstats { display: grid; grid-template-columns: repeat(4, 1fr); padding: 14px 0; border-bottom: 1px solid var(--rule); }
+.gh-dstat { padding: 0 0 0 18px; border-left: 1px solid var(--hair); border-radius: var(--r-card, 0px); }
+.gh-dstat:first-child { border-left: none; padding-left: 0; }
+.gh-dstat b { display: block; font-size: 26px; line-height: 1.1; font-weight: 600; letter-spacing: -.01em; font-variant-numeric: tabular-nums; color: var(--text); }
+.gh-dstat:first-child b { color: var(--primary); }
+.gh-dstat span { font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--text-3); }
+/* 图表区:两块并排(1.6fr:1fr),竖发丝线分隔 */
+.gh-dcharts { display: grid; grid-template-columns: 1.6fr 1fr; gap: 0; padding: 16px 0; border-bottom: 1px solid var(--rule); }
+.gh-dchart { min-width: 0; border-radius: var(--r-card, 0px); }
+.gh-dchart + .gh-dchart { border-left: 1px solid var(--hair); padding-left: 18px; }
+.gh-dchart__title { font-size: 10.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--text-2); margin-bottom: 12px; display: flex; align-items: center; gap: 14px; }
+.legend-dot { display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; letter-spacing: 0; text-transform: none; font-weight: 400; color: var(--text-2); }
+.legend-dot i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+/* 柱状图(纯 CSS):12 组双柱,柱顶圆角随 --r-xs */
+.bars { display: flex; align-items: flex-end; gap: 12px; height: 170px; border-bottom: 1px solid var(--line); padding-bottom: 0; }
+.bar-g { flex: 1; display: flex; align-items: flex-end; justify-content: center; gap: 3px; height: 100%; min-width: 0; }
+.bar { width: 9px; border-radius: var(--r-xs, 4px) var(--r-xs, 4px) 0 0; }
+.bar--hi { background: var(--primary); }
+.bar--dim { background: #C9CDD3; }
+.bars-x { display: flex; gap: 12px; margin-top: 6px; }
+.bars-x span { flex: 1; text-align: center; font-size: 9px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transform: rotate(-32deg); }
+/* 环形图 */
+.donut-row { display: flex; align-items: center; justify-content: center; gap: 18px; height: 170px; }
+.donut-legend { display: flex; flex-direction: column; gap: 6px; font-size: 11px; color: var(--text-2); }
+/* full 热力图(图表 tab):整块一段 */
+.gh-gstat--full { padding: 14px 0 0; }
+.gh-gstat--full .gh-gstat__fullhead { display: flex; align-items: baseline; gap: 6px; font-size: 12px; color: var(--text-2); margin-bottom: 10px; }
+.gh-gstat--full .gh-gstat__fullhead b { font-size: 15px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+.gh-gstat--full .gh-gstat__fullhead .tag-now { font-size: 11px; }
+.gh-gstat--full .gh-heat { --hg: 3px; }
+.gh-gstat__fullfoot { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; font-size: 11px; color: var(--text-2); }
+.gh-gstat__failsum { margin-top: 8px; font-size: 11px; color: var(--text-3); }
+/* 卡片化(B/C):图表 tab 的统计格 / 图表块 / full 热力图一并成卡 */
+.page[data-card="on"] .gh-dstats { gap: 16px; }
+.page[data-card="on"] .gh-dstat { background: var(--surface-muted); border: 1px solid var(--hair); padding: 12px 16px; }
+.page[data-card="on"] .gh-dstat:first-child { border: 1px solid var(--hair); padding-left: 16px; }
+.page[data-card="on"] .gh-dcharts { gap: 16px; }
+.page[data-card="on"] .gh-dchart { background: var(--surface-muted); border: 1px solid var(--hair); padding: 14px 16px 16px; }
+.page[data-card="on"] .gh-dchart + .gh-dchart { border: 1px solid var(--hair); padding-left: 16px; }
+.page[data-card="on"] .gh-gstat--full { background: var(--surface-muted); border: 1px solid var(--hair); border-radius: var(--r-card, 0px); padding: 14px 16px 14px; margin-top: 4px; }
+
+/* ---- 控件样本区 ---- */
+.sample-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 16px; }
+.sample-card { background: #fff; border: 1px solid var(--hair); border-radius: 10px; padding: 16px 18px; }
+.sample-card h3 { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--text-2); margin-bottom: 12px; }
+.sample-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.sample-row + .sample-row { margin-top: 10px; }
+.gh-search {
+  font: inherit; font-size: 12px; line-height: 1; height: 28px; padding: 0 10px;
+  border: none; border-bottom: 1px solid var(--rule); border-radius: 0; background: transparent;
+  color: var(--text); outline: none; width: 180px;
+}
+.gh-input {
+  font: inherit; font-size: 12.5px; height: 30px; padding: 0 10px;
+  border: 1px solid var(--line); border-radius: var(--r-ctl, 4px); background: #fff; color: var(--text); outline: none; width: 180px;
+}
+.gh-input:focus { border-color: var(--primary); }
+.gh-select {
+  font: inherit; font-size: 12.5px; height: 30px; padding: 0 8px;
+  border: 1px solid var(--line); border-radius: var(--r-ctl, 4px); background: #fff; color: var(--text); outline: none;
+}
+.gh-textarea {
+  font: inherit; font-size: 12.5px; padding: 6px 10px; width: 100%;
+  border: 1px solid var(--line); border-radius: var(--r-ctl, 4px); background: #fff; color: var(--text); outline: none; resize: vertical;
+}
+/* 弹窗缩略 */
+.gh-modal-mock { position: relative; height: 150px; background: var(--surface-alt); border-radius: 8px; overflow: hidden; }
+.gh-modal-mock__backdrop { position: absolute; inset: 0; background: rgba(15,23,42,.35); }
+.gh-modal {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
+  width: 260px; background: #fff; border-radius: var(--r-pop, 4px);
+  border: 1px solid var(--hair); box-shadow: 0 8px 30px rgba(17,18,20,.18); padding: 14px 16px;
+}
+.gh-modal h4 { font-size: 13px; font-weight: 700; margin-bottom: 8px; }
+.gh-modal p { font-size: 11.5px; color: var(--text-2); margin-bottom: 12px; }
+.gh-modal__foot { display: flex; justify-content: flex-end; gap: 8px; }
+/* 浮层气泡 */
+.gh-popover {
+  display: inline-block; margin-top: 8px; padding: 8px 12px; font-size: 11.5px; color: var(--text-2);
+  background: #fff; border: 1px solid var(--hair); border-radius: var(--r-pop, 4px);
+  box-shadow: 0 4px 16px rgba(17,18,20,.10);
+}
+
+/* ===== 对照表 ===== */
+.cmp { margin-top: 16px; background: #fff; border: 1px solid var(--hair); border-radius: 10px; overflow: hidden; }
+.cmp table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.cmp th, .cmp td { padding: 8px 14px; text-align: left; border-bottom: 1px solid var(--hair-soft); }
+.cmp th { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-2); background: var(--surface-muted); }
+.cmp td code { font-size: 11.5px; background: var(--surface-alt); border-radius: 4px; padding: 1px 6px; }
+.cmp td.num { font-variant-numeric: tabular-nums; }
+.cmp .hl { background: #f0f7f2; }
+.cmp-note { padding: 10px 14px; font-size: 12px; color: var(--text-2); }
+
+/* 标注徽标(元素右上角小字,标注当前值) */
+.tag-now { font-size: 10px; color: var(--text-3); letter-spacing: .04em; }
+</style>
+</head>
+<body data-scheme="cur" data-solid="ink">
+<div class="wrap">
+
+  <!-- ============ 说明头 ============ -->
+  <div class="proto-head">
+    <h1>github-show 圆角方案原型 <span class="tag-now">v1.6.46-candidate · 只动「形状」,不动色板与线档</span></h1>
+    <p>现状(方案「当前」)是 v1.6.45 墨线版式:控件圆 4px、版面全直角,观感偏硬。
+       以下四档把圆角从<b>控件 → 浮层 → 版面卡片 → 表格容器</b>逐级放宽;颜色 / 线档 / 间距 / 字号与真实页面
+       <code>localhost:5183/components/github-show?groupId=24</code> 完全一致,可左右对照。
+       另有一条与圆角正交的维度 <b>「实心块」</b>:控制激活态与悬停的黑底反白、环形图深色,用来减少纯黑色块。</p>
+  </div>
+
+  <!-- ============ 方案切换 ============ -->
+  <div class="scheme-bar" id="schemeBar">
+    <span class="scheme-bar__label">方案</span>
+    <button class="scheme-btn is-active" data-scheme="cur"><b>当前</b> v1.6.45</button>
+    <button class="scheme-btn" data-scheme="a"><b>A · 微圆</b> 控件 6</button>
+    <button class="scheme-btn" data-scheme="b"><b>B · 柔和</b> 控件 8 + 卡片 <span style="opacity:.7">推荐</span></button>
+    <button class="scheme-btn" data-scheme="c"><b>C · 圆润</b> 控件 10</button>
+    <button class="scheme-btn" data-scheme="custom"><b>自定义</b> ⚙</button>
+    <span class="scheme-desc" id="schemeDesc">基线:控件 4px,版面方块,卡片不可见(发丝线分栏)。</span>
+  </div>
+  <div class="custom-row" id="customRow">
+    <label>控件 r-ctl <input type="range" id="rCtl" min="0" max="14" value="8"><span class="val" id="vCtl">8px</span></label>
+    <label>浮层 r-pop <input type="range" id="rPop" min="0" max="20" value="12"><span class="val" id="vPop">12px</span></label>
+    <label>卡片 r-card <input type="range" id="rCard" min="0" max="20" value="12"><span class="val" id="vCard">12px</span></label>
+    <label>表格容器 r-panel <input type="range" id="rPanel" min="0" max="16" value="10"><span class="val" id="vPanel">10px</span></label>
+    <label class="chk"><input type="checkbox" id="cardOn" checked> 版面卡片化</label>
+  </div>
+
+  <!-- ============ 实心块用量(与圆角正交) ============ -->
+  <div class="solid-bar" id="solidBar">
+    <span class="scheme-bar__label">实心块</span>
+    <button class="scheme-btn is-active" data-solid="ink">保留黑底 · 现状</button>
+    <button class="scheme-btn" data-solid="soft">柔化为浅灰底</button>
+    <button class="scheme-btn" data-solid="none">去掉色块 · 描边加粗</button>
+    <span class="scheme-desc" id="solidDesc">激活态(视图切换 / 分页当前页)与按钮悬停都是黑底反白,环形图深色为纯黑 #111214。</span>
+  </div>
+
+  <!-- ============ 复刻:展示视图(表格 tab) ============ -->
+  <div class="page" id="page" data-card="off">
+    <!-- 顶栏 -->
+    <div class="gh-topbar">
+      <div class="gh-topbar__left">
+        <span class="gh-title">GitHub 项目数据库</span>
+        <span class="gh-meta">23 个项目</span>
+      </div>
+      <div class="gh-topbar__right">
+        <span class="gh-pill gh-pill--ok">公开分享 · github-show · #24</span>
+        <button class="gh-btn">复制链接</button>
+        <button class="gh-btn gh-btn--primary">我也要用</button>
+      </div>
+    </div>
+
+    <div class="gh-display">
+      <!-- 工具栏 -->
+      <div class="gh-dtoolbar">
+        <div class="gh-viewswitch" id="viewSwitch">
+          <button class="gh-viewswitch__btn is-active" data-view="table">表格</button>
+          <button class="gh-viewswitch__btn" data-view="chart">图表</button>
+        </div>
+        <button class="gh-btn">导出 PDF</button>
+      </div>
+
+      <!-- ══ 表格 tab ══ -->
+      <div id="view-table">
+
+      <!-- 统计区:左热力图卡 + 右文字统计卡 -->
+      <div class="gh-gstat">
+        <div class="gh-gstat__heatcard">
+          <span class="gh-gstat__title">提交记录</span>
+          <div class="gh-heat" id="heat"></div>
+          <div class="gh-heat-legend">少 <i style="background:#ECEFF1"></i><i style="background:#CFE8D6"></i><i style="background:#7FC794"></i><i style="background:#2F9C55"></i><i style="background:#177F37"></i> 多</div>
+        </div>
+        <div class="gh-gstat__textcard">
+          <div class="gh-gstat__texttitle">提交统计</div>
+          <dl class="gh-facts">
+            <div class="gh-fact"><dt>过去一年提交</dt><dd><b>2576</b><i>次</i></dd></div>
+            <div class="gh-fact"><dt>当前连续</dt><dd><b>15</b><i>天</i></dd></div>
+            <div class="gh-fact"><dt>最长连续</dt><dd><b>27</b><i>天</i></dd></div>
+            <div class="gh-fact"><dt>覆盖仓库</dt><dd><b>2</b><i>/22</i></dd></div>
+            <div class="gh-fact"><dt>统计于</dt><dd><i class="tag-now" style="font-size:12px;color:var(--text-2)">2026-09-30</i></dd></div>
+          </dl>
+          <div class="gh-popover">20 个仓库未统计 · 2 个链接无效 · 18 个匿名配额已用尽 ▾</div>
+        </div>
+      </div>
+
+      <!-- 表格 -->
+      <div class="gh-tablewrap">
+        <div class="gh-table">
+          <div class="gh-th">GITHUB 链接</div><div class="gh-th">项目名</div><div class="gh-th">亮点</div><div class="gh-th">产出</div><div class="gh-th">是否公开</div>
+          <div class="gh-tr" style="display:contents">
+            <div class="gh-td"><a class="gh-link" href="#">On-DevPlan/ve</a></div>
+            <div class="gh-td">On-DevPlan/ve</div>
+            <div class="gh-td"><span class="gh-dim">1. 同时兼容 react/vue 的浏览器项目,错误一键定位,展示「运行时」运行 2. 预览一体化…</span></div>
+            <div class="gh-td"><span class="gh-dim">action 特缘发布 https://…</span></div>
+            <div class="gh-td">是</div>
+          </div>
+          <div class="gh-tr" style="display:contents">
+            <div class="gh-td"><a class="gh-link" href="#">ZHLX2005/fr</a></div>
+            <div class="gh-td">ZHLX2005/fr</div>
+            <div class="gh-td"><span class="gh-dim">1. 完全开源 2. 支持最通用的状态模式(即使没系统学过 UIA 设计)3. 有详细指南…</span></div>
+            <div class="gh-td"><span class="gh-dim">直接可安装</span></div>
+            <div class="gh-td">是</div>
+          </div>
+          <div class="gh-tr" style="display:contents">
+            <div class="gh-td"><a class="gh-link" href="#">ZHLX2005/br_ct</a></div>
+            <div class="gh-td">ZHLX2005/br_ct</div>
+            <div class="gh-td"><span class="gh-dim">1. 提示词的自管理 2. windows的nativehost 实现本地文件 BG时管理 3. skill 管理环境…</span></div>
+            <div class="gh-td"><span class="gh-dim">直接可安装</span></div>
+            <div class="gh-td">是</div>
+          </div>
+          <div class="gh-sum" style="grid-column: 1 / -1;">共 23 条</div>
+        </div>
+      </div>
+
+      <!-- 分页 -->
+      <div class="gh-pagination">
+        <button class="gh-pager">‹</button>
+        <button class="gh-pager is-active">1</button>
+        <button class="gh-pager">2</button>
+        <button class="gh-pager">3</button>
+        <button class="gh-pager">›</button>
+        <span style="margin-left:6px">10 条/ 页</span>
+        <span>跳至</span>
+        <button class="gh-pager" style="min-width:40px">1</button>
+        <span>页</span>
+      </div>
+      </div><!-- /view-table -->
+
+      <!-- ══ 图表 tab ══ -->
+      <div id="view-chart" hidden>
+        <!-- 4 列印刷式统计 -->
+        <div class="gh-dstats">
+          <div class="gh-dstat"><b>23</b><span>项目总数</span></div>
+          <div class="gh-dstat"><b>14</b><span>已填充点</span></div>
+          <div class="gh-dstat"><b>14</b><span>已填写</span></div>
+          <div class="gh-dstat"><b>65%</b><span>内容完整度</span></div>
+        </div>
+
+        <!-- 双图表 -->
+        <div class="gh-dcharts">
+          <div class="gh-dchart">
+            <div class="gh-dchart__title">项目介绍充实度
+              <span class="legend-dot"><i style="background:var(--primary)"></i>亮点</span>
+              <span class="legend-dot"><i style="background:#C9CDD3"></i>暗发</span>
+            </div>
+            <div class="bars" id="bars"></div>
+            <div class="bars-x" id="barsX"></div>
+          </div>
+          <div class="gh-dchart">
+            <div class="gh-dchart__title">杂点填写率</div>
+            <div class="donut-row">
+              <svg width="150" height="150" viewBox="0 0 120 120">
+                <circle cx="60" cy="60" r="44" fill="none" stroke="#E8EAED" stroke-width="16"/>
+                <circle cx="60" cy="60" r="44" fill="none" style="stroke:var(--ring)" stroke-width="16"
+                        stroke-dasharray="65 35" stroke-dashoffset="25" stroke-linecap="butt"/>
+              </svg>
+              <div class="donut-legend">
+                <span class="legend-dot"><i style="background:var(--ring)"></i>已填亮点 65%</span>
+                <span class="legend-dot"><i style="background:#E8EAED"></i>未填亮点</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 全宽热力图 -->
+        <div class="gh-gstat--full">
+          <div class="gh-gstat__fullhead">过一年 <b>2576</b> 次提交 <span class="tag-now">(2/22 个仓库合并) · 统计于 2026-09-30</span></div>
+          <div class="gh-heat" id="heatFull"></div>
+          <div class="gh-gstat__fullfoot">
+            <span>当前连续 15 天 · 最长连续 27 天 · 覆盖 2/22 个仓库</span>
+            <span class="gh-heat-legend" style="margin:0">少 <i style="background:#ECEFF1"></i><i style="background:#CFE8D6"></i><i style="background:#7FC794"></i><i style="background:#2F9C55"></i><i style="background:#177F37"></i> 多</span>
+          </div>
+          <div class="gh-gstat__failsum">2 个仓库数据未统计 · 2 个链接无效 · 18 个匿名配额已用尽 ▾</div>
+        </div>
+      </div><!-- /view-chart -->
+    </div>
+  </div>
+
+  <!-- ============ 控件样本 ============ -->
+  <div class="sample-grid">
+    <div class="sample-card">
+      <h3>控件 · 输入</h3>
+      <div class="sample-row">
+        <input class="gh-search" placeholder="搜索 · 下划线(不参与圆角)">
+        <input class="gh-input" value="输入框 r-ctl">
+        <select class="gh-select"><option>下拉 r-ctl</option></select>
+      </div>
+      <div class="sample-row">
+        <textarea class="gh-textarea" rows="2">文本域 r-ctl —— 编辑视图「亮点」列同款</textarea>
+      </div>
+      <div class="sample-row">
+        <span class="gh-chip">标签 chip</span>
+        <span class="gh-chip">react</span>
+        <span class="gh-chip">vue</span>
+        <span class="gh-pill gh-pill--ok">✓ 已同步</span>
+        <span class="gh-pill" style="color:#b91c1c">⚠ 2 个链接无效</span>
+      </div>
+    </div>
+    <div class="sample-card">
+      <h3>浮层 · 弹窗与气泡</h3>
+      <div class="gh-modal-mock">
+        <div class="gh-modal-mock__backdrop"></div>
+        <div class="gh-modal">
+          <h4>列设置</h4>
+          <p>拖拽排序或勾选可见列。弹窗面板圆角随 r-pop。</p>
+          <div class="gh-modal__foot">
+            <button class="gh-btn">取消</button>
+            <button class="gh-btn gh-btn--primary">确定</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 对照表 ============ -->
+  <div class="cmp">
+    <table>
+      <thead><tr><th>元素</th><th>token</th><th>当前</th><th>A · 微圆</th><th>B · 柔和 ★</th><th>C · 圆润</th></tr></thead>
+      <tbody>
+        <tr><td>热力图格子 / chip / pill</td><td><code>--sl-gh-radius-xs</code> <span class="tag-now">新增</span></td><td class="num">4px</td><td class="num">5px</td><td class="num hl">6px</td><td class="num">8px</td></tr>
+        <tr><td>按钮 / 输入框 / 下拉 / 文本域 / 分页</td><td><code>--sl-gh-radius-ctl</code></td><td class="num">4px</td><td class="num">6px</td><td class="num hl">8px</td><td class="num">10px</td></tr>
+        <tr><td>连体视图切换(仅外角)</td><td><code>--sl-gh-radius-tab</code> <span class="tag-now">新增</span></td><td class="num">4px</td><td class="num">6px</td><td class="num hl">8px</td><td class="num">10px</td></tr>
+        <tr><td>弹窗面板 / 气泡 / 下拉浮层</td><td><code>--sl-gh-radius-pop</code> <span class="tag-now">新增</span></td><td class="num">4px</td><td class="num">8px</td><td class="num hl">12px</td><td class="num">14px</td></tr>
+        <tr><td>统计卡片(热力图卡 / 文字统计卡)</td><td><code>--sl-gh-radius-card</code> <span class="tag-now">新增</span></td><td class="num">—(无卡片)</td><td class="num">8px(卡片仍隐藏)</td><td class="num hl">12px(卡片化)</td><td class="num">16px(卡片化)</td></tr>
+        <tr><td>表格容器 / 展示表格</td><td><code>--sl-gh-radius-panel</code> <span class="tag-now">新增</span></td><td class="num">0</td><td class="num">0</td><td class="num hl">10px(仅外框,内容裁切)</td><td class="num">12px</td></tr>
+        <tr><td>搜索框(下划线形态)</td><td>—</td><td colspan="4" style="color:var(--text-3)">四档均保持直角 —— 圆角会让线端上翘(唯一刻意例外)</td></tr>
+        <tr><td>激活态实心块(tab / 分页 / 悬停)</td><td>—</td><td colspan="4" style="color:var(--text-3)">黑底反白(现状) → 浅灰底深字 → 描边加粗 —— 与圆角正交的独立开关,见上方「实心块」</td></tr>
+      </tbody>
+    </table>
+    <div class="cmp-note" id="cmpNote">
+      <b>B · 柔和(推荐)</b>:控件从 4→8px(观感翻倍但不失利落);统计区从「发丝线分栏」升级为两张淡底圆角卡片,版面获得「面」的柔软感;表格容器加 10px 外框圆角、内部行列线保持不变。绿色配额、线档四级、纵向节奏 12/16 全部不动。
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---- 方案定义 ---- */
+const SCHEMES = {
+  cur:    { xs:4, ctl:4,  tab:4,  pop:4,  card:0,  panel:0,  cardOn:false, desc:'基线:控件 4px,版面方块,卡片不可见(发丝线分栏)。' },
+  a:      { xs:5, ctl:6,  tab:6,  pop:8,  card:8,  panel:0,  cardOn:false, desc:'A · 微圆:只软化控件与浮层(6/8px),版面仍靠「线」,与现状语汇连续。' },
+  b:      { xs:6, ctl:8,  tab:8,  pop:12, card:12, panel:10, cardOn:true,  desc:'B · 柔和(推荐):控件 8px + 统计卡片化(12px)+ 表格容器 10px 外框,版面获得「面」的柔软感。' },
+  c:      { xs:8, ctl:10, tab:10, pop:14, card:16, panel:12, cardOn:true,  desc:'C · 圆润:全面放宽(控件 10 / 浮层 14 / 卡片 16),观感最接近现代 SaaS 面板。' },
+};
+const page = document.getElementById('page');
+const bar  = document.getElementById('schemeBar');
+const desc = document.getElementById('schemeDesc');
+const customRow = document.getElementById('customRow');
+const cmpNote = document.getElementById('cmpNote');
+const NOTES = {
+  cur: '基线对照:与线上 v1.6.45 完全一致的形状语汇。',
+  a: '<b>A · 微圆</b>:最小侵入 —— 只改 3 个值(控件 4→6、浮层 4→8、格子 4→5),版面仍是「纸上线格」,适合想保留墨线气质、只去一点「割手感」的场景。',
+  b: '<b>B · 柔和(推荐)</b>:控件 8px + 统计卡片化 + 表格容器 10px 外框。版面从「纯线」变为「线 + 面」,整体硬度明显下降,信息层级反而更清楚。落地时新增 5 个 radius token + 2 处类开关。',
+  c: '<b>C · 圆润</b>:在 B 基础上再抬一档,弹窗/气泡 14px、卡片 16px。风险:表格行列发丝线与 16px 大圆角并存时,「墨线」气质会淡出,变成通用后台观感。',
+};
+
+function apply(s) {
+  const r = document.documentElement.style; // 全文档变量:复刻页 + 控件样本区都跟随
+  r.setProperty('--r-xs', s.xs + 'px');
+  r.setProperty('--r-ctl', s.ctl + 'px');
+  r.setProperty('--r-tab', s.tab + 'px');
+  r.setProperty('--r-pop', s.pop + 'px');
+  r.setProperty('--r-card', s.card + 'px');
+  r.setProperty('--r-panel', s.panel + 'px');
+  page.dataset.card = s.cardOn ? 'on' : 'off';
+  desc.textContent = s.desc;
+  const active = bar.querySelector('.is-active');
+  if (active && NOTES[active.dataset.scheme]) cmpNote.innerHTML = NOTES[active.dataset.scheme];
+}
+bar.addEventListener('click', (e) => {
+  const btn = e.target.closest('.scheme-btn'); if (!btn) return;
+  bar.querySelectorAll('.scheme-btn').forEach(b => b.classList.remove('is-active'));
+  btn.classList.add('is-active');
+  const key = btn.dataset.scheme;
+  customRow.classList.toggle('is-show', key === 'custom');
+  if (key === 'custom') { applyCustom(); return; }
+  apply(SCHEMES[key]);
+});
+
+/* ---- 自定义调参 ---- */
+const ids = [['rCtl','vCtl','ctl'],['rPop','vPop','pop'],['rCard','vCard','card'],['rPanel','vPanel','panel']];
+function applyCustom() {
+  const vals = {};
+  ids.forEach(([rid, vid, key]) => {
+    vals[key] = +document.getElementById(rid).value;
+    document.getElementById(vid).textContent = vals[key] + 'px';
+  });
+  const s = {
+    ctl: vals.ctl, pop: vals.pop, card: vals.card, panel: vals.panel,
+    tab: vals.ctl, xs: Math.max(3, vals.ctl - 2),
+    cardOn: document.getElementById('cardOn').checked,
+  };
+  apply(s);
+}
+ids.forEach(([rid]) => document.getElementById(rid).addEventListener('input', applyCustom));
+document.getElementById('cardOn').addEventListener('change', applyCustom);
+
+/* ---- 热力图(53×7 随机绿阶,表格 tab 与图表 tab 各一份) ---- */
+const LEVELS = ['#ECEFF1','#CFE8D6','#7FC794','#2F9C55','#177F37'];
+function fillHeat(el, gapPx) {
+  el.style.gap = gapPx + 'px';
+  let html = '';
+  for (let c = 0; c < 53; c++) {
+    for (let r = 0; r < 7; r++) {
+      const v = Math.random();
+      const lv = v > .93 ? 4 : v > .8 ? 3 : v > .6 ? 2 : v > .3 ? 1 : 0;
+      html += `<i style="background:${LEVELS[lv]}"></i>`;
+    }
+  }
+  el.innerHTML = html;
+}
+fillHeat(document.getElementById('heat'), 2);
+fillHeat(document.getElementById('heatFull'), 3);
+
+/* ---- 柱状图(12 组双柱:亮点/暗发) ---- */
+const REPOS = ['chess','sudoku','fr','ve','nx-pn','py-ee','br_ct','br_tb','rt','rt-','p-n','i-r'];
+const bars = document.getElementById('bars'), barsX = document.getElementById('barsX');
+let bh = '', bx = '';
+for (let i = 0; i < 12; i++) {
+  const hi = 18 + Math.round(Math.random() * 82);   /* 亮点柱高 % */
+  const dim = 10 + Math.round(Math.random() * 90);  /* 暗发柱高 % */
+  bh += `<div class="bar-g"><i class="bar bar--hi" style="height:${hi}%"></i><i class="bar bar--dim" style="height:${dim}%"></i></div>`;
+  bx += `<span>${REPOS[i]}</span>`;
+}
+bars.innerHTML = bh; barsX.innerHTML = bx;
+
+/* ---- 实心块用量切换 ---- */
+const solidBar = document.getElementById('solidBar');
+const solidDesc = document.getElementById('solidDesc');
+const SOLID_NOTES = {
+  ink:  '激活态(视图切换 / 分页当前页)与按钮悬停都是黑底反白,环形图深色为纯黑 #111214。',
+  soft: '实心块换成浅灰底 #E9EBEE + 深字,黑只留在线条上;环形图深色改深灰 #3A3F45。整页「黑色面积」大幅下降,激活态依然读得出来。',
+  none: '完全取消实心色块:激活态 = 透明底 + 1px 内描边墨线 + 字加粗;环形图深色改中性灰 #555B63。最轻,代价是低亮度屏下激活态区分度下降。',
+};
+solidBar.addEventListener('click', (e) => {
+  const btn = e.target.closest('.scheme-btn'); if (!btn) return;
+  solidBar.querySelectorAll('.scheme-btn').forEach(b => b.classList.toggle('is-active', b === btn));
+  document.body.dataset.solid = btn.dataset.solid;
+  solidDesc.textContent = SOLID_NOTES[btn.dataset.solid];
+});
+
+/* ---- 视图切换(表格 / 图表) ---- */
+document.getElementById('viewSwitch').addEventListener('click', (e) => {
+  const btn = e.target.closest('.gh-viewswitch__btn'); if (!btn) return;
+  document.querySelectorAll('#viewSwitch .gh-viewswitch__btn').forEach(b => b.classList.toggle('is-active', b === btn));
+  document.getElementById('view-table').hidden = btn.dataset.view !== 'table';
+  document.getElementById('view-chart').hidden = btn.dataset.view !== 'chart';
+});
+
+apply(SCHEMES.cur);
+</script>
+</body>
+</html>

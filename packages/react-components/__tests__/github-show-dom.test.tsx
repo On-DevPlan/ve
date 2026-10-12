@@ -126,16 +126,35 @@ describe('GithubShow', () => {
     clickButtonByText('展示');
     await flushLoad();
 
-    const text = container.textContent ?? '';
+    // 默认落在「表格」tab:工具栏 + 提交统计分栏 + 展示表
+    let text = container.textContent ?? '';
     expect(text).toContain('导出 PDF');
-    expect(text).toContain('项目总数');
-    expect(container.querySelector('.sl-gh-dchart__canvas')).not.toBeNull();
-    // 展示表格里的链接也可点击
+    expect(text).toContain('提交记录');
+    expect(container.querySelector('.sl-gh-gstat.is-split')).not.toBeNull();
+    expect(container.querySelector('.sl-gh-gstat__textcard')).not.toBeNull();
     expect(container.querySelector<HTMLAnchorElement>('.sl-gh-dlink')?.getAttribute('target')).toBe(
       '_blank',
     );
-    // 编辑按钮不再可见(视图分离)
+    // 文本类列必须带 sl-gh-dtext,否则继承 td nowrap 会被裁切
+    const firstDataRow = container.querySelector('.sl-gh-dtable tbody tr');
+    expect(firstDataRow).not.toBeNull();
+    const ths = Array.from(container.querySelectorAll('.sl-gh-dtable thead th'));
+    for (const label of ['GitHub 链接', '项目名', '亮点', '启发', '产出']) {
+      const th = ths.find((el) => el.textContent?.includes(label));
+      expect(th, label).toBeTruthy();
+      const idx = Array.from(th!.parentElement!.children).indexOf(th!);
+      expect(firstDataRow!.children[idx]?.classList.contains('sl-gh-dtext'), label).toBe(true);
+    }
     expect(text).not.toContain('添加项目');
+
+    // 切到「图表」tab:四格统计 + 图表容器 + 全宽热力图(非 split)
+    clickButtonByText('图表');
+    await flushLoad();
+    text = container.textContent ?? '';
+    expect(text).toContain('项目总数');
+    expect(container.querySelector('.sl-gh-dchart__canvas')).not.toBeNull();
+    expect(container.querySelector('.sl-gh-gstat.is-split')).toBeNull();
+    expect(container.querySelector('.sl-gh-gstat')).not.toBeNull();
   });
 
   it('moves rows up/down in edit mode (order syncs with doc)', async () => {

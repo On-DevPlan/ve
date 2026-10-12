@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>github-show · B + iOS 激活态 · 审阅原型</title>
+<style>
+/* ============================================================
+   从 proto-radius.html 单独抽出:方案 B · 柔和 + iOS 质感激活态
+   本版固定点
+   - 圆角:B(ctl/tab 8 · pop 12 · card 12 · panel 10 · 卡片化)
+   - 热力格子:4px(低于 B 原 xs=6,略圆不过圆)
+   - 激活态:告别不透明泥灰平涂,改 iOS 语汇(分段轨/系统填色/品牌轻染)
+   颜色 / 线档 / 间距 / 字号仍对齐真实 token。
+   ============================================================ */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --ink: #111214;
+  --text: #15171a;
+  --text-2: #5c6169;
+  --text-3: #9aa0a8;
+  --primary: #177F37;
+  --rule: rgba(17,18,20,.42);
+  --line: rgba(17,18,20,.24);
+  --hair: rgba(17,18,20,.14);
+  --hair-soft: rgba(17,18,20,.10);
+  --col: rgba(17,18,20,.14);
+  --surface: #fff;
+  --surface-alt: #F4F5F7;
+  --surface-muted: #F7F8FA;
+  --canvas: #F2F2F7; /* iOS grouped background 近似 */
+
+  /* B 锁定 */
+  --r-ctl: 8px;
+  --r-tab: 8px;
+  --r-pop: 12px;
+  --r-card: 12px;
+  --r-panel: 10px;
+  --r-heat: 4px;
+  --r-bar: 3px;
+
+  /* iOS systemGray 系半透明填(非 #E9EBEE 泥灰) */
+  --ios-fill: rgba(120, 120, 128, 0.16);
+  --ios-fill-soft: rgba(120, 120, 128, 0.12);
+  --ios-track: rgba(118, 118, 128, 0.12);
+  /* 分段浮起:靠轨底对比立住,不加阴影 */
+  --ios-elev: none;
+
+  /* 默认 seg */
+  --solid-bg: #fff;
+  --solid-fg: var(--ink);
+  --solid-bd: transparent;
+  --solid-shadow: none;
+  --hover-bg: var(--ios-fill-soft);
+  --hover-bd: transparent;
+  --ring: #3A3F45;
+  --seg-mode: 1;
+}
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "PingFang SC", sans-serif;
+  font-size: 14px; line-height: 1.5; color: var(--text);
+  background: var(--canvas); padding: 28px 20px 72px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---- 激活态三档:iOS 语汇(只动交互态,不动版面骨架) ---- */
+/* seg:UISegmentedControl —— 半透明轨 + 白底浮起(默认推荐) */
+body[data-soft="seg"] {
+  --solid-bg: #fff;
+  --solid-fg: var(--ink);
+  --solid-bd: transparent;
+  --solid-shadow: none;
+  --hover-bg: var(--ios-fill-soft);
+  --hover-bd: transparent;
+  --ring: #3A3F45;
+  --seg-mode: 1;
+}
+/* tint:列表选中感 —— 品牌绿轻染 + 绿字(无灰块) */
+body[data-soft="tint"] {
+  --solid-bg: rgba(23, 127, 55, 0.12);
+  --solid-fg: #0F6A2C;
+  --solid-bd: transparent;
+  --solid-shadow: none;
+  --hover-bg: rgba(23, 127, 55, 0.08);
+  --hover-bd: transparent;
+  --ring: #177F37;
+  --seg-mode: 0;
+}
+/* fill:secondarySystemFill —— 半透明系统灰,透出底色,不脏 */
+body[data-soft="fill"] {
+  --solid-bg: var(--ios-fill);
+  --solid-fg: var(--ink);
+  --solid-bd: transparent;
+  --solid-shadow: none;
+  --hover-bg: var(--ios-fill-soft);
+  --hover-bd: transparent;
+  --ring: #3A3F45;
+  --seg-mode: 0;
+}
+
+.wrap { max-width: 1240px; margin: 0 auto; }
+
+/* ===== 审阅说明层 ===== */
+.proto-head { margin-bottom: 16px; max-width: 820px; }
+.proto-head h1 { font-size: 18px; font-weight: 700; letter-spacing: .02em; }
+.proto-head .sub { font-size: 12.5px; color: var(--text-2); margin-top: 6px; line-height: 1.55; }
+.proto-head code {
+  font-size: 11.5px; background: #fff; border: 1px solid var(--hair);
+  border-radius: 4px; padding: 1px 6px;
+}
+.lock-row {
+  display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px;
+}
+.lock-chip {
+  font-size: 11px; letter-spacing: .04em; color: var(--text-2);
+  background: #fff; border: 1px solid var(--hair); border-radius: 6px;
+  padding: 4px 10px;
+}
+.lock-chip b { color: var(--text); font-weight: 600; }
+
+.soft-bar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: #fff; border: 1px solid var(--hair); border-radius: 12px;
+  padding: 12px 14px; margin: 14px 0 16px;
+}
+.soft-bar__label {
+  font-size: 11px; font-weight: 700; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--text-2); margin-right: 2px;
+}
+.soft-btns {
+  display: inline-flex; gap: 2px; padding: 2px;
+  background: var(--ios-track); border-radius: 9px;
+}
+.soft-btn {
+  font: inherit; font-size: 12px; padding: 6px 12px; cursor: pointer;
+  border: none; background: transparent; color: var(--text-2);
+  border-radius: 7px; transition: all .15s;
+}
+.soft-btn:hover { color: var(--text); }
+.soft-btn.is-active {
+  background: #fff; color: var(--ink); font-weight: 600;
+  box-shadow: none;
+}
+.soft-desc { font-size: 11.5px; color: var(--text-3); margin-left: 4px; flex: 1 1 220px; }
+
+/* ============================================================
+   组件复刻区
+   ============================================================ */
+.page {
+  background: var(--surface);
+  border: 1px solid var(--hair);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(17,18,20,.04), 0 8px 24px rgba(17,18,20,.04);
+}
+
+.gh-topbar {
+  position: relative; display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; padding: 12px 22px; border-bottom: 1px solid var(--rule); flex-wrap: wrap;
+  background: rgba(255,255,255,.92);
+}
+.gh-topbar__left { display: flex; align-items: baseline; gap: 8px; }
+.gh-title { font-size: 14px; font-weight: 700; letter-spacing: .04em; white-space: nowrap; }
+.gh-meta { font-size: 11.5px; letter-spacing: .04em; color: var(--text-3); white-space: nowrap; }
+.gh-topbar__right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+.gh-btn {
+  font: inherit; font-size: 11.5px; line-height: 1; height: 28px; padding: 0 12px;
+  border: 1px solid var(--rule); border-radius: var(--r-ctl);
+  cursor: pointer; background: transparent; color: var(--text);
+  letter-spacing: .04em; display: inline-flex; align-items: center; justify-content: center;
+  transition: background .12s, border-color .12s, color .12s, box-shadow .12s; white-space: nowrap;
+}
+.gh-btn:hover {
+  background: var(--hover-bg); border-color: var(--hover-bd, var(--rule)); color: var(--text);
+  box-shadow: none;
+}
+body[data-soft="seg"] .gh-btn:hover,
+body[data-soft="fill"] .gh-btn:hover {
+  border-color: transparent;
+}
+.gh-btn--primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+.gh-btn--primary:hover { background: #12652B; border-color: #12652B; color: #fff; box-shadow: none; }
+
+.gh-pill {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 11px; letter-spacing: .04em;
+  padding: 3px 8px; border-radius: var(--r-ctl); background: transparent;
+  color: var(--text-2); border: 1px solid var(--hair); white-space: nowrap;
+}
+.gh-pill--ok { color: var(--primary); }
+.gh-chip {
+  display: inline-flex; align-items: center; font-size: 11px; padding: 2px 9px;
+  border: 1px solid var(--line); border-radius: 999px; color: var(--text-2); background: var(--surface-muted);
+}
+
+/* 默认:连体描边(tint / fill 仍可用) */
+.gh-viewswitch { display: inline-flex; }
+.gh-viewswitch__btn {
+  font: inherit; font-size: 11.5px; line-height: 1; height: 28px; padding: 0 14px;
+  border: 1px solid var(--rule); border-radius: 0; background: transparent;
+  color: var(--text-2); letter-spacing: .06em; text-transform: uppercase; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; transition: all .18s ease;
+}
+.gh-viewswitch__btn + .gh-viewswitch__btn { margin-left: -1px; }
+.gh-viewswitch__btn:first-child { border-top-left-radius: var(--r-tab); border-bottom-left-radius: var(--r-tab); }
+.gh-viewswitch__btn:last-child { border-top-right-radius: var(--r-tab); border-bottom-right-radius: var(--r-tab); }
+.gh-viewswitch__btn:hover { background: var(--hover-bg); color: var(--ink); }
+.gh-viewswitch__btn.is-active {
+  background: var(--solid-bg); border-color: var(--solid-bd); color: var(--solid-fg);
+  font-weight: 600; box-shadow: var(--solid-shadow);
+}
+
+/* seg:iOS UISegmentedControl —— 轨 + 白拇指浮起 */
+body[data-soft="seg"] .gh-viewswitch {
+  gap: 2px; padding: 2px;
+  background: var(--ios-track);
+  border-radius: 9px;
+  border: none;
+}
+body[data-soft="seg"] .gh-viewswitch__btn {
+  height: 26px; border: none; border-radius: 7px; margin-left: 0;
+  letter-spacing: .04em; text-transform: none; font-size: 12px;
+  color: var(--text-2); background: transparent;
+}
+body[data-soft="seg"] .gh-viewswitch__btn + .gh-viewswitch__btn { margin-left: 0; }
+body[data-soft="seg"] .gh-viewswitch__btn:first-child,
+body[data-soft="seg"] .gh-viewswitch__btn:last-child { border-radius: 7px; }
+body[data-soft="seg"] .gh-viewswitch__btn:hover { background: transparent; color: var(--ink); }
+body[data-soft="seg"] .gh-viewswitch__btn.is-active {
+  background: #fff; color: var(--ink); font-weight: 600;
+  box-shadow: none;
+}
+
+/* tint:连体取消硬边,选中轻染 */
+body[data-soft="tint"] .gh-viewswitch__btn,
+body[data-soft="fill"] .gh-viewswitch__btn {
+  border-color: var(--hair);
+}
+body[data-soft="tint"] .gh-viewswitch__btn.is-active,
+body[data-soft="fill"] .gh-viewswitch__btn.is-active {
+  border-color: transparent; z-index: 1;
+}
+
+.gh-display { padding: 0 22px 24px; }
+.gh-dtoolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; }
+
+/* 统计区:B 卡片化 */
+.gh-gstat {
+  display: grid; grid-template-columns: minmax(0, 700px) minmax(0, 1fr);
+  align-items: start; gap: 16px; padding: 4px 0 14px;
+}
+.gh-gstat__heatcard,
+.gh-gstat__textcard {
+  min-width: 0; padding: 14px 18px; border-radius: var(--r-card);
+  background: var(--surface-muted); border: 1px solid var(--hair);
+}
+.gh-gstat__title {
+  font-size: 10.5px; font-weight: 700; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--text-2); white-space: nowrap;
+}
+.gh-gstat__texttitle {
+  font-size: 10.5px; font-weight: 700; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--text-2); margin-bottom: 10px;
+}
+
+/* 热力图:格子略圆(4px),间隙略收 */
+.gh-heat {
+  display: grid;
+  grid-template-columns: repeat(53, 1fr);
+  grid-template-rows: repeat(7, 1fr);
+  grid-auto-flow: column;
+  gap: 2.5px; margin-top: 10px;
+}
+.gh-heat i {
+  display: block; aspect-ratio: 1;
+  border-radius: var(--r-heat);
+}
+.gh-heat-legend {
+  display: flex; align-items: center; gap: 4px; margin-top: 8px;
+  font-size: 10.5px; color: var(--text-3);
+}
+.gh-heat-legend i {
+  width: 10px; height: 10px; border-radius: var(--r-heat); display: inline-block;
+}
+
+.gh-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 2px 24px; }
+.gh-fact {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  padding: 6px 0 5px; border-bottom: 1px solid var(--hair-soft);
+}
+.gh-fact dt { font-size: 11px; letter-spacing: .04em; color: var(--text-3); white-space: nowrap; }
+.gh-fact dd { display: flex; align-items: baseline; gap: 3px; font-variant-numeric: tabular-nums; }
+.gh-fact dd b { font-size: 18px; font-weight: 600; line-height: 1.1; letter-spacing: -.01em; color: var(--text); }
+.gh-fact dd i { font-style: normal; font-size: 11px; color: var(--text-3); }
+
+.gh-tablewrap {
+  border-radius: var(--r-panel);
+  border: 1px solid var(--hair);
+  overflow: hidden;
+}
+.gh-table { display: grid; grid-template-columns: 240px 150px 1fr 170px 80px; }
+.gh-th {
+  font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--text-2); background: var(--surface);
+  border-bottom: 1px solid var(--rule); border-right: 1px solid var(--line);
+  padding: 0 12px; height: 30px; line-height: 1; display: flex; align-items: center; white-space: nowrap;
+}
+.gh-th:last-child { border-right: none; }
+.gh-td {
+  padding: 6px 12px; min-height: 35px; font-size: 12.5px; display: flex; align-items: center;
+  border-bottom: 1px solid var(--hair-soft); border-right: 1px solid var(--col);
+  background: #fff;
+}
+.gh-td:last-child { border-right: none; }
+.gh-tr:hover .gh-td { background: rgba(23,127,55,.05); }
+.gh-link { color: var(--text); font-weight: 600; text-decoration: none; }
+.gh-link:hover { text-decoration: underline; }
+.gh-dim { color: var(--text-3); }
+.gh-sum {
+  display: flex; align-items: center; padding: 0 12px; height: 30px;
+  font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--text-2);
+  border-top: 1px solid var(--rule); background: var(--surface);
+}
+
+.gh-pagination {
+  display: flex; align-items: center; justify-content: flex-end; gap: 6px;
+  padding: 10px 0 0; font-size: 12px; color: var(--text-2);
+}
+.gh-pager {
+  min-width: 28px; height: 28px; padding: 0 6px; font-size: 12px; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid transparent; background: transparent; color: var(--text-2);
+  border-radius: var(--r-ctl); transition: all .15s ease;
+}
+.gh-pager:hover {
+  background: var(--hover-bg); color: var(--ink);
+}
+.gh-pager.is-active {
+  background: var(--solid-bg); border-color: var(--solid-bd); color: var(--solid-fg);
+  font-weight: 600; box-shadow: var(--solid-shadow);
+}
+/* seg:分页当前页 = 白底(同分段拇指,无阴影) */
+body[data-soft="seg"] .gh-pager.is-active {
+  background: #fff; border-color: transparent; color: var(--ink);
+  box-shadow: none;
+}
+/* 分页组也铺一层半透明轨,白拇指才读得出来 */
+body[data-soft="seg"] .gh-pagination {
+  gap: 8px;
+}
+body[data-soft="seg"] .gh-pagination .gh-pager.is-active {
+  background: #fff;
+}
+body[data-soft="tint"] .gh-pager.is-active {
+  background: rgba(23, 127, 55, 0.12); color: #0F6A2C; box-shadow: none;
+}
+
+/* 图表 tab */
+.gh-dstats {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
+  padding: 14px 0; border-bottom: none;
+}
+.gh-dstat {
+  padding: 12px 16px; border-radius: var(--r-card);
+  background: var(--surface-muted); border: 1px solid var(--hair);
+}
+.gh-dstat b {
+  display: block; font-size: 26px; line-height: 1.1; font-weight: 600;
+  letter-spacing: -.01em; font-variant-numeric: tabular-nums; color: var(--text);
+}
+.gh-dstat:first-child b { color: var(--primary); }
+.gh-dstat span { font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--text-3); }
+
+.gh-dcharts {
+  display: grid; grid-template-columns: 1.6fr 1fr; gap: 16px;
+  padding: 16px 0; border-bottom: none;
+}
+.gh-dchart {
+  min-width: 0; border-radius: var(--r-card);
+  background: var(--surface-muted); border: 1px solid var(--hair);
+  padding: 14px 16px 16px;
+}
+.gh-dchart__title {
+  font-size: 10.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--text-2); margin-bottom: 12px; display: flex; align-items: center; gap: 14px;
+}
+.legend-dot {
+  display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px;
+  letter-spacing: 0; text-transform: none; font-weight: 400; color: var(--text-2);
+}
+.legend-dot i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+
+.bars {
+  display: flex; align-items: flex-end; gap: 12px; height: 170px;
+  border-bottom: 1px solid var(--line); padding-bottom: 0;
+}
+.bar-g { flex: 1; display: flex; align-items: flex-end; justify-content: center; gap: 3px; height: 100%; min-width: 0; }
+.bar { width: 9px; border-radius: var(--r-bar) var(--r-bar) 0 0; }
+.bar--hi { background: var(--primary); }
+.bar--dim { background: #C9CDD3; }
+.bars-x { display: flex; gap: 12px; margin-top: 6px; }
+.bars-x span {
+  flex: 1; text-align: center; font-size: 9px; color: var(--text-3);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transform: rotate(-32deg);
+}
+
+.donut-row { display: flex; align-items: center; justify-content: center; gap: 18px; height: 170px; }
+.donut-legend { display: flex; flex-direction: column; gap: 6px; font-size: 11px; color: var(--text-2); }
+
+.gh-gstat--full {
+  background: var(--surface-muted); border: 1px solid var(--hair);
+  border-radius: var(--r-card); padding: 14px 16px; margin-top: 4px;
+}
+.gh-gstat--full .gh-gstat__fullhead {
+  display: flex; align-items: baseline; gap: 6px; font-size: 12px;
+  color: var(--text-2); margin-bottom: 10px;
+}
+.gh-gstat--full .gh-gstat__fullhead b {
+  font-size: 15px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums;
+}
+.gh-gstat--full .gh-heat { gap: 3px; }
+.gh-gstat__fullfoot {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-top: 8px; font-size: 11px; color: var(--text-2);
+}
+.gh-gstat__failsum { margin-top: 8px; font-size: 11px; color: var(--text-3); }
+
+.gh-popover {
+  display: inline-block; margin-top: 8px; padding: 8px 12px; font-size: 11.5px; color: var(--text-2);
+  background: #fff; border: 1px solid var(--hair); border-radius: var(--r-pop);
+  box-shadow: 0 4px 16px rgba(17,18,20,.08);
+}
+
+/* 控件样本 */
+.sample-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 16px; }
+.sample-card {
+  background: #fff; border: 1px solid var(--hair); border-radius: 10px; padding: 16px 18px;
+}
+.sample-card h3 {
+  font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--text-2); margin-bottom: 12px;
+}
+.sample-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.sample-row + .sample-row { margin-top: 10px; }
+.gh-search {
+  font: inherit; font-size: 12px; line-height: 1; height: 28px; padding: 0 10px;
+  border: none; border-bottom: 1px solid var(--rule); border-radius: 0; background: transparent;
+  color: var(--text); outline: none; width: 180px;
+}
+.gh-input {
+  font: inherit; font-size: 12.5px; height: 30px; padding: 0 10px;
+  border: 1px solid var(--line); border-radius: var(--r-ctl); background: #fff; color: var(--text);
+  outline: none; width: 180px;
+}
+.gh-input:focus { border-color: var(--primary); }
+.gh-select {
+  font: inherit; font-size: 12.5px; height: 30px; padding: 0 8px;
+  border: 1px solid var(--line); border-radius: var(--r-ctl); background: #fff; color: var(--text); outline: none;
+}
+.gh-textarea {
+  font: inherit; font-size: 12.5px; padding: 6px 10px; width: 100%;
+  border: 1px solid var(--line); border-radius: var(--r-ctl); background: #fff; color: var(--text);
+  outline: none; resize: vertical;
+}
+.gh-modal-mock {
+  position: relative; height: 150px; background: var(--surface-alt); border-radius: 8px; overflow: hidden;
+}
+.gh-modal-mock__backdrop { position: absolute; inset: 0; background: rgba(15,23,42,.28); }
+.gh-modal {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
+  width: 260px; background: #fff; border-radius: var(--r-pop);
+  border: 1px solid var(--hair); box-shadow: 0 8px 30px rgba(17,18,20,.16); padding: 14px 16px;
+}
+.gh-modal h4 { font-size: 13px; font-weight: 700; margin-bottom: 8px; }
+.gh-modal p { font-size: 11.5px; color: var(--text-2); margin-bottom: 12px; }
+.gh-modal__foot { display: flex; justify-content: flex-end; gap: 8px; }
+
+/* 审阅备注 */
+.notes {
+  margin-top: 16px; background: #fff; border: 1px solid var(--hair);
+  border-radius: 10px; padding: 14px 18px;
+}
+.notes h2 {
+  font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--text-2); margin-bottom: 10px;
+}
+.notes ul { padding-left: 18px; font-size: 12.5px; color: var(--text-2); line-height: 1.65; }
+.notes li + li { margin-top: 4px; }
+.notes code {
+  font-size: 11.5px; background: var(--surface-alt); border-radius: 4px; padding: 1px 6px;
+}
+.tag-now { font-size: 10px; color: var(--text-3); letter-spacing: .04em; }
+
+@media (max-width: 900px) {
+  .gh-gstat { grid-template-columns: 1fr; }
+  .gh-dstats, .gh-dcharts, .sample-grid { grid-template-columns: 1fr; }
+  .gh-table { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); }
+  /* display:contents 行内,按 5 列周期隐藏第 3–5 列 */
+  .gh-th:nth-child(5n+3), .gh-th:nth-child(5n+4), .gh-th:nth-child(5n+5),
+  .gh-td:nth-child(5n+3), .gh-td:nth-child(5n+4), .gh-td:nth-child(5n+5) { display: none; }
+  .gh-sum { grid-column: 1 / -1; }
+}
+</style>
+</head>
+<body data-soft="seg">
+<div class="wrap">
+
+  <div class="proto-head">
+    <h1>B + iOS 激活态 · 单独审阅原型</h1>
+    <p class="sub">
+      锁定 <b>方案 B · 柔和</b>圆角;激活态放弃不透明浅灰平涂(难看、不够 iOS),
+      改为系统控件语汇:<b>分段轨 + 白拇指</b> / <b>品牌轻染</b> / <b>半透明 systemFill</b>。
+      热力格子 <b>4px</b>。对照 <code>localhost:5183/components/github-show?groupId=24</code>。
+    </p>
+    <div class="lock-row">
+      <span class="lock-chip">圆角 <b>B 锁定</b> ctl/tab 8 · pop 12 · card 12 · panel 10</span>
+      <span class="lock-chip">热力格子 <b>4px</b></span>
+      <span class="lock-chip">卡片化 <b>开</b></span>
+      <span class="lock-chip">激活态 <b>iOS · 非泥灰</b></span>
+    </div>
+  </div>
+
+  <div class="soft-bar" id="softBar">
+    <span class="soft-bar__label">激活态</span>
+    <div class="soft-btns">
+      <button type="button" class="soft-btn is-active" data-soft="seg"><b>seg</b> 分段浮起</button>
+      <button type="button" class="soft-btn" data-soft="tint"><b>tint</b> 绿轻染</button>
+      <button type="button" class="soft-btn" data-soft="fill"><b>fill</b> 半透明填</button>
+    </div>
+    <span class="soft-desc" id="softDesc">定稿 · 半透明轨 + 白底拇指,无阴影;图表页无规则分隔线,靠卡片间隙分层。</span>
+  </div>
+
+  <div class="page" id="page">
+    <div class="gh-topbar">
+      <div class="gh-topbar__left">
+        <span class="gh-title">GitHub 项目数据库</span>
+        <span class="gh-meta">23 个项目</span>
+      </div>
+      <div class="gh-topbar__right">
+        <span class="gh-pill gh-pill--ok">公开分享 · github-show · #24</span>
+        <button type="button" class="gh-btn">复制链接</button>
+        <button type="button" class="gh-btn gh-btn--primary">我也要用</button>
+      </div>
+    </div>
+
+    <div class="gh-display">
+      <div class="gh-dtoolbar">
+        <div class="gh-viewswitch" id="viewSwitch">
+          <button type="button" class="gh-viewswitch__btn is-active" data-view="table">表格</button>
+          <button type="button" class="gh-viewswitch__btn" data-view="chart">图表</button>
+        </div>
+        <button type="button" class="gh-btn">导出 PDF</button>
+      </div>
+
+      <div id="view-table">
+        <div class="gh-gstat">
+          <div class="gh-gstat__heatcard">
+            <span class="gh-gstat__title">提交记录 <span class="tag-now">格子 r=4px</span></span>
+            <div class="gh-heat" id="heat"></div>
+            <div class="gh-heat-legend">少 <i style="background:#ECEFF1"></i><i style="background:#CFE8D6"></i><i style="background:#7FC794"></i><i style="background:#2F9C55"></i><i style="background:#177F37"></i> 多</div>
+          </div>
+          <div class="gh-gstat__textcard">
+            <div class="gh-gstat__texttitle">提交统计</div>
+            <dl class="gh-facts">
+              <div class="gh-fact"><dt>过去一年提交</dt><dd><b>2576</b><i>次</i></dd></div>
+              <div class="gh-fact"><dt>当前连续</dt><dd><b>15</b><i>天</i></dd></div>
+              <div class="gh-fact"><dt>最长连续</dt><dd><b>27</b><i>天</i></dd></div>
+              <div class="gh-fact"><dt>覆盖仓库</dt><dd><b>2</b><i>/22</i></dd></div>
+              <div class="gh-fact"><dt>统计于</dt><dd><i class="tag-now" style="font-size:12px;color:var(--text-2)">2026-09-30</i></dd></div>
+            </dl>
+            <div class="gh-popover">20 个仓库未统计 · 2 个链接无效 · 18 个匿名配额已用尽</div>
+          </div>
+        </div>
+
+        <div class="gh-tablewrap">
+          <div class="gh-table">
+            <div class="gh-th">GITHUB 链接</div><div class="gh-th">项目名</div><div class="gh-th">亮点</div><div class="gh-th">产出</div><div class="gh-th">是否公开</div>
+            <div class="gh-tr" style="display:contents">
+              <div class="gh-td"><a class="gh-link" href="#">On-DevPlan/ve</a></div>
+              <div class="gh-td">On-DevPlan/ve</div>
+              <div class="gh-td"><span class="gh-dim">1. 同时兼容 react/vue 的浏览器项目,错误一键定位,展示「运行时」运行 2. 预览一体化…</span></div>
+              <div class="gh-td"><span class="gh-dim">action 特缘发布 https://…</span></div>
+              <div class="gh-td">是</div>
+            </div>
+            <div class="gh-tr" style="display:contents">
+              <div class="gh-td"><a class="gh-link" href="#">ZHLX2005/fr</a></div>
+              <div class="gh-td">ZHLX2005/fr</div>
+              <div class="gh-td"><span class="gh-dim">1. 完全开源 2. 支持最通用的状态模式(即使没系统学过 UIA 设计)3. 有详细指南…</span></div>
+              <div class="gh-td"><span class="gh-dim">直接可安装</span></div>
+              <div class="gh-td">是</div>
+            </div>
+            <div class="gh-tr" style="display:contents">
+              <div class="gh-td"><a class="gh-link" href="#">ZHLX2005/br_ct</a></div>
+              <div class="gh-td">ZHLX2005/br_ct</div>
+              <div class="gh-td"><span class="gh-dim">1. 提示词的自管理 2. windows的nativehost 实现本地文件 BG时管理 3. skill 管理环境…</span></div>
+              <div class="gh-td"><span class="gh-dim">直接可安装</span></div>
+              <div class="gh-td">是</div>
+            </div>
+            <div class="gh-sum" style="grid-column: 1 / -1;">共 23 条</div>
+          </div>
+        </div>
+
+        <div class="gh-pagination">
+          <button type="button" class="gh-pager" aria-label="上一页">‹</button>
+          <button type="button" class="gh-pager is-active" aria-current="page">1</button>
+          <button type="button" class="gh-pager">2</button>
+          <button type="button" class="gh-pager">3</button>
+          <button type="button" class="gh-pager" aria-label="下一页">›</button>
+          <span style="margin-left:6px">10 条/ 页</span>
+          <span>跳至</span>
+          <button type="button" class="gh-pager" style="min-width:40px">1</button>
+          <span>页</span>
+        </div>
+      </div>
+
+      <div id="view-chart" hidden>
+        <div class="gh-dstats">
+          <div class="gh-dstat"><b>23</b><span>项目总数</span></div>
+          <div class="gh-dstat"><b>14</b><span>已填充点</span></div>
+          <div class="gh-dstat"><b>14</b><span>已填写</span></div>
+          <div class="gh-dstat"><b>65%</b><span>内容完整度</span></div>
+        </div>
+
+        <div class="gh-dcharts">
+          <div class="gh-dchart">
+            <div class="gh-dchart__title">项目介绍充实度
+              <span class="legend-dot"><i style="background:var(--primary)"></i>亮点</span>
+              <span class="legend-dot"><i style="background:#C9CDD3"></i>暗发</span>
+            </div>
+            <div class="bars" id="bars"></div>
+            <div class="bars-x" id="barsX"></div>
+          </div>
+          <div class="gh-dchart">
+            <div class="gh-dchart__title">杂点填写率</div>
+            <div class="donut-row">
+              <svg width="150" height="150" viewBox="0 0 120 120" aria-hidden="true">
+                <circle cx="60" cy="60" r="44" fill="none" stroke="#E8EAED" stroke-width="16"/>
+                <!-- C≈276; 65% ≈ 179.5 -->
+                <circle cx="60" cy="60" r="44" fill="none" style="stroke:var(--ring)" stroke-width="16"
+                        stroke-dasharray="179.5 96.5" stroke-dashoffset="69" stroke-linecap="butt"/>
+              </svg>
+              <div class="donut-legend">
+                <span class="legend-dot"><i style="background:var(--ring)"></i>已填亮点 65%</span>
+                <span class="legend-dot"><i style="background:#E8EAED"></i>未填亮点</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="gh-gstat--full">
+          <div class="gh-gstat__fullhead">过一年 <b>2576</b> 次提交 <span class="tag-now">(2/22 个仓库合并) · 统计于 2026-09-30</span></div>
+          <div class="gh-heat" id="heatFull"></div>
+          <div class="gh-gstat__fullfoot">
+            <span>当前连续 15 天 · 最长连续 27 天 · 覆盖 2/22 个仓库</span>
+            <span class="gh-heat-legend" style="margin:0">少 <i style="background:#ECEFF1"></i><i style="background:#CFE8D6"></i><i style="background:#7FC794"></i><i style="background:#2F9C55"></i><i style="background:#177F37"></i> 多</span>
+          </div>
+          <div class="gh-gstat__failsum">2 个仓库数据未统计 · 2 个链接无效 · 18 个匿名配额已用尽</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sample-grid">
+    <div class="sample-card">
+      <h3>控件 · 输入</h3>
+      <div class="sample-row">
+        <input class="gh-search" placeholder="搜索 · 下划线(不参与圆角)">
+        <input class="gh-input" value="输入框 r-ctl 8">
+        <select class="gh-select"><option>下拉 r-ctl 8</option></select>
+      </div>
+      <div class="sample-row">
+        <textarea class="gh-textarea" rows="2">文本域 r-ctl 8 —— 编辑视图「亮点」列同款</textarea>
+      </div>
+      <div class="sample-row">
+        <span class="gh-chip">标签 chip</span>
+        <span class="gh-chip">react</span>
+        <span class="gh-chip">vue</span>
+        <span class="gh-pill gh-pill--ok">已同步</span>
+        <span class="gh-pill" style="color:#b91c1c">2 个链接无效</span>
+      </div>
+    </div>
+    <div class="sample-card">
+      <h3>浮层 · 弹窗(r-pop 12)</h3>
+      <div class="gh-modal-mock">
+        <div class="gh-modal-mock__backdrop"></div>
+        <div class="gh-modal">
+          <h4>列设置</h4>
+          <p>拖拽排序或勾选可见列。弹窗面板圆角随 r-pop。</p>
+          <div class="gh-modal__foot">
+            <button type="button" class="gh-btn">取消</button>
+            <button type="button" class="gh-btn gh-btn--primary">确定</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="notes">
+    <h2>为何丢掉不透明浅灰</h2>
+    <ul>
+      <li><b>问题</b>:<code>#E9EBEE</code> / <code>#EEF0F3</code> 平涂是「死灰」,和卡片/画布同阶,显脏,也不像 iOS。</li>
+      <li><b>seg(默认)</b>:学 UISegmentedControl —— <code>rgba(118,118,128,.12)</code> 轨 + 白拇指 + 轻阴影。选中靠浮起,不是靠涂灰。</li>
+      <li><b>tint</b>:学列表选中 —— <code>rgba(23,127,55,.12)</code> 绿轻染 + 绿字,零灰色块。</li>
+      <li><b>fill</b>:学 secondarySystemFill —— <code>rgba(120,120,128,.16)</code> 半透明,透出底色,比实心灰干净。</li>
+      <li>圆角仍 B;热力格子 4px(略圆不过圆)。</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+const SOFT_NOTES = {
+  seg: '定稿 · 半透明轨 + 白底拇指,无阴影;图表页无规则分隔线,靠卡片间隙分层。',
+  tint: '列表选中感:品牌绿 12% 轻染 + 深绿字。完全不堆灰,和 primary 语汇连续。',
+  fill: 'secondarySystemFill:rgba(120,120,128,.16) 半透明系统灰,透出底色;比不透明 #E9EBEE 干净得多。',
+};
+
+document.getElementById('softBar').addEventListener('click', (e) => {
+  const btn = e.target.closest('.soft-btn');
+  if (!btn) return;
+  document.querySelectorAll('#softBar .soft-btn').forEach((b) => b.classList.toggle('is-active', b === btn));
+  document.body.dataset.soft = btn.dataset.soft;
+  document.getElementById('softDesc').textContent = SOFT_NOTES[btn.dataset.soft];
+});
+
+document.getElementById('viewSwitch').addEventListener('click', (e) => {
+  const btn = e.target.closest('.gh-viewswitch__btn');
+  if (!btn) return;
+  document.querySelectorAll('#viewSwitch .gh-viewswitch__btn').forEach((b) => b.classList.toggle('is-active', b === btn));
+  document.getElementById('view-table').hidden = btn.dataset.view !== 'table';
+  document.getElementById('view-chart').hidden = btn.dataset.view !== 'chart';
+});
+
+const LEVELS = ['#ECEFF1', '#CFE8D6', '#7FC794', '#2F9C55', '#177F37'];
+function fillHeat(el) {
+  let html = '';
+  for (let c = 0; c < 53; c++) {
+    for (let r = 0; r < 7; r++) {
+      const v = Math.random();
+      const lv = v > .93 ? 4 : v > .8 ? 3 : v > .6 ? 2 : v > .3 ? 1 : 0;
+      html += `<i style="background:${LEVELS[lv]}"></i>`;
+    }
+  }
+  el.innerHTML = html;
+}
+fillHeat(document.getElementById('heat'));
+fillHeat(document.getElementById('heatFull'));
+
+const REPOS = ['chess', 'sudoku', 'fr', 've', 'nx-pn', 'py-ee', 'br_ct', 'br_tb', 'rt', 'rt-', 'p-n', 'i-r'];
+const bars = document.getElementById('bars');
+const barsX = document.getElementById('barsX');
+let bh = '', bx = '';
+for (let i = 0; i < 12; i++) {
+  const hi = 18 + Math.round(Math.random() * 82);
+  const dim = 10 + Math.round(Math.random() * 90);
+  bh += `<div class="bar-g"><i class="bar bar--hi" style="height:${hi}%"></i><i class="bar bar--dim" style="height:${dim}%"></i></div>`;
+  bx += `<span>${REPOS[i]}</span>`;
+}
+bars.innerHTML = bh;
+barsX.innerHTML = bx;
+</script>
+</body>
+</html>

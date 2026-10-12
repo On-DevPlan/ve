@@ -116,6 +116,24 @@
 //   effect 只剩「构造 store → 两段调用 → cleanup 置 cancelled」。
 //   行为等价的两处顺带清理:配额耗尽从「继续遍历但每条 continue」改成
 //   `break` + `queue.slice(cursor)` 收集剩余,阶段边界成为真的早退。
+//
+// v1.6.44 版式分叉(用户反馈:表格页统计区太高,挤掉表格可视行数):
+//   热力图是 53 列 × aspect-ratio:1 的方格,铺满容器宽 → 1440 视口下每格约
+//   25px、7 行约 180px,整块(标题+标尺+网格+脚注)约 260px,全压在表格上方。
+//   新增 variant:
+//     · 'full'(默认)  —— 现状不变,整行大热力图(「图表」tab 底部);
+//     · 'split'       —— 左卡片热力图(限宽 ⇒ 格子变小、整块显著变矮)+
+//                        右卡片**文字**提交统计(过去一年次数 / 当前·最长连续 /
+//                        覆盖仓库 / 统计日);表格 tab 用它,把高度让给表格。
+//   两种变体共用同一套 heat 子树与 notes —— 保持 .sl-gh-heat__cell 与
+//   .sl-gh-gstat__note* 的结构/数量一致,既有单测(覆盖诚实化 / 失败提示)
+//   两条路径都能命中。
+//
+// v1.6.45 失败明细收敛 → v1.6.46 一律一行:
+//   失败提示(含 ≤3 条)默认只留**一行汇总**+「立即重试」,逐条明细收进
+//   <details> 默认关闭 —— 收起态不再挤占表格可视高度。
+//   明细仍在 DOM(details 关闭不影响 textContent),单测「点名仓库 + 原因」
+//   契约照旧成立。
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { GithubShowDoc } from '@api/components/github-show/types';
@@ -152,6 +170,9 @@ interface CommitStatsProps {
   doc: GithubShowDoc;
   /** 公开分享模式参数(?groupId=&key=);null = 编辑自己的文档 */
   publicParams: { key: string; groupId: number } | null;
+  /** v1.6.44 版式:full = 整行大热力图(默认,「图表」tab);split = 左热力图 +
+   *  右文字统计(「表格」tab,压低整块高度给表格让位)。 */
+  variant?: 'full' | 'split';
 }
 
 /** v1.6.38 热力图槽位:数据格(引擎 HeatCell)/ 'future' 快照日之后的未来格 /
@@ -177,7 +198,7 @@ function extractRepos(doc: GithubShowDoc): string[] {
   return out;
 }
 
-export default function CommitStats({ doc, publicParams }: CommitStatsProps) {
+export default function CommitStats({ doc, publicParams, variant = 'full' }: CommitStatsProps) {
   // 去重后的仓库列表(按行序);doc 变更(导入/编辑行)→ 重新对齐
   const repos = useMemo(() => extractRepos(doc), [doc]);
 
@@ -333,6 +354,9 @@ export default function CommitStats({ doc, publicParams }: CommitStatsProps) {
 
   if (repos.length === 0) return null; // 没有 GitHub 链接就不渲染这块
 
+  // v1.6.44 版式开关:split = 左热力图 + 右文字统计(表格 tab)
+  const split = variant === 'split';
+
   const now = Date.now();
   const missingCount = repos.length - doneList.length;
   // v1.6.39:同样按「核对时刻」算 —— 探测确认过无新提交的仓库不算过期快照
@@ -362,11 +386,51 @@ export default function CommitStats({ doc, publicParams }: CommitStatsProps) {
     setRetryTick((t) => t + 1);
   }
 
+  // ── v1.6.45 失败提示收敛 ──────────────────────────────────────────────
+  // 一行汇总 = 数量 + 按原因分组的计数(「2 个链接无效 · 18 个匿名配额已用尽」),
+  // 逐条明细只在这行下面,默认收起。原因分组直接吃 FAIL_REASON_LABEL。
+  const failReasonSummary = (() => {
+    const parts: string[] = [];
+    if (goneList.length > 0) parts.push(`${goneList.length} 个链接无效`);
+    const byReason = new Map<string, number>();
+    for (const e of retryList) {
+      const label = FAIL_REASON_LABEL[e.reason ?? 'unknown'];
+      byReason.set(label, (byReason.get(label) ?? 0) + 1);
+    }
+    for (const [label, n] of byReason) parts.push(`${n} 个${label}`);
+    return parts.join(' · ');
+  })();
+  // v1.6.46:失败提示一律收成一行汇总(默认关闭),明细点开再看 ——
+  // 此前 ≤3 条直接展开会把表格上方占掉一大截,窄屏尤其顶破一屏。
+  const failList = (
+    <ul className="sl-gh-gstat__fails">
+      {goneList.map((e) => (
+        <li key={e.full} className="sl-gh-gstat__fail is-gone">
+          <i className="sl-gh-gstat__fail-dot" aria-hidden="true" />
+          <span className="sl-gh-gstat__fail-repo">{e.full}</span>
+          <span className="sl-gh-gstat__fail-why">{FAIL_REASON_LABEL[e.reason ?? 'unknown']},请检查链接</span>
+        </li>
+      ))}
+      {retryList.map((e) => (
+        <li key={e.full} className="sl-gh-gstat__fail is-retry">
+          <i className="sl-gh-gstat__fail-dot" aria-hidden="true" />
+          <span className="sl-gh-gstat__fail-repo">{e.full}</span>
+          <span className="sl-gh-gstat__fail-why">{FAIL_REASON_LABEL[e.reason ?? 'unknown']}</span>
+        </li>
+      ))}
+    </ul>
+  );
+
   return (
-    <div className="sl-gh-gstat">
+    <div className={`sl-gh-gstat${split ? ' is-split' : ''}`}>
+      {/* v1.6.44:head + heat 归入 heatcard —— full 下只是一层透传的块级 div
+          (不引入任何视觉变化);split 下它是 grid 的左卡片。 */}
+      <div className="sl-gh-gstat__heatcard">
       <div className="sl-gh-gstat__head">
         <span className="sl-gh-gstat__title">
-          {summary ? (
+          {split ? (
+            '提交记录'
+          ) : summary ? (
             <>
               过去一年 <b>{summary.yearCount}</b> 次提交
               <span className="sl-gh-gstat__cover">
@@ -377,7 +441,7 @@ export default function CommitStats({ doc, publicParams }: CommitStatsProps) {
             '提交统计'
           )}
         </span>
-        {summary ? <span className="sl-gh-gstat__asof">统计于 {summary.asOf}</span> : null}
+        {!split && summary ? <span className="sl-gh-gstat__asof">统计于 {summary.asOf}</span> : null}
       </div>
       {/* v1.6.38 单一渲染路径:骨架与数据不再各写一棵子树 —— 两棵树时 React 会
           整体替换掉 371 个格子节点(class 切换不经过 CSS 过渡,「从无到有」依旧
@@ -428,17 +492,20 @@ export default function CommitStats({ doc, publicParams }: CommitStatsProps) {
           })}
         </div>
         <div className="sl-gh-heat__foot">
-          <span className="sl-gh-heat__streaks">
-            {summary ? (
-              `当前连续 ${summary.currentStreak} 天 · 最长连续 ${summary.longestStreak} 天`
-            ) : renewing.length > 0 ? (
-              `统计中(${doneList.length}/${repos.length})…`
-            ) : mayFetch ? (
-              '暂无统计数据,将分批自动续期'
-            ) : (
-              '未统计(编辑者访问本页时自动生成)'
-            )}
-          </span>
+          {/* split:连续天数挪到右侧文字卡片,foot 只留色阶图例 */}
+          {!split ? (
+            <span className="sl-gh-heat__streaks">
+              {summary ? (
+                `当前连续 ${summary.currentStreak} 天 · 最长连续 ${summary.longestStreak} 天`
+              ) : renewing.length > 0 ? (
+                `统计中(${doneList.length}/${repos.length})…`
+              ) : mayFetch ? (
+                '暂无统计数据,将分批自动续期'
+              ) : (
+                '未统计(编辑者访问本页时自动生成)'
+              )}
+            </span>
+          ) : null}
           <span className="sl-gh-heat__legend">
             少
             {[0, 1, 2, 3, 4].map((l) => (
@@ -448,6 +515,58 @@ export default function CommitStats({ doc, publicParams }: CommitStatsProps) {
           </span>
         </div>
       </div>
+      </div>
+      {split ? (
+        <div className="sl-gh-gstat__textcard">
+          <div className="sl-gh-gstat__texttitle">提交统计</div>
+          {summary ? (
+            <dl className="sl-gh-gstat__facts">
+              <div className="sl-gh-gstat__fact">
+                <dt>过去一年提交</dt>
+                <dd>
+                  <b>{summary.yearCount}</b>
+                  <i>次</i>
+                </dd>
+              </div>
+              <div className="sl-gh-gstat__fact">
+                <dt>当前连续</dt>
+                <dd>
+                  <b>{summary.currentStreak}</b>
+                  <i>天</i>
+                </dd>
+              </div>
+              <div className="sl-gh-gstat__fact">
+                <dt>最长连续</dt>
+                <dd>
+                  <b>{summary.longestStreak}</b>
+                  <i>天</i>
+                </dd>
+              </div>
+              <div className="sl-gh-gstat__fact">
+                <dt>覆盖仓库</dt>
+                <dd>
+                  <b>{summary.covered}</b>
+                  <i>/{repos.length}</i>
+                </dd>
+              </div>
+              <div className="sl-gh-gstat__fact">
+                <dt>统计于</dt>
+                <dd>
+                  <i className="sl-gh-gstat__fact-date">{summary.asOf}</i>
+                </dd>
+              </div>
+            </dl>
+          ) : (
+            <p className="sl-gh-gstat__status">
+              {renewing.length > 0
+                ? `统计中(${doneList.length}/${repos.length})…`
+                : mayFetch
+                  ? '暂无统计数据,将分批自动续期'
+                  : '未统计(编辑者访问本页时自动生成)'}
+            </p>
+          )}
+        </div>
+      ) : null}
       {renewing.length > 0 ? (
         <div className="sl-gh-gstat__note">统计更新中(剩余 {renewing.length} 个仓库)…</div>
       ) : null}
@@ -465,40 +584,39 @@ export default function CommitStats({ doc, publicParams }: CommitStatsProps) {
       ) : null}
       {failedEntries.length > 0 ? (
         <div className="sl-gh-gstat__note sl-gh-gstat__note--fails">
-          {/* v1.6.35 条目化:每仓库一行(名左 · 原因右),替代揉成一行的长句 */}
-          <ul className="sl-gh-gstat__fails">
-            {goneList.map((e) => (
-              <li key={e.full} className="sl-gh-gstat__fail is-gone">
-                <i className="sl-gh-gstat__fail-dot" aria-hidden="true" />
-                <span className="sl-gh-gstat__fail-repo">{e.full}</span>
-                <span className="sl-gh-gstat__fail-why">{FAIL_REASON_LABEL[e.reason ?? 'unknown']},请检查链接</span>
-              </li>
-            ))}
-            {retryList.map((e) => (
-              <li key={e.full} className="sl-gh-gstat__fail is-retry">
-                <i className="sl-gh-gstat__fail-dot" aria-hidden="true" />
-                <span className="sl-gh-gstat__fail-repo">{e.full}</span>
-                <span className="sl-gh-gstat__fail-why">{FAIL_REASON_LABEL[e.reason ?? 'unknown']}</span>
-              </li>
-            ))}
-          </ul>
-          <div className="sl-gh-gstat__fail-foot">
-            <span className="sl-gh-gstat__fail-hint">
-              {retryList.length > 0 && nextRetryText ? nextRetryText : retryList.length > 0 ? '失败项稍后自动重试' : ''}
-              {retryList.length > 0 && goneList.length > 0 ? ' · ' : ''}
-              {goneList.length > 0 ? '无效链接每 7 天复查一次' : ''}
-            </span>
-            {mayFetch ? (
-              <button
-                type="button"
-                className="sl-gh-gstat__retry"
-                onClick={handleRetryFailed}
-                disabled={renewing.length > 0}
-              >
-                {renewing.length > 0 ? '重试中…' : '立即重试'}
-              </button>
-            ) : null}
-          </div>
+          {/* v1.6.46:始终一行汇总 + 默认关闭的明细;重试钮挂在摘要行右侧,
+              不再单独占一条 fail-foot(收起态也只高一行)。 */}
+          <details className="sl-gh-gstat__failbox">
+            <summary className="sl-gh-gstat__failsum">
+              <span className="sl-gh-gstat__failsum-lead">{failedEntries.length} 个仓库未统计</span>
+              {failReasonSummary ? (
+                <span className="sl-gh-gstat__failsum-why">{failReasonSummary}</span>
+              ) : null}
+              <span className="sl-gh-gstat__failsum-toggle" aria-hidden="true" />
+              {mayFetch ? (
+                <button
+                  type="button"
+                  className="sl-gh-gstat__retry"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleRetryFailed();
+                  }}
+                  disabled={renewing.length > 0}
+                >
+                  {renewing.length > 0 ? '重试中…' : '立即重试'}
+                </button>
+              ) : null}
+            </summary>
+            {failList}
+            <div className="sl-gh-gstat__fail-foot">
+              <span className="sl-gh-gstat__fail-hint">
+                {retryList.length > 0 && nextRetryText ? nextRetryText : retryList.length > 0 ? '失败项稍后自动重试' : ''}
+                {retryList.length > 0 && goneList.length > 0 ? ' · ' : ''}
+                {goneList.length > 0 ? '无效链接每 7 天复查一次' : ''}
+              </span>
+            </div>
+          </details>
         </div>
       ) : null}
       {missingCount > 0 && failedEntries.length === 0 && renewing.length === 0 && !mayFetch ? (
