@@ -221,21 +221,20 @@ describe('CommitStats 失败提示(v1.6.34)', () => {
   });
 });
 
-// v1.6.50 GitHub Token 入口:只对编辑者显示(登录 + 非公开分享)。
-// 公开访客既不读 token 也不发 GitHub 请求,不该看到设置入口。
-describe('CommitStats 的 Token 入口(v1.6.50)', () => {
-  it('编辑者(登录 + publicParams=null)→ 出现 Token 入口', async () => {
+// v1.6.50 GitHub Token 入口的归属:设置是**编辑期**的事,入口放在编辑视图的
+// 顶栏操作行(组件根 index.tsx);展示视图的统计卡是给别人看的 —— 不出现任何
+// token 控件,公开访客更不该看到。
+describe('CommitStats 统计卡不承载 Token 入口(v1.6.50)', () => {
+  it('编辑者(登录 + publicParams=null)→ 统计卡内也没有 Token 入口', async () => {
     const el = await mount();
-    const btn = el.querySelector('.sl-gh-gstat__tokenbtn');
-    expect(btn).not.toBeNull();
-    expect(btn!.textContent).toContain('Token');
+    expect(el.querySelector('.sl-gh-gstat__tokenbtn')).toBeNull();
+    expect(el.textContent).not.toContain('Token');
   });
 
-  it('公开分享模式(publicParams 传入)→ 不出现 Token 入口', async () => {
+  it('公开分享模式(publicParams 传入)→ 同样没有 Token 入口', async () => {
     await act(async () => {
       root.render(<CommitStats doc={doc} publicParams={{ key: 'github-show', groupId: 7 }} />);
     });
-    const el = container;
-    expect(el.querySelector('.sl-gh-gstat__tokenbtn')).toBeNull();
+    expect(container.querySelector('.sl-gh-gstat__tokenbtn')).toBeNull();
   });
 });

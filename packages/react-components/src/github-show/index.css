@@ -995,33 +995,13 @@ body.is-dragging * {
 
 /* v1.6.49 窄屏短标签:桌面默认只显示长文案;≤768px 由媒体查询换成短标签 */
 .sl-gh-share__label-short,
-.sl-gh-pill__label-short { display: none; }
+.sl-gh-pill__label-short,
+.sl-gh-token-label-short { display: none; }
 
 /* ===== GitHub Token 设置(v1.6.50)===== */
-/* 统计卡的 token 入口:小字墨线按钮,贴 head 右缘 —— 绿只留 4 处配额,
-   已配置态用中性色(不再抢视线),未配置态提示"该配了"。 */
-.sl-gh-gstat__tokenbtn {
-  flex: none;
-  margin-left: auto;
-  font: inherit;
-  font-size: 11px;
-  line-height: 1;
-  height: 24px;
-  padding: 0 8px;
-  border: 1px solid var(--sl-color-hair, rgba(17, 18, 20, 0.14));
-  border-radius: var(--sl-gh-radius-ctl, 8px);
-  background: transparent;
-  color: var(--sl-color-text-secondary, #5c6169);
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background 0.12s, color 0.12s, border-color 0.12s;
-}
-.sl-gh-gstat__tokenbtn:hover {
-  background: var(--sl-gh-ios-fill-soft, rgba(120, 120, 128, 0.12));
-  color: var(--sl-color-ink, #111214);
-}
-/* 已配置:弱化成一枚状态标签,不再是"待办" */
-.sl-gh-gstat__tokenbtn.is-set {
+/* 入口在**编辑视图的顶栏操作行**(设置是编辑期的事;展示视图是给别人看的,
+   不出现任何 token 控件)。已配置态弱化成状态标签,不抢视线。 */
+.sl-gh-tokenbtn.is-set {
   border-color: transparent;
   color: var(--sl-color-text-tertiary, #9aa0a8);
 }
@@ -2351,20 +2331,29 @@ body.is-dragging * {
      按钮组出现大缝、标题行空心 —— 移动端全部行左聚拢,搜索框靠 flex-grow
      吃掉本行余量,天然右侧贴齐 */
   .sl-gh-topbar__right { display: contents; }
-  /* v1.6.49 移动端顶栏三行:① 标题+视图切换(切换贴右缘) ② 搜索独占一行
-     ③ 工具栏一行(状态/分享/导入/列设置/添加项目)。
-     搜索 basis 100% 强制独占一行;视图切换 margin-left:auto 贴右。 */
-  .sl-gh-viewswitch { margin-left: auto; }
-  .sl-gh-search { flex: 1 1 100%; min-width: 0; }
-  .sl-gh-pill { padding: 2px 5px; gap: 4px; }
+  /* v1.6.49 移动端顶栏三行:① 标题+同步状态+视图切换 ② 搜索独占一行
+     ③ 操作行(分享/Token/导入/列设置/添加项目)。
+     搜索 basis 100% 强制独占一行;状态条并入标题行(窄屏隐掉「N 个项目」
+     —— 分页条已有「共 N 条」),给操作行腾出整行宽度,登录态 6 个控件也放得下。 */
+  .sl-gh-meta { display: none; }
+  .sl-gh-pill { order: 1; padding: 2px 5px; gap: 4px; }
+  .sl-gh-viewswitch { order: 2; margin-left: auto; }
+  .sl-gh-search { order: 3; flex: 1 1 100%; min-width: 0; }
+  .sl-gh-share { order: 4; }
+  .sl-gh-topbar__right > [data-topbtn='token'] { order: 5; }
+  .sl-gh-topbar__right > [data-topbtn='import'] { order: 6; }
+  .sl-gh-topbar__right > [data-topbtn='columns'] { order: 7; }
+  .sl-gh-topbar__right > [data-topbtn='add'] { order: 8; }
   .sl-gh-btn { padding: 0 10px; }
   /* 操作行右端留白时,主按钮推到行尾压轴(次级操作靠左、主 CTA 靠右) */
   .sl-gh-topbar__right > .sl-gh-btn--primary { margin-left: auto; }
   /* 长文案在窄屏换短标签(完整语义保留在 title / 弹层里) */
   .sl-gh-share__label-short,
-  .sl-gh-pill__label-short { display: inline; }
+  .sl-gh-pill__label-short,
+  .sl-gh-token-label-short { display: inline; }
   .sl-gh-share__label-long,
-  .sl-gh-pill__label-long { display: none; }
+  .sl-gh-pill__label-long,
+  .sl-gh-token-label-long { display: none; }
   /* 搜索框吃满同行剩余宽度(列头已由卡片化标签承担,搜索框不再钉固定宽) */
   .sl-gh-table { margin: 12px 14px 0; }
   .sl-gh-table + .sl-gh-pagination { margin: 0 14px; }

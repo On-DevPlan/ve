@@ -37,6 +37,10 @@ const GITHUB_TOKEN_TAGS = ['github-show'] as const;
  */
 let cached: string | null = null;
 
+/** 本会话是否已读过 KV —— 读过就直接给缓存,不再打网络
+ *  (组件根与统计续期各会读一次,没有这个标记就是两次 KV GET)。 */
+let loaded = false;
+
 /** 取当前缓存的 token(未配置返回空串) */
 export function getCachedGithubToken(): string {
   return cached ?? '';
@@ -46,13 +50,16 @@ export function getCachedGithubToken(): string {
 export function setCachedGithubToken(token: string | null): void {
   const v = (token ?? '').trim();
   cached = v === '' ? null : v;
+  loaded = true;
 }
 
 /**
  * 从 KV 读 token(需鉴权)。读不到(未配置 / 无权限 / 网络错)一律当作
  * 「未配置」—— 统计退回匿名请求,行为与今天一致,不因此报错。
+ * 本会话已读过则直接给缓存(force=true 时强制重读)。
  */
-export async function loadGithubToken(): Promise<string> {
+export async function loadGithubToken(force = false): Promise<string> {
+  if (loaded && !force) return getCachedGithubToken();
   try {
     const item = await kvV1Service.get({ key: GITHUB_TOKEN_KV_KEY });
     setCachedGithubToken(typeof item?.value === 'string' ? item.value : '');
