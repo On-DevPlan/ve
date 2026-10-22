@@ -26,7 +26,7 @@ import { createRoot, type Root } from 'react-dom/client';
 // vi.mock 会被提升到文件顶部,工厂里只能用 vi.hoisted 里定义的变量。
 // 日期用固定 epoch(2026-09-20 / 往前 3 天 = 2026-09-17),不用 Date.now() 偏移
 // —— 「相差几天」必须与运行时刻无关,否则测试会随执行时间飘。
-const { fetchMock, served, mixedBlob, sameDayBlob } = vi.hoisted(() => {
+const { fetchMock, served, mixedBlob, sameDayBlob, authState } = vi.hoisted(() => {
   const mk = (full: string, fetchedAt: number, days: Record<string, number>) => ({
     ok: true as const,
     full,
@@ -44,6 +44,7 @@ const { fetchMock, served, mixedBlob, sameDayBlob } = vi.hoisted(() => {
     // 当前被 KV 返回的快照(mount 时切换)—— 放在 hoisted 里,避免 mock 工厂
     // 在模块体之前执行时读到 TDZ 的模块级 let
     served: { blob: null as unknown },
+    authState: { loggedIn: false },
     // a/b 今天核对;c 停在 3 天前(还是新鲜数据,没进续期队列)
     mixedBlob: {
       version: 1,
@@ -67,10 +68,25 @@ const { fetchMock, served, mixedBlob, sameDayBlob } = vi.hoisted(() => {
 
 // 匿名读者:未登录 → 永远不会触发任何 GitHub 请求(也就不会覆盖 fixture)
 vi.mock('@/api/http/auth-store', () => ({
-  useJwtAuth: () => ({ jwtAuthState: 'logged-out', token: null }),
-  getJwtAuthSnapshot: () => ({ jwtAuthState: 'logged-out', token: null }),
+  // 可变:编辑器视图(publicParams=null)要求登录才会读 KV 快照
+  // (v1.6.23:未登录不拉,也不读 —— 分享模式才是公开读路径)
+  useJwtAuth: () => ({
+    jwtAuthState: authState.loggedIn ? 'logged-in' : 'logged-out',
+    token: authState.loggedIn ? 'test-token' : null,
+  }),
+  getJwtAuthSnapshot: () => ({
+    jwtAuthState: authState.loggedIn ? 'logged-in' : 'logged-out',
+    token: authState.loggedIn ? 'test-token' : null,
+  }),
   jwtAuth: {},
 }));
+
+// 续期链 mock 成空实现:本文件只验渲染 —— 真实的续期会重拉并覆盖种子数据,
+// 覆盖诚实化的断言就失去了意义(它验的是「按快照口径画格子」)。
+vi.mock('../src/github-show/src/engine/renewal', async (orig) => {
+  const actual = await orig<typeof import('../src/github-show/src/engine/renewal')>();
+  return { ...actual, runRenewal: vi.fn(async () => {}) };
+});
 
 vi.mock('@api/services', () => ({
   kvV1Service: {
@@ -116,15 +132,27 @@ afterEach(() => {
   act(() => root.unmount());
   container.remove();
   localStorage.clear();
+  authState.loggedIn = false;
 });
 
-async function mount(blob: unknown): Promise<HTMLElement> {
+/**
+ * 挂载统计卡。默认**公开分享模式**(公开访客视角);
+ * v1.6.51 起分享页不渲染运维脚注(覆盖口径说明等)—— 需要断言脚注的用例
+ * 传 mode='editor' 走编辑者自己的展示视图。
+ */
+async function mount(blob: unknown, mode: 'public' | 'editor' = 'public'): Promise<HTMLElement> {
   served.blob = blob;
+  authState.loggedIn = mode === 'editor';
   await act(async () => {
-    root.render(<CommitStats doc={doc} publicParams={{ key: 'demo', groupId: 1 }} />);
+    root.render(
+      <CommitStats
+        doc={doc}
+        publicParams={mode === 'public' ? { key: 'demo', groupId: 1 } : null}
+      />,
+    );
   });
   await act(async () => {
-    await new Promise((r) => setTimeout(r, 0));
+    await new Promise((r) => setTimeout(r, 80));
   });
   return container;
 }
@@ -156,12 +184,19 @@ describe('CommitStats 覆盖诚实化(v1.6.40)', () => {
     expect(cellOfDate(el, '2026-09-18')?.classList.contains('is-partial')).toBe(true);
   });
 
-  it('脚注量化:最近 N 天仅 M/K 个仓库覆盖到当天', async () => {
-    const el = await mount(mixedBlob);
+  it('脚注量化:最近 N 天仅 M/K 个仓库覆盖到当天(编辑者视图)', async () => {
+    const el = await mount(mixedBlob, 'editor');
     const note = el.querySelector('.sl-gh-gstat__note--partial')?.textContent ?? '';
     expect(note).toContain('最近 3 天');
     expect(note).toContain('2/3'); // a、b 覆盖到当天;c 停在快照期
     expect(note).toContain('浅纹');
+  });
+
+  it('分享页(公开访客)不渲染覆盖口径脚注(v1.6.51)', async () => {
+    const el = await mount(mixedBlob);
+    expect(el.querySelector('.sl-gh-gstat__note--partial')).toBeNull();
+    // 但浅纹格子本身照旧(数据诚实性不受影响,只是不再配脚注)
+    expect(el.querySelectorAll('.sl-gh-heat__cell.is-partial').length).toBeGreaterThan(0);
   });
 
   it('全部仓库核对在同一天时不出浅纹(别无中生有)', async () => {

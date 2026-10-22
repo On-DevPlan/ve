@@ -46,6 +46,23 @@ export function getCachedGithubToken(): string {
   return cached ?? '';
 }
 
+/**
+ * token 变更事件(v1.6.51):保存/清除后广播,让统计续期立刻清退避、全量重拉。
+ * 事件而非回调 —— 保存动作在组件根(index.tsx),续期在 CommitStats(展示视图),
+ * 两者不同子树,事件避免一路透传 prop。
+ */
+export const GITHUB_TOKEN_CHANGED_EVENT = 'sl-gh:github-token-changed';
+
+function broadcastTokenChanged(configured: boolean): void {
+  try {
+    window.dispatchEvent(
+      new CustomEvent(GITHUB_TOKEN_CHANGED_EVENT, { detail: { configured } }),
+    );
+  } catch {
+    /* 非浏览器环境(SSR/测试)忽略 */
+  }
+}
+
 /** 写内存缓存(空串/空白 = 未配置) */
 export function setCachedGithubToken(token: string | null): void {
   const v = (token ?? '').trim();
@@ -86,6 +103,7 @@ export async function saveGithubToken(token: string): Promise<void> {
     visibility: 'private',
   });
   setCachedGithubToken(v);
+  broadcastTokenChanged(true);
 }
 
 /** 清除 token(删 key);key 不存在也当清除成功。 */
@@ -96,4 +114,5 @@ export async function clearGithubToken(): Promise<void> {
     // key 不存在(50/404)也算已清除
   }
   setCachedGithubToken('');
+  broadcastTokenChanged(false);
 }
