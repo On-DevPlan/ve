@@ -15,6 +15,7 @@
 //   · 阶段边界变成真正的「早退」:配额耗尽用 break 跳出,不再靠
 //     「继续遍历但每条都 continue」来收集剩余仓库。
 
+import { diag, diagWarn, humanDuration, maskToken } from './diagnostics';
 import {
   GithubRateLimitError,
   currentGithubToken,
@@ -26,11 +27,13 @@ import {
 import {
   GithubShowStatsStore,
   OWNER_PROBE_SKIP_MAX_MS,
+  STATS_RETRY_BACKOFF_MS,
   canSkipByProbe,
   groupReposByOwner,
   isSessionBackoff,
   needsFetch,
   pickSeedEntry,
+  retryBackoffMs,
   probeEditorAccess,
   reasonOfError,
   shouldProbeOwners,
@@ -195,12 +198,46 @@ export async function runRenewal(opts: RenewalOptions): Promise<void> {
   // v1.6.51:已配置 GitHub token → 编辑者侧的省请求限制全部豁免 —— 会话退避
   // 不再生效(配额 5000/h,重试廉价);needsFetch 内部也已豁免限流类 KV 退避。
   const hasToken = currentGithubToken().trim() !== '';
+  // v1.6.52 诊断:本轮没被拉取的仓库逐个记下原因与剩余退避 —— 界面上的失败块
+  // 已按用户要求移除,「2/5 个仓库合并」背后的缺口只能从这里看。
+  const notAttempted: Array<{ full: string; why: string; remain: number }> = [];
   const due = repos.filter((full) => {
     if (forced.has(full)) return true;
-    if (!needsFetch(full, seedBlob, now)) return false;
+    if (!needsFetch(full, seedBlob, now)) {
+      const e = seedBlob?.repos[full];
+      if (e && !e.ok) {
+        notAttempted.push({
+          full,
+          why: e.reason ?? 'unknown',
+          remain: Math.max(0, e.attemptedAt + retryBackoffMs(e.reason) - now),
+        });
+      } else if (e) {
+        notAttempted.push({ full, why: 'fresh(24h 内已统计)', remain: 0 });
+      }
+      return false;
+    }
     if (hasToken) return true;
-    return !isSessionBackoff(sessionAttempted.get(full), now);
+    if (isSessionBackoff(sessionAttempted.get(full), now)) {
+      notAttempted.push({
+        full,
+        why: 'session(本会话已试过)',
+        remain: Math.max(0, (sessionAttempted.get(full) ?? now) + STATS_RETRY_BACKOFF_MS - now),
+      });
+      return false;
+    }
+    return true;
   });
+  diag(
+    `续期开始 · ${repos.length} 个仓库 · token ${maskToken(currentGithubToken())} · ` +
+      `${hasToken ? '鉴权模式(豁免限流退避/会话退避/单次预算)' : '匿名模式(受 6h 限流退避与单次预算限制)'}` +
+      ` · 本轮待拉 ${due.length}`,
+  );
+  if (notAttempted.length > 0) {
+    diag(
+      `未拉取 ${notAttempted.length} 个:`,
+      notAttempted.map((n) => `${n.full}(${n.why}${n.remain > 0 ? `,剩 ${humanDuration(n.remain)}` : ''})`).join(' · '),
+    );
+  }
   for (const full of forced) forced.delete(full);
   if (due.length === 0) return;
 
@@ -240,6 +277,9 @@ export async function runRenewal(opts: RenewalOptions): Promise<void> {
 
   let rateLimited = false;
   let cursor = 0;
+  let okCount = 0;
+  let failCount = 0;
+  const failedByReason = new Map<string, string[]>();
   for (; cursor < queue.length; cursor += 1) {
     // 配额耗尽即跳出(v1.6.23):后续请求注定 403,逐个撞只是白烧。
     if (rateLimited) break;
@@ -251,15 +291,23 @@ export async function runRenewal(opts: RenewalOptions): Promise<void> {
       const stats = await fetchRepoStatsDedup(full);
       writeCachedStats(stats);
       entry = { ok: true, ...stats };
+      okCount += 1;
     } catch (e) {
       if (e instanceof GithubRateLimitError) rateLimited = true;
+      const reason = reasonOfError(e);
       entry = {
         ok: false,
         full,
         attemptedAt: Date.now(),
         error: e instanceof Error ? e.message : '拉取失败',
-        reason: reasonOfError(e),
+        reason,
       };
+      failCount += 1;
+      failedByReason.set(reason, [...(failedByReason.get(reason) ?? []), full]);
+      diagWarn(
+        `拉取失败 ${full} — ${entry.error} · reason=${reason}` +
+          (reason === 'auth' ? ' · 换一枚有效 token 后会自动重拉' : ''),
+      );
     }
     local = { version: 1, repos: { ...local.repos, [full]: entry } };
     if (isCancelled()) return;
@@ -269,6 +317,13 @@ export async function runRenewal(opts: RenewalOptions): Promise<void> {
     // 逐个写回:中途失败/关页,已完成的仓库也已落 KV。
     await saveQuietly(store, local, '本仓库数据仅存本机');
   }
+
+  diag(
+    `续期结束 · 成功 ${okCount} · 失败 ${failCount} · 未拉取 ${notAttempted.length}` +
+      (failedByReason.size > 0
+        ? ` · 失败分组 ${[...failedByReason].map(([r, l]) => `${r}→${l.join(',')}`).join(' | ')}`
+        : ''),
+  );
 
   // ── 阶段 D:配额耗尽,本轮没碰到的整批补记退避 ────────────────────────
   const blocked = queue.slice(cursor);

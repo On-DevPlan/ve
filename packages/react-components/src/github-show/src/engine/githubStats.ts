@@ -211,6 +211,8 @@ export function epochToUtcDateKey(ms: number): string {
 //   - 错误分三类交给 StatsStore 决定退避:仓库不存在/已私有(404,近永久)、
 //     配额耗尽(403/429)、网络或聚合未就绪(短退避,值得很快再试)。
 
+import { diagWarn, maskToken } from './diagnostics';
+
 const API = 'https://api.github.com';
 
 /** 单次请求超时:GitHub 正常响应 <1s,公司网抖动时常见 connect 超时 10s+。 */
@@ -283,6 +285,15 @@ function apiHeaders(): HeadersInit {
     : { Accept: 'application/vnd.github+json' };
 }
 
+/** GitHub 配额头(CORS 已把 X-RateLimit-* 列入 Expose-Headers,浏览器可读)。 */
+function rateLimitOf(res: Response): { limit: string; remaining: string; reset: string } {
+  return {
+    limit: res.headers.get('x-ratelimit-limit') ?? '?',
+    remaining: res.headers.get('x-ratelimit-remaining') ?? '?',
+    reset: res.headers.get('x-ratelimit-reset') ?? '?',
+  };
+}
+
 /**
  * 带超时的 fetch:把「连接超时 / 中断 / DNS」统一抛成 GithubNetworkError,
  * 调用方据此走网络类退避(而不是被当成配额或永久失败)。
@@ -319,11 +330,32 @@ export async function fetchRepoStats(full: string, now = new Date()): Promise<Re
   // 而且 202 响应同样计配额,3 次尝试等于把最坏请求数翻倍。40 分钟后再来
   // 必然命中 GitHub 侧聚合缓存。
   const res = await fetchGithub(`${API}/repos/${full}/stats/commit_activity`);
-  if (res.status === 403 || res.status === 429) throw new GithubRateLimitError();
-  if (res.status === 401) throw new GithubAuthError();
-  if (res.status === 404) throw new GithubRepoGoneError();
-  if (res.status === 202) throw new GithubAggregatingError();
-  if (!res.ok) throw new Error(`GitHub API ${res.status}`);
+  const rl = rateLimitOf(res);
+  if (res.status === 403 || res.status === 429) {
+    diagWarn(
+      `GitHub ${res.status} — ${full} 配额受限(剩余 ${rl.remaining}/${rl.limit},reset ${rl.reset})` +
+        ` · token ${maskToken(currentGithubToken())}`,
+    );
+    throw new GithubRateLimitError();
+  }
+  if (res.status === 401) {
+    diagWarn(
+      `GitHub 401 — ${full} token 无效/被撤销(token ${maskToken(currentGithubToken())})`,
+    );
+    throw new GithubAuthError();
+  }
+  if (res.status === 404) {
+    diagWarn(`GitHub 404 — ${full} 仓库不存在或已私有`);
+    throw new GithubRepoGoneError();
+  }
+  if (res.status === 202) {
+    diagWarn(`GitHub 202 — ${full} 正在聚合该仓库的提交统计,稍后自动重试`);
+    throw new GithubAggregatingError();
+  }
+  if (!res.ok) {
+    diagWarn(`GitHub ${res.status} — ${full} 未知错误(剩余配额 ${rl.remaining}/${rl.limit})`);
+    throw new Error(`GitHub API ${res.status}`);
+  }
   const raw = (await res.json()) as unknown;
   if (!Array.isArray(raw)) throw new Error('GitHub API 未返回提交统计');
   const weeks = raw as CommitActivityWeek[];
