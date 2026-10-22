@@ -17,6 +17,7 @@
 
 import {
   GithubRateLimitError,
+  currentGithubToken,
   fetchRepoStatsDedup,
   probeOwnerPushedAt,
   readCachedStats,
@@ -191,9 +192,13 @@ export async function runRenewal(opts: RenewalOptions): Promise<void> {
 
   // ── 续期队列:缺失 / 过期 / 失败退避期满,且不在本会话退避窗口内 ──────────
   // 截断到单次访问预算,剩余顺延下次访问(不加 attemptedAt,保持原状,下次优先续)。
+  // v1.6.51:已配置 GitHub token → 编辑者侧的省请求限制全部豁免 —— 会话退避
+  // 不再生效(配额 5000/h,重试廉价);needsFetch 内部也已豁免限流类 KV 退避。
+  const hasToken = currentGithubToken().trim() !== '';
   const due = repos.filter((full) => {
     if (forced.has(full)) return true;
     if (!needsFetch(full, seedBlob, now)) return false;
+    if (hasToken) return true;
     return !isSessionBackoff(sessionAttempted.get(full), now);
   });
   for (const full of forced) forced.delete(full);
@@ -225,7 +230,10 @@ export async function runRenewal(opts: RenewalOptions): Promise<void> {
   }
 
   // ── 阶段 C:真正变化的按预算逐个拉 ────────────────────────────────────
-  const queue = probe.toFetch.slice(0, STATS_FETCH_BUDGET);
+  // v1.6.51:有 token 不设单次访问预算,一轮拉完(匿名时代 8 个/次是省配额的)
+  const queue = hasToken
+    ? probe.toFetch
+    : probe.toFetch.slice(0, STATS_FETCH_BUDGET);
   if (queue.length === 0) return;
   let renewing = [...queue];
   hooks.onRenewing(renewing);

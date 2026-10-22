@@ -29,14 +29,22 @@
 import { kvV1Service } from '@api/services';
 import {
   GithubAggregatingError,
+  GithubAuthError,
   GithubNetworkError,
   GithubRateLimitError,
   GithubRepoGoneError,
+  currentGithubToken,
   type RepoStats,
 } from '../engine/githubStats';
 
 /** 失败原因(决定退避档位与文案,见 RETRY_BACKOFF_BY_REASON)。 */
-export type StatsFailReason = 'gone' | 'rate-limit' | 'aggregating' | 'network' | 'unknown';
+export type StatsFailReason =
+  | 'gone'
+  | 'rate-limit'
+  | 'aggregating'
+  | 'network'
+  | 'auth'
+  | 'unknown';
 
 /**
  * 成功条目:完整统计 + v1.6.39 的「探测确认」时刻。
@@ -79,6 +87,10 @@ export function retryBackoffMs(reason: StatsFailReason | undefined): number {
   switch (reason) {
     case 'gone':
       return STATS_RETRY_BACKOFF_GONE_MS;
+    case 'auth':
+      // v1.6.50:token 无效/被撤销 —— 重试无意义,但要短于 gone(用户可能
+      // 马上换 token;换了之后由 token-changed 事件强制重拉,不等退避)
+      return STATS_RETRY_BACKOFF_SHORT_MS;
     case 'rate-limit':
       return STATS_RETRY_BACKOFF_MS;
     case 'network':
@@ -92,6 +104,7 @@ export function retryBackoffMs(reason: StatsFailReason | undefined): number {
 /** 抛出的错误 → 失败原因(纯函数,便于单测)。 */
 export function reasonOfError(e: unknown): StatsFailReason {
   if (e instanceof GithubRepoGoneError) return 'gone';
+  if (e instanceof GithubAuthError) return 'auth';
   if (e instanceof GithubRateLimitError) return 'rate-limit';
   if (e instanceof GithubNetworkError) return 'network';
   if (e instanceof GithubAggregatingError) return 'aggregating';
@@ -102,6 +115,7 @@ export function reasonOfError(e: unknown): StatsFailReason {
 export const FAIL_REASON_LABEL: Record<StatsFailReason, string> = {
   gone: '仓库不存在或已私有',
   'rate-limit': '匿名配额已用尽',
+  auth: 'GitHub Token 无效或已撤销',
   aggregating: 'GitHub 正在聚合',
   network: '网络连接失败',
   unknown: '未知错误',
@@ -153,7 +167,12 @@ export function parseStatsBlob(raw: unknown): GithubStatsBlob | null {
 
 function isFailReason(v: unknown): v is StatsFailReason {
   return (
-    v === 'gone' || v === 'rate-limit' || v === 'aggregating' || v === 'network' || v === 'unknown'
+    v === 'gone' ||
+    v === 'rate-limit' ||
+    v === 'aggregating' ||
+    v === 'network' ||
+    v === 'auth' ||
+    v === 'unknown'
   );
 }
 
@@ -184,6 +203,16 @@ export function needsFetch(full: string, blob: GithubStatsBlob | null, now = Dat
   const e = blob?.repos[full];
   if (!e) return true;
   if (e.ok) return now - entryCheckedAt(e) > STATS_FRESH_MS;
+  // v1.6.51:已配置 GitHub token → 匿名时代的限流退避豁免。6h 退避是给
+  // 匿名 60 次/小时省着用的;token 下 5000 次/小时,重试廉价。
+  // 24h 新鲜窗口保留 —— 挡住 doc 每次编辑引发的续期 effect 重跑风暴。
+  // gone(7d,仓库不存在重拉无意义)与网络/聚合(30min,GitHub 侧确实没就绪)照旧。
+  if (
+    currentGithubToken() &&
+    (e.reason === 'rate-limit' || e.reason === 'unknown' || e.reason === 'auth')
+  ) {
+    return true;
+  }
   return now - e.attemptedAt > retryBackoffMs(e.reason);
 }
 

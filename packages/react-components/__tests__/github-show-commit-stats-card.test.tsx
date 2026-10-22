@@ -70,7 +70,13 @@ vi.mock('@/api/http/auth-store', () => ({
 
 vi.mock('@api/services', () => ({
   kvV1Service: {
-    get: vi.fn(async () => ({ key: 'github-show-stats', value: JSON.stringify(statsBlob) })),
+    // 按 key 分流:统计快照返回 blob,token key 返回空串(否则统计 blob 会被
+    // 当成 token 读进缓存,「无 token」用例就假阳性了)
+    get: vi.fn(async ({ key }: { key: string }) =>
+      key === 'github-show-token'
+        ? { key, value: '' }
+        : { key, value: JSON.stringify(statsBlob) },
+    ),
     getPublic: vi.fn(async () => ({ key: 'github-show-stats', value: JSON.stringify(statsBlob) })),
     set: vi.fn(async () => ({ key: 'github-show-stats' })),
     getPublicUrl: () => '',
@@ -83,6 +89,7 @@ vi.mock('../src/github-show/src/engine/githubStats', async (orig) => {
 });
 
 import CommitStats from '../src/github-show/src/components/CommitStats';
+import { setCachedGithubToken } from '@api/components/github-show/githubToken';
 import type { GithubShowDoc } from '@api/components/github-show/types';
 
 const doc: GithubShowDoc = {
@@ -171,5 +178,68 @@ describe('分享页不渲染运维 note(v1.6.51)', () => {
     expect(container.querySelector('.sl-gh-gstat__note')).toBeNull();
     // 状态段同样不出现
     expect(container.querySelector('.sl-gh-gstat__status')).toBeNull();
+  });
+});
+
+// v1.6.51:配了 token 就不该再受「匿名时代」的省请求限制 ——
+//   · 限流类失败(6h 退避)直接视为需要重拉
+//   · token 保存/清除的事件 → 清会话退避 + 全部强制入队 + 续期重跑
+describe('配了 token 后豁免省请求限制(v1.6.51)', () => {
+  // 文档里必须真的有「限流失败」的仓库 —— 退避判定是按仓库走的
+  const docRl: GithubShowDoc = {
+    version: 1,
+    rows: [
+      { id: 'rl1', repoUrl: 'https://github.com/rl/one', name: 'rl/one', highlights: '', insights: '', output: '', values: {} },
+    ],
+    columns: [],
+  };
+
+  const okStats = {
+    full: 'rl/one',
+    yearCount: 1,
+    currentStreak: 0,
+    longestStreak: 0,
+    days: {},
+    fetchedAt: Date.now(),
+    truncated: false,
+  };
+
+  afterEach(() => {
+    setCachedGithubToken('');
+  });
+
+  async function mountRl(): Promise<void> {
+    await act(async () => {
+      root.render(<CommitStats doc={docRl} publicParams={null} />);
+    });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 60));
+    });
+  }
+
+  it('无 token:限流失败仍在 6h 退避内 → 本次不重拉', async () => {
+    setCachedGithubToken('');
+    await mountRl();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('有 token:限流失败立即重拉(退避豁免)', async () => {
+    setCachedGithubToken('ghp_test');
+    fetchMock.mockResolvedValue(okStats);
+    await mountRl();
+    expect(fetchMock).toHaveBeenCalledWith('rl/one');
+  });
+
+  it('token 变更事件 → 清退避并强制全部重拉', async () => {
+    setCachedGithubToken('');
+    await mountRl();
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    fetchMock.mockResolvedValue(okStats);
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent('sl-gh:github-token-changed', { detail: { configured: true } }));
+      await new Promise((r) => setTimeout(r, 60));
+    });
+    expect(fetchMock).toHaveBeenCalledWith('rl/one');
   });
 });

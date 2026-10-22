@@ -135,7 +135,7 @@
 //   明细仍在 DOM(details 关闭不影响 textContent),单测「点名仓库 + 原因」
 //   契约照旧成立。
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { GithubShowDoc } from '@api/components/github-show/types';
 import { parseRepoUrl } from '../utils/repo';
 import { useJwtAuth } from '../hooks/useAuth';
@@ -146,6 +146,7 @@ import {
   mergeDays,
   monthLabels,
   readCachedStats,
+  setGithubTokenProvider,
   type HeatCell,
 } from '../engine/githubStats';
 import { loadStatsSeed, runRenewal } from '../engine/renewal';
@@ -157,7 +158,11 @@ import {
   type GithubStatsEntry,
   type StatsFailReason,
 } from '../storage/StatsStore';
-import { loadGithubToken } from '@api/components/github-show/githubToken';
+import {
+  GITHUB_TOKEN_CHANGED_EVENT,
+  getCachedGithubToken,
+  loadGithubToken,
+} from '@api/components/github-show/githubToken';
 
 /** 会话内尝试登记(v1.6.28):full → 本页面会话上次真实尝试时刻。
  * 不依赖 KV 写回成败 —— 写回失败时 KV 里没有退避记录,没有这层登记,
@@ -220,6 +225,9 @@ export default function CommitStats({ doc, publicParams, variant = 'full' }: Com
   });
   const [mayFetch, setMayFetch] = useState(false);
   const [renewing, setRenewing] = useState<string[]>([]);
+  // v1.6.51:token 变更 → 强制重拉通道(无视会话退避与 needsFetch 的限流退避)
+  const [retryTick, setRetryTick] = useState(0);
+  const forcedReposRef = useRef<Set<string>>(new Set());
   // v1.6.50 GitHub Token:编辑者自己的 PAT 存本账号 private KV key,统计请求
   // 带鉴权头(5000 次/小时)而不是匿名(60 次/小时/IP,十几个仓库就限流)。
   // token 的读取与 provider 装配在**组件根**(index.tsx)做 —— 设置入口也放在
@@ -280,7 +288,7 @@ export default function CommitStats({ doc, publicParams, variant = 'full' }: Com
         repos,
         seedBlob: { version: 1, repos: seeded },
         baseBlob: blob,
-        forced: new Set<string>(),
+        forced: forcedReposRef.current,
         sessionAttempted: sessionAttemptedAt,
         isCancelled: () => cancelled,
         hooks: {
@@ -295,7 +303,29 @@ export default function CommitStats({ doc, publicParams, variant = 'full' }: Com
     };
     // repos 由 doc 派生;publicParams/isLoggedIn 变化重新对齐
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [doc, publicParams, isLoggedIn]);
+  }, [doc, publicParams, isLoggedIn, retryTick]);
+
+  // 引擎取 token 的入口:应用层缓存(private KV 读出)→ 引擎按需取。
+  // 组件根也装一遍(同一条闭包,幂等);装在子侧是因为 React 的 effect 是
+  // 子先于父,续期可能早于父组件的装配 effect。
+  useEffect(() => {
+    setGithubTokenProvider(() => getCachedGithubToken());
+  }, []);
+
+  // ── v1.6.51 token 变更 → 立刻全量重拉 ──────────────────────────────
+  // 现象(用户实测):此前匿名失败把仓库打进 6h KV 退避,贴上 PAT 后统计仍然
+  // 「暂无数据」—— 队列一个都不拉。这里在 token 保存/清除时:清掉会话退避
+  // + 把全部仓库强制入队 + 触发续期 effect 重跑(配了 token 就没有省请求
+  // 的必要,配额 5000/小时)。
+  useEffect(() => {
+    const onTokenChanged = () => {
+      sessionAttemptedAt.clear();
+      forcedReposRef.current = new Set(repos);
+      setRetryTick((t) => t + 1);
+    };
+    window.addEventListener(GITHUB_TOKEN_CHANGED_EVENT, onTokenChanged);
+    return () => window.removeEventListener(GITHUB_TOKEN_CHANGED_EVENT, onTokenChanged);
+  }, [repos]);
 
   // 注:repos 是 'owner/repo' 字符串数组(extractRepos 已去重),不是对象
   const doneList = repos.map((full) => entries[full]).filter((e): e is Extract<GithubStatsEntry, { ok: true }> => e?.ok === true);
