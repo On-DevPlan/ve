@@ -273,6 +273,15 @@ export default function CommitStats({ doc, publicParams, variant = 'full' }: Com
       if (cancelled) return;
       setEntries(seeded);
       setMayFetch(fetchable);
+      // v1.6.52 诊断:这轮能不能拉、为什么不能 —— 界面上没有失败块了,
+      // 「2/5 个仓库合并」的缺口从这行开始追。
+      const seedOk = Object.values(seeded).filter((e) => e?.ok === true).length;
+      diag(
+        `统计种子 · 仓库 ${repos.length} · 快照已覆盖 ${seedOk} · ` +
+          `可续期 ${fetchable ? '是' : '否'}` +
+          `${fetchable ? '' : publicParams ? '(公开访客:永不拉 GitHub)' : '(未登录)'}` +
+          ` · token ${maskToken(getCachedGithubToken())}`,
+      );
 
       // 2) 编辑者:后台增量续期(owner 探测 → 跳过 / 逐个拉取 → 写回 KV)。
       //    访客(fetchable=false)到此为止 —— 永远 0 次 GitHub 请求。
