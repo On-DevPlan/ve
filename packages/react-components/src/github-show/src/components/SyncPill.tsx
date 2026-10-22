@@ -18,7 +18,11 @@ export default function SyncPill({ status, syncStatus, isLoggedIn, onLogin, onRe
   if (!isLoggedIn) {
     return (
       <span className="sl-gh-pill sl-gh-pill--guest">
-        游客模式 · 本机保存
+        {/* v1.6.49 移动端短标签:窄屏工具栏一行要放下全部控件,「游客模式 ·
+            本机保存」占 120px 挤不下 —— ≤768px 换「游客」,完整说明仍在
+            本地存储语义与登录入口里。 */}
+        <span className="sl-gh-pill__label-long">游客模式 · 本机保存</span>
+        <span className="sl-gh-pill__label-short">游客</span>
         <button type="button" className="sl-gh-pill__btn" onClick={onLogin}>
           登录
         </button>

@@ -294,12 +294,6 @@ export default function GithubShow() {
           onClose={() => setImportOpen(false)}
         />
       )}
-
-      <footer className="sl-gh-foot">
-        {store.readOnly
-          ? '公开分享模式 — 通过 URL groupId 参数只读访问,不会写入任何数据。'
-          : '数据整体保存在一个云端 key(github-show);未登录时仅保存在本机浏览器。'}
-      </footer>
     </div>
   );
 }

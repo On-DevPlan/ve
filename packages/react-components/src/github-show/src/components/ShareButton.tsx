@@ -198,7 +198,17 @@ export default function ShareButton({ ready = true }: ShareButtonProps) {
         aria-expanded={open}
         title="公开分享:设置可见性 + 复制分享链接"
       >
-        {isPublic ? '已公开' : '设为公开分享'}
+        {/* v1.6.49 移动端短标签:窄屏工具栏要一行放下全部操作,长文案
+            「设为公开分享」占 92px 挤不下 —— ≤768px 换「分享」两字,
+            完整语义仍在 title 与弹层里。 */}
+        {isPublic ? (
+          '已公开'
+        ) : (
+          <>
+            <span className="sl-gh-share__label-long">设为公开分享</span>
+            <span className="sl-gh-share__label-short">分享</span>
+          </>
+        )}
       </button>
 
       {open && (

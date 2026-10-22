@@ -53,7 +53,9 @@ export interface GithubShowTableProps {
   onPageSizeChange: (size: number) => void;
 }
 
-/** 自动撑高 textarea:内容变长时高度跟随,超出不出现滚动条。 */
+/** 自动撑高 textarea:内容变长时高度跟随,超出不出现滚动条。
+ *  v1.6.47 行高由内容决定(与展示视图一致):ResizeObserver 监听自身尺寸 ——
+ *  列宽拖拽/视口变化引起折行数变化时重新撑高,不再依赖 value 变化才触发。 */
 function AutoTextarea({
   value,
   placeholder,
@@ -80,6 +82,14 @@ function AutoTextarea({
 
   useEffect(() => {
     resize();
+  }, []);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => resize());
+    ro.observe(el);
+    return () => ro.disconnect();
   }, []);
 
   return (
@@ -477,7 +487,8 @@ function GithubShowTable({
             data-row-id={row.id}
             onKeyDown={(e) => handleRowKeyDown(e)}
           >
-            <div className="sl-gh-cell sl-gh-cell--url" role="cell">
+            {/* data-label:移动端卡片化(≤768px)时逐格 ::before 显示字段名 */}
+            <div className="sl-gh-cell sl-gh-cell--url" role="cell" data-label="GitHub 链接">
               {!readOnly && (
                 <button
                   type="button"
@@ -501,7 +512,7 @@ function GithubShowTable({
                 onCommit={(v) => handleRepoUrlCommit(row, v)}
               />
             </div>
-            <div className="sl-gh-cell sl-gh-cell--name" role="cell">
+            <div className="sl-gh-cell sl-gh-cell--name" role="cell" data-label="项目名">
               <input
                 className="sl-gh-input"
                 value={row.name}
@@ -510,7 +521,7 @@ function GithubShowTable({
                 onChange={(e) => onUpdateRow(row.id, { name: e.target.value })}
               />
             </div>
-            <div className="sl-gh-cell sl-gh-cell--highlights" role="cell">
+            <div className="sl-gh-cell sl-gh-cell--highlights" role="cell" data-label="亮点">
               <AutoTextarea
                 value={row.highlights}
                 placeholder="技术亮点、难点与成果…"
@@ -518,7 +529,7 @@ function GithubShowTable({
                 onChange={(v) => onUpdateRow(row.id, { highlights: v })}
               />
             </div>
-            <div className="sl-gh-cell sl-gh-cell--insights" role="cell">
+            <div className="sl-gh-cell sl-gh-cell--insights" role="cell" data-label="启发">
               <AutoTextarea
                 value={row.insights}
                 placeholder="做这件事的收获、可复用的思路…"
@@ -526,7 +537,7 @@ function GithubShowTable({
                 onChange={(v) => onUpdateRow(row.id, { insights: v })}
               />
             </div>
-            <div className="sl-gh-cell sl-gh-cell--demo" role="cell">
+            <div className="sl-gh-cell sl-gh-cell--demo" role="cell" data-label="产出">
               <AutoTextarea
                 value={row.output}
                 placeholder="可选:产出 / 成果链接或说明,含 http 自动可点…"
@@ -539,6 +550,7 @@ function GithubShowTable({
                 className={`sl-gh-cell sl-gh-cell--custom${c.type === 'multi-select' ? ' is-multi' : ''}${c.type === 'number' ? ' is-num' : ''}`}
                 role="cell"
                 key={c.id}
+                data-label={c.title}
               >
                 {c.type === 'multi-select' ? (
                   <MultiSelectCell
@@ -619,6 +631,7 @@ function GithubShowTable({
             <div
               key={c.id}
               className={`sl-gh-cell sl-gh-cell--custom${c.type === 'number' ? ' is-sum' : ''}`}
+              data-label={c.title}
             >
               {c.type === 'number' ? formatAmount(colSums[c.id] ?? 0) : ''}
             </div>

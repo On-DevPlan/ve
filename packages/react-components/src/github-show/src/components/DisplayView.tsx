@@ -69,6 +69,25 @@ function compareNumber(a: string, b: string): number {
   return an - bn;
 }
 
+/** 是否窄视口(≤768px,v1.6.48):柱状图在 ~350px 容器里画 12 根轴标签不可读,
+ *  只画 6 根。matchMedia 双重守卫(jsdom / 老浏览器无此 API)。 */
+function useIsNarrowViewport(): boolean {
+  const [narrow, setNarrow] = useState(
+    () =>
+      typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(max-width: 768px)').matches,
+  );
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    const mq = window.matchMedia('(max-width: 768px)');
+    const onChange = (e: MediaQueryListEvent) => setNarrow(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  return narrow;
+}
+
 function sortRows(doc: GithubShowDoc, sort: SortState): typeof doc.rows {
   if (sort.key === 'order') return doc.rows;
   const dir = sort.dir;
@@ -179,7 +198,9 @@ export default function DisplayView(props: DisplayViewProps) {
   const [pageSize, setPageSize] = useState(10);
 
   const stats = useMemo(() => computeStats(doc), [doc]);
-  const chartData = useMemo(() => contentChartData(doc, 12), [doc]);
+  // v1.6.48:窄视口柱状图只画 6 个项目(轴标签可读),桌面仍 12
+  const isNarrow = useIsNarrowViewport();
+  const chartData = useMemo(() => contentChartData(doc, isNarrow ? 6 : 12), [doc, isNarrow]);
   // 展示页只渲染 hiddenInDisplay=false 的自定义列(编辑页始终显示全部列)
   const visibleColumns = useMemo(() => doc.columns.filter((c) => !c.hiddenInDisplay), [doc.columns]);
   const sortedRows = useMemo(() => sortRows(doc, sort), [doc, sort]);
@@ -684,23 +705,24 @@ export default function DisplayView(props: DisplayViewProps) {
             </tr>
           </thead>
           <tbody>
+            {/* data-label:移动端卡片化(≤768px)时逐格 ::before 显示字段名 */}
             {pageRows.map((row) => (
               <tr key={row.id}>
-                <td className="sl-gh-dtext">
+                <td className="sl-gh-dtext" data-label="GitHub 链接">
                   <div className="sl-gh-dcell">
                     <RepoLink url={row.repoUrl} name="" />
                   </div>
                 </td>
-                <td className="sl-gh-dname sl-gh-dtext">
+                <td className="sl-gh-dname sl-gh-dtext" data-label="项目名">
                   <div className="sl-gh-dcell">{row.name || '—'}</div>
                 </td>
-                <td className="sl-gh-dtext">
+                <td className="sl-gh-dtext" data-label="亮点">
                   <div className="sl-gh-dcell">{row.highlights || <span className="sl-gh-dim">—</span>}</div>
                 </td>
-                <td className="sl-gh-dtext">
+                <td className="sl-gh-dtext" data-label="启发">
                   <div className="sl-gh-dcell">{row.insights || <span className="sl-gh-dim">—</span>}</div>
                 </td>
-                <td className="sl-gh-dtext">
+                <td className="sl-gh-dtext" data-label="产出">
                   <div className="sl-gh-dcell">
                     {row.output ? <RichText value={row.output} /> : <span className="sl-gh-dim">—</span>}
                   </div>
@@ -709,13 +731,13 @@ export default function DisplayView(props: DisplayViewProps) {
                   const v = row.values[c.id] ?? '';
                   if (c.type === 'number') {
                     return (
-                      <td key={c.id} className="sl-gh-dnum">
+                      <td key={c.id} className="sl-gh-dnum" data-label={c.title}>
                         <div className="sl-gh-dcell">{v.trim() !== '' ? v : <span className="sl-gh-dim">—</span>}</div>
                       </td>
                     );
                   }
                   return (
-                    <td key={c.id} className="sl-gh-dtext">
+                    <td key={c.id} className="sl-gh-dtext" data-label={c.title}>
                       <div className="sl-gh-dcell">
                         {c.type === 'multi-select' ? (
                           <TagList value={v} />
@@ -740,7 +762,7 @@ export default function DisplayView(props: DisplayViewProps) {
                 <td />
                 <td />
                 {visibleColumns.map((c) => (
-                  <td key={c.id} className={c.type === 'number' ? 'sl-gh-dnum is-sum' : undefined}>
+                  <td key={c.id} className={c.type === 'number' ? 'sl-gh-dnum is-sum' : undefined} data-label={c.title}>
                     {c.type === 'number' ? formatAmount(colSums[c.id] ?? 0) : ''}
                   </td>
                 ))}

@@ -243,6 +243,9 @@ watch(componentId, (id) => {
   inset: 0;
   width: 100vw;
   height: 100vh;
+  /* 移动端动态视口:地址栏收放时以可视高度为准,组件底部不被浏览器工具栏遮住
+     (不支持 dvh 的旧浏览器回退上一行) */
+  height: 100dvh;
   overflow: hidden;
 }
 .detail__wrapper {
