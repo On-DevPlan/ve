@@ -997,6 +997,89 @@ body.is-dragging * {
 .sl-gh-share__label-short,
 .sl-gh-pill__label-short { display: none; }
 
+/* ===== GitHub Token 设置(v1.6.50)===== */
+/* 统计卡的 token 入口:小字墨线按钮,贴 head 右缘 —— 绿只留 4 处配额,
+   已配置态用中性色(不再抢视线),未配置态提示"该配了"。 */
+.sl-gh-gstat__tokenbtn {
+  flex: none;
+  margin-left: auto;
+  font: inherit;
+  font-size: 11px;
+  line-height: 1;
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--sl-color-hair, rgba(17, 18, 20, 0.14));
+  border-radius: var(--sl-gh-radius-ctl, 8px);
+  background: transparent;
+  color: var(--sl-color-text-secondary, #5c6169);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.sl-gh-gstat__tokenbtn:hover {
+  background: var(--sl-gh-ios-fill-soft, rgba(120, 120, 128, 0.12));
+  color: var(--sl-color-ink, #111214);
+}
+/* 已配置:弱化成一枚状态标签,不再是"待办" */
+.sl-gh-gstat__tokenbtn.is-set {
+  border-color: transparent;
+  color: var(--sl-color-text-tertiary, #9aa0a8);
+}
+
+.sl-gh-token__status {
+  margin: 0 0 12px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--sl-color-text-secondary, #5c6169);
+}
+.sl-gh-token__label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--sl-color-text-tertiary, #9aa0a8);
+}
+/* v1.6.50:输入框 16px —— iOS Safari 对 <16px 的输入框聚焦会强制整页缩放 */
+.sl-gh-token__input {
+  width: 100%;
+  box-sizing: border-box;
+  height: 36px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 16px;
+  color: var(--sl-color-text, #15171a);
+  background: transparent;
+  border: 1px solid var(--sl-color-border, rgba(17, 18, 20, 0.24));
+  border-radius: var(--sl-gh-radius-ctl, 8px);
+  outline: none;
+}
+.sl-gh-token__input:focus {
+  border-color: var(--sl-color-primary, #177f37);
+}
+.sl-gh-token__hint {
+  margin: 10px 0 0;
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--sl-color-text-tertiary, #9aa0a8);
+}
+.sl-gh-token__hint b {
+  font-weight: 600;
+  color: var(--sl-color-text-secondary, #5c6169);
+}
+.sl-gh-token__error {
+  margin: 8px 0 0;
+  font-size: 11.5px;
+  color: #dc2626;
+}
+.sl-gh-token__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
 /* ===== 公开分享模式 banner(readOnly 时挂载)—— 极简一条 ===== */
 /* 公开分享 banner(v1.6.0 起并入顶栏右侧 .sl-gh-topbar__right):
    收窄为自然内容宽的直角小条(类名沿用 pill,视觉已非胶囊),不再占满一行

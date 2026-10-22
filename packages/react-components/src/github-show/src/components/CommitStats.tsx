@@ -146,6 +146,7 @@ import {
   mergeDays,
   monthLabels,
   readCachedStats,
+  setGithubTokenProvider,
   type HeatCell,
 } from '../engine/githubStats';
 import { loadStatsSeed, runRenewal } from '../engine/renewal';
@@ -159,6 +160,11 @@ import {
   type GithubStatsEntry,
   type StatsFailReason,
 } from '../storage/StatsStore';
+import {
+  getCachedGithubToken,
+  loadGithubToken,
+} from '@api/components/github-show/githubToken';
+import GithubTokenModal from './GithubTokenModal';
 
 /** 会话内尝试登记(v1.6.28):full → 本页面会话上次真实尝试时刻。
  * 不依赖 KV 写回成败 —— 写回失败时 KV 里没有退避记录,没有这层登记,
@@ -221,9 +227,20 @@ export default function CommitStats({ doc, publicParams, variant = 'full' }: Com
   });
   const [mayFetch, setMayFetch] = useState(false);
   const [renewing, setRenewing] = useState<string[]>([]);
+  // v1.6.50 GitHub Token:编辑者自己的 PAT 存本账号 private KV key,统计请求
+  // 带鉴权头(5000 次/小时)而不是匿名(60 次/小时/IP,十几个仓库就限流)。
+  // 公开分享模式一律不读、不显示 —— 访客本来也不发 GitHub 请求。
+  const [hasToken, setHasToken] = useState(false);
+  const [tokenOpen, setTokenOpen] = useState(false);
   // v1.6.34「立即重试」:用户点一次就无视会话/KV 退避,把失败仓库重新排队
   const [retryTick, setRetryTick] = useState(0);
   const forcedReposRef = useRef<Set<string>>(new Set());
+
+  // 引擎取 token 的入口:应用层缓存(private KV 读出)→ 引擎按需取。
+  // 挂载即注册,早于任何续期请求。
+  useEffect(() => {
+    setGithubTokenProvider(() => getCachedGithubToken());
+  }, []);
 
   // 上面的惰性初始化只在挂载时跑一次;doc 编辑(导入行/改 URL)导致 repos
   // 增删时,给尚无条目的仓库同步补一次 L1 种子(有则立即显示,不闪骨架)。
@@ -269,6 +286,13 @@ export default function CommitStats({ doc, publicParams, variant = 'full' }: Com
       // 2) 编辑者:后台增量续期(owner 探测 → 跳过 / 逐个拉取 → 写回 KV)。
       //    访客(fetchable=false)到此为止 —— 永远 0 次 GitHub 请求。
       if (!fetchable) return;
+      // v1.6.50:先取 token(鉴权 KV 读,失败按"未配置"处理),再发 GitHub 请求
+      // —— 否则首轮仍走匿名,配额刚够的仓库会先撞限流。
+      if (isLoggedIn && !publicParams) {
+        const t = await loadGithubToken();
+        if (cancelled) return;
+        setHasToken(!!t);
+      }
       await runRenewal({
         store,
         repos,
@@ -386,6 +410,20 @@ export default function CommitStats({ doc, publicParams, variant = 'full' }: Com
     setRetryTick((t) => t + 1);
   }
 
+  /**
+   * token 变更后的处理(v1.6.50):配好鉴权后,之前因匿名配额失败的仓库
+   * 立即重试(带鉴权就不会再撞限流);清除 token 则只更新按钮状态。
+   */
+  function handleTokenChanged(configured: boolean) {
+    setHasToken(configured);
+    if (!configured) return;
+    for (const e of failedEntries) {
+      forcedReposRef.current.add(e.full);
+      sessionAttemptedAt.delete(e.full);
+    }
+    setRetryTick((t) => t + 1);
+  }
+
   // ── v1.6.45 失败提示收敛 ──────────────────────────────────────────────
   // 一行汇总 = 数量 + 按原因分组的计数(「2 个链接无效 · 18 个匿名配额已用尽」),
   // 逐条明细只在这行下面,默认收起。原因分组直接吃 FAIL_REASON_LABEL。
@@ -442,6 +480,17 @@ export default function CommitStats({ doc, publicParams, variant = 'full' }: Com
           )}
         </span>
         {!split && summary ? <span className="sl-gh-gstat__asof">统计于 {summary.asOf}</span> : null}
+        {/* v1.6.50 Token 入口:只对编辑者显示(登录 + 非公开分享);
+            公开访客既不读 token 也不发 GitHub 请求,无需这个入口。 */}
+        {isLoggedIn && !publicParams ? (
+          <button
+            type="button"
+            className={`sl-gh-gstat__tokenbtn${hasToken ? ' is-set' : ''}`}
+            onClick={() => setTokenOpen(true)}
+          >
+            {hasToken ? 'Token 已配置' : '设置 GitHub Token'}
+          </button>
+        ) : null}
       </div>
       {/* v1.6.38 单一渲染路径:骨架与数据不再各写一棵子树 —— 两棵树时 React 会
           整体替换掉 371 个格子节点(class 切换不经过 CSS 过渡,「从无到有」依旧
@@ -621,6 +670,9 @@ export default function CommitStats({ doc, publicParams, variant = 'full' }: Com
       ) : null}
       {missingCount > 0 && failedEntries.length === 0 && renewing.length === 0 && !mayFetch ? (
         <div className="sl-gh-gstat__note">{missingCount} 个仓库未统计 —— 编辑者访问本页时自动生成。</div>
+      ) : null}
+      {tokenOpen ? (
+        <GithubTokenModal onClose={() => setTokenOpen(false)} onChanged={handleTokenChanged} />
       ) : null}
     </div>
   );
