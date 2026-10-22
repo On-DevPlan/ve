@@ -22,6 +22,12 @@ import DisplayView from './src/components/DisplayView';
 import SyncPill from './src/components/SyncPill';
 import PublicShareBanner from './src/components/PublicShareBanner';
 import ShareButton from './src/components/ShareButton';
+import GithubTokenModal from './src/components/GithubTokenModal';
+import { setGithubTokenProvider } from './src/engine/githubStats';
+import {
+  getCachedGithubToken,
+  loadGithubToken,
+} from '@api/components/github-show/githubToken';
 import type { GithubShowRow } from '@api/components/github-show/types';
 
 const VIEW_LS_KEY = 'sl-github-show:view';
@@ -64,6 +70,23 @@ export default function GithubShow() {
   const [view, setView] = useState<ViewMode>(() => (store.readOnly ? 'display' : readInitialView()));
   const [columnsOpen, setColumnsOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  // v1.6.50 GitHub Token:编辑者自己的 PAT 存本账号 private KV key,统计请求
+  // 带鉴权头(5000 次/小时)而不是匿名(60 次/小时/IP,十几个仓库就限流)。
+  // 入口放在**编辑视图的顶栏操作行**(设置是编辑期的事,展示视图是给别人看的);
+  // 公开分享模式不读也不显示。
+  const [tokenConfigured, setTokenConfigured] = useState(false);
+  const [tokenOpen, setTokenOpen] = useState(false);
+
+  // 引擎取 token 的入口:应用层缓存(private KV 读出)→ 引擎按需取。
+  // 装在组件根 —— 展示视图的统计续期也走这一条,不必各自装配。
+  useEffect(() => {
+    setGithubTokenProvider(() => getCachedGithubToken());
+  }, []);
+
+  useEffect(() => {
+    if (store.readOnly || !store.isLoggedIn) return;
+    void loadGithubToken().then((t) => setTokenConfigured(!!t));
+  }, [store.readOnly, store.isLoggedIn]);
 
   useEffect(() => {
     try {
@@ -170,9 +193,24 @@ export default function GithubShow() {
           )}
           {view === 'edit' && !store.readOnly && (
             <>
+              {/* v1.6.50 Token 入口(编辑视图操作行):只对登录的编辑者显示;
+                  已配置态弱化成状态标签,不再占视觉焦点。 */}
+              {store.isLoggedIn ? (
+                <button
+                  type="button"
+                  className={`sl-gh-btn sl-gh-btn--ghost sl-gh-tokenbtn${tokenConfigured ? ' is-set' : ''}`}
+                  data-topbtn="token"
+                  onClick={() => setTokenOpen(true)}
+                  title="设置 GitHub Token —— 提交统计的鉴权凭据(存本账号 private key,不随分享链接公开)"
+                >
+                  <span className="sl-gh-token-label-long">GitHub Token</span>
+                  <span className="sl-gh-token-label-short">Token</span>
+                </button>
+              ) : null}
               <button
                 type="button"
                 className="sl-gh-btn sl-gh-btn--ghost"
+                data-topbtn="import"
                 onClick={() => setImportOpen(true)}
               >
                 导入
@@ -180,6 +218,7 @@ export default function GithubShow() {
               <button
                 type="button"
                 className="sl-gh-btn sl-gh-btn--ghost"
+                data-topbtn="columns"
                 onClick={() => setColumnsOpen(true)}
               >
                 列设置
@@ -188,6 +227,7 @@ export default function GithubShow() {
                 <button
                   type="button"
                   className="sl-gh-btn sl-gh-btn--primary"
+                  data-topbtn="add"
                   onClick={() => handleAddRow()}
                 >
                   ＋ 添加项目
@@ -295,11 +335,12 @@ export default function GithubShow() {
         />
       )}
 
-      <footer className="sl-gh-foot">
-        {store.readOnly
-          ? '公开分享模式 — 通过 URL groupId 参数只读访问,不会写入任何数据。'
-          : '数据整体保存在一个云端 key(github-show);未登录时仅保存在本机浏览器。'}
-      </footer>
+      {tokenOpen && (
+        <GithubTokenModal
+          onClose={() => setTokenOpen(false)}
+          onChanged={(configured) => setTokenConfigured(configured)}
+        />
+      )}
     </div>
   );
 }

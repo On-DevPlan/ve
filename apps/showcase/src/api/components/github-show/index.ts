@@ -6,4 +6,5 @@
 
 export * from './types';
 export * from './createGithubShowStore';
+export * from './githubToken';
 export { docSchema } from './docSchema';

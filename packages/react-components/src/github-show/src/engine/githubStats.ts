@@ -251,8 +251,36 @@ export class GithubAggregatingError extends Error {
   }
 }
 
+/** 401:带了 token 但 GitHub 拒绝(过期/撤销/填错)—— 与「配额耗尽」不同,
+ *  重试无用,必须让使用者去改 token。 */
+export class GithubAuthError extends Error {
+  constructor() {
+    super('GitHub Token 无效或已撤销,请重新设置');
+    this.name = 'GithubAuthError';
+  }
+}
+
+/**
+ * GitHub token 提供者(v1.6.50):应用层(组件)从 private KV 读出 PAT 后注册,
+ * 引擎每次请求时取值 —— 避免把 token 参数穿过整条 renewal 调用链。
+ * 未注册/返回空串 = 匿名请求(行为与之前完全一致)。
+ */
+let tokenProvider: () => string = () => '';
+
+export function setGithubTokenProvider(fn: () => string): void {
+  tokenProvider = fn;
+}
+
+/** 当前生效的 token(供 UI 显示"已配置/未配置") */
+export function currentGithubToken(): string {
+  return tokenProvider().trim();
+}
+
 function apiHeaders(): HeadersInit {
-  return { Accept: 'application/vnd.github+json' };
+  const token = currentGithubToken();
+  return token
+    ? { Accept: 'application/vnd.github+json', Authorization: `Bearer ${token}` }
+    : { Accept: 'application/vnd.github+json' };
 }
 
 /**
@@ -292,6 +320,7 @@ export async function fetchRepoStats(full: string, now = new Date()): Promise<Re
   // 必然命中 GitHub 侧聚合缓存。
   const res = await fetchGithub(`${API}/repos/${full}/stats/commit_activity`);
   if (res.status === 403 || res.status === 429) throw new GithubRateLimitError();
+  if (res.status === 401) throw new GithubAuthError();
   if (res.status === 404) throw new GithubRepoGoneError();
   if (res.status === 202) throw new GithubAggregatingError();
   if (!res.ok) throw new Error(`GitHub API ${res.status}`);
