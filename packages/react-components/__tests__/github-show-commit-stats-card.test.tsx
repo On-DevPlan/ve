@@ -160,3 +160,16 @@ describe('脚注与失败明细块已移除(v1.6.51)', () => {
     expect(el.textContent).toContain('个仓库合并');
   });
 });
+
+// v1.6.51 分享页(公开访客)不渲染任何运维 note —— 那些是给编辑者的提示
+// (未统计/数据过期/覆盖口径/更新进度),公开访客只看数据本身。
+describe('分享页不渲染运维 note(v1.6.51)', () => {
+  it('publicParams 传入 → 无任何 sl-gh-gstat__note', async () => {
+    await act(async () => {
+      root.render(<CommitStats doc={doc} publicParams={{ key: 'github-show', groupId: 7 }} />);
+    });
+    expect(container.querySelector('.sl-gh-gstat__note')).toBeNull();
+    // 状态段同样不出现
+    expect(container.querySelector('.sl-gh-gstat__status')).toBeNull();
+  });
+});

@@ -486,7 +486,7 @@ export default function CommitStats({ doc, publicParams, variant = 'full' }: Com
                 </dd>
               </div>
             </dl>
-          ) : (
+          ) : publicParams ? null : (
             <p className="sl-gh-gstat__status">
               {renewing.length > 0
                 ? `统计中(${doneList.length}/${repos.length})…`
@@ -497,22 +497,22 @@ export default function CommitStats({ doc, publicParams, variant = 'full' }: Com
           )}
         </div>
       ) : null}
-      {renewing.length > 0 ? (
+      {!publicParams && renewing.length > 0 ? (
         <div className="sl-gh-gstat__note">统计更新中(剩余 {renewing.length} 个仓库)…</div>
       ) : null}
       {/* v1.6.40 覆盖诚实化:浅纹格的量化说明 —— 把「哪几天不全、差多少」
           直接写出来,而不是让读者自己怀疑右端是不是少了提交。 */}
-      {coverage ? (
+      {!publicParams && coverage ? (
         <div className="sl-gh-gstat__note sl-gh-gstat__note--partial">
           {`最近 ${coverage.days} 天仅 ${coverage.covered}/${coverage.total} 个仓库覆盖到当天,浅纹格为快照期(数值可能偏低)。`}
         </div>
       ) : null}
-      {staleOkCount > 0 ? (
+      {!publicParams && staleOkCount > 0 ? (
         <div className="sl-gh-gstat__note">
           {staleOkCount} 个仓库数据已超 24h,为上传时快照;编辑者访问本页会自动刷新。
         </div>
       ) : null}
-      {missingCount > 0 && failedEntries.length === 0 && renewing.length === 0 && !mayFetch ? (
+      {!publicParams && missingCount > 0 && failedEntries.length === 0 && renewing.length === 0 && !mayFetch ? (
         <div className="sl-gh-gstat__note">{missingCount} 个仓库未统计 —— 编辑者访问本页时自动生成。</div>
       ) : null}
     </div>
