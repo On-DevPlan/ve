@@ -1815,140 +1815,6 @@ body.is-dragging * {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* 失败块允许 summary 内排钮,展开后明细可折行 */
-.sl-gh-gstat__note--fails {
-  white-space: normal;
-  overflow: visible;
-  text-overflow: unset;
-}
-/* v1.6.40 覆盖诚实化:浅纹格的口径说明 —— 是「口径提示」而非报错,
-   贴着热力图脚注,上间距比常规 note 再紧一档。 */
-.sl-gh-gstat__note--partial {
-  padding-top: 2px;
-}
-/* v1.6.45/46 失败提示:默认一行,展开才见明细 */
-.sl-gh-gstat__failbox {
-  margin-top: 0;
-}
-.sl-gh-gstat__failsum {
-  display: flex;
-  flex-wrap: nowrap;
-  align-items: center;
-  gap: 6px 8px;
-  padding: 0;
-  min-height: 22px;
-  cursor: pointer;
-  list-style: none;
-  user-select: none;
-}
-.sl-gh-gstat__failsum::-webkit-details-marker {
-  display: none;
-}
-.sl-gh-gstat__failsum-lead {
-  color: var(--sl-color-text, #15171a);
-}
-.sl-gh-gstat__failsum-why {
-  color: var(--sl-color-text-tertiary, #9aa0a8);
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.sl-gh-gstat__failsum-toggle {
-  flex: none;
-  color: var(--sl-color-text-tertiary, #9aa0a8);
-  font-size: 10px;
-  white-space: nowrap;
-}
-.sl-gh-gstat__failsum .sl-gh-gstat__retry {
-  flex: none;
-  margin-left: auto;
-}
-.sl-gh-gstat__failsum-toggle::before {
-  content: '展开明细';
-}
-.sl-gh-gstat__failbox[open] .sl-gh-gstat__failsum-toggle::before {
-  content: '收起';
-}
-.sl-gh-gstat__failsum:hover .sl-gh-gstat__failsum-toggle {
-  color: var(--sl-color-text-secondary, #5c6169);
-}
-/* v1.6.35 失败提示条目化:每仓库一行(仓库名左 · 原因右),
-   替代原先把 N 个仓库揉成一行的长句;>4 条时列表内部滚动。 */
-.sl-gh-gstat__fails {
-  margin: 2px 0 0;
-  padding: 0;
-  list-style: none;
-  max-height: 160px; /* v1.6.45:展开明细后约 7 行 */
-  overflow-y: auto;
-}
-.sl-gh-gstat__fail {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  padding: 3px 0;
-  font-size: 11px;
-  line-height: 1.4;
-}
-/* 状态点:gone 空心(需人工修链接) / retry 实心墨(可自动恢复) —— 方角贴合墨线风格 */
-.sl-gh-gstat__fail-dot {
-  flex: none;
-  width: 5px;
-  height: 5px;
-  transform: translateY(-1px);
-}
-.sl-gh-gstat__fail.is-gone .sl-gh-gstat__fail-dot {
-  box-shadow: inset 0 0 0 1px var(--sl-color-rule, rgba(17, 18, 20, 0.42));
-}
-.sl-gh-gstat__fail.is-retry .sl-gh-gstat__fail-dot {
-  background: var(--sl-color-ink, #111214);
-}
-.sl-gh-gstat__fail-repo {
-  color: var(--sl-color-text, #15171a);
-}
-.sl-gh-gstat__fail-why {
-  margin-left: auto;
-  color: var(--sl-color-text-tertiary, #9aa0a8);
-  text-align: right;
-}
-/* footer:仅展开明细后出现(重试钮已挂在 summary) */
-.sl-gh-gstat__fail-foot {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 4px;
-  padding-top: 4px;
-  border-top: 1px solid var(--sl-color-hair-soft, rgba(17, 18, 20, 0.10));
-}
-.sl-gh-gstat__fail-hint {
-  color: var(--sl-color-text-tertiary, #9aa0a8);
-  font-size: 10.5px;
-}
-/* v1.6.34 失败提示里的「立即重试」:墨线小按钮,与提示同一行基线 */
-.sl-gh-gstat__retry {
-  font: inherit;
-  font-size: 11px;
-  line-height: 1;
-  margin-left: auto;
-  padding: 3px 8px;
-  border: 1px solid var(--sl-color-line, rgba(17, 18, 20, 0.24));
-  border-radius: var(--sl-gh-radius-ctl, 8px);
-  background: transparent;
-  color: var(--sl-color-text-secondary, #5c6169);
-  cursor: pointer;
-  vertical-align: baseline;
-  transition: border-color 0.15s, color 0.15s, background 0.15s;
-}
-.sl-gh-gstat__retry:hover:not(:disabled) {
-  border-color: var(--sl-color-ink, #111214);
-  color: var(--sl-color-ink, #111214);
-  background: rgba(17, 18, 20, 0.03);
-}
-.sl-gh-gstat__retry:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-
 /* 热力图:grid 四象限布局
    [空]      [月份标尺 53 列]
    [星期标尺] [格子 53 列 × 7 行]
@@ -1961,7 +1827,8 @@ body.is-dragging * {
   --sl-gh-heat-gap: 3px;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  grid-template-rows: auto auto auto;
+  /* v1.6.51:脚注(连续天数 + 色阶图例)按用户要求移除 —— 网格只剩月份行 + 格子行 */
+  grid-template-rows: auto auto;
   width: 100%;
   min-width: 0;
 }
@@ -2035,36 +1902,6 @@ body.is-dragging * {
 .sl-gh-heat__cell.is-l3 { background: #30A14E; }
 .sl-gh-heat__cell.is-l4 { background: #216E39; }
 
-.sl-gh-heat__foot {
-  grid-column: 1 / -1;
-  grid-row: 3;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 8px;
-  font-size: 11px;
-  color: var(--sl-color-text-secondary, #5c6169);
-}
-.sl-gh-heat__streaks {
-  white-space: nowrap;
-}
-.sl-gh-heat__legend {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  white-space: nowrap;
-}
-.sl-gh-heat__legend .sl-gh-heat__cell {
-  /* 图例小方格固定尺寸,不跟随主图格子伸缩(width:100% 会塌缩) */
-  width: 11px;
-  height: 11px;
-  aspect-ratio: auto;
-  flex: none;
-  border-radius: var(--sl-gh-radius-heat, 4px);
-}
-/* v1.6.36 占位骨架格子:空态/加载态与数据态同构渲染(等高不浮动),
-   用比空格(#EDEFF2)更浅一档的灰,弱化成背景纹理 */
 .sl-gh-heat__cell.is-ph {
   background: #F0F1F4;
 }

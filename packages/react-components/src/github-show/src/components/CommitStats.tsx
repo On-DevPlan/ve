@@ -135,7 +135,7 @@
 //   明细仍在 DOM(details 关闭不影响 textContent),单测「点名仓库 + 原因」
 //   契约照旧成立。
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { GithubShowDoc } from '@api/components/github-show/types';
 import { parseRepoUrl } from '../utils/repo';
 import { useJwtAuth } from '../hooks/useAuth';
@@ -150,12 +150,10 @@ import {
 } from '../engine/githubStats';
 import { loadStatsSeed, runRenewal } from '../engine/renewal';
 import {
-  FAIL_REASON_LABEL,
   GithubShowStatsStore,
   STATS_FRESH_MS,
   entryCheckedAt,
   pickSeedEntry,
-  retryBackoffMs,
   type GithubStatsEntry,
   type StatsFailReason,
 } from '../storage/StatsStore';
@@ -226,9 +224,6 @@ export default function CommitStats({ doc, publicParams, variant = 'full' }: Com
   // 带鉴权头(5000 次/小时)而不是匿名(60 次/小时/IP,十几个仓库就限流)。
   // token 的读取与 provider 装配在**组件根**(index.tsx)做 —— 设置入口也放在
   // 编辑视图的顶栏操作行,展示视图不出现任何 token 控件。
-  // v1.6.34「立即重试」:用户点一次就无视会话/KV 退避,把失败仓库重新排队
-  const [retryTick, setRetryTick] = useState(0);
-  const forcedReposRef = useRef<Set<string>>(new Set());
 
   // 上面的惰性初始化只在挂载时跑一次;doc 编辑(导入行/改 URL)导致 repos
   // 增删时,给尚无条目的仓库同步补一次 L1 种子(有则立即显示,不闪骨架)。
@@ -285,7 +280,7 @@ export default function CommitStats({ doc, publicParams, variant = 'full' }: Com
         repos,
         seedBlob: { version: 1, repos: seeded },
         baseBlob: blob,
-        forced: forcedReposRef.current,
+        forced: new Set<string>(),
         sessionAttempted: sessionAttemptedAt,
         isCancelled: () => cancelled,
         hooks: {
@@ -298,9 +293,9 @@ export default function CommitStats({ doc, publicParams, variant = 'full' }: Com
     return () => {
       cancelled = true;
     };
-    // repos 由 doc 派生;publicParams/isLoggedIn 变化重新对齐;retryTick = 手动重试
+    // repos 由 doc 派生;publicParams/isLoggedIn 变化重新对齐
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [doc, publicParams, isLoggedIn, retryTick]);
+  }, [doc, publicParams, isLoggedIn]);
 
   // 注:repos 是 'owner/repo' 字符串数组(extractRepos 已去重),不是对象
   const doneList = repos.map((full) => entries[full]).filter((e): e is Extract<GithubStatsEntry, { ok: true }> => e?.ok === true);
@@ -373,66 +368,11 @@ export default function CommitStats({ doc, publicParams, variant = 'full' }: Com
   // v1.6.39:同样按「核对时刻」算 —— 探测确认过无新提交的仓库不算过期快照
   const staleOkCount = doneList.filter((e) => now - entryCheckedAt(e) > STATS_FRESH_MS).length;
 
-  // ── 失败条目分组(v1.6.34):区分「仓库不存在/已私有」(近永久,降频重试)
-  //    与「可重试」(网络抖动 / 配额 / 聚合中),后者给「立即重试」按钮。 ──
+  // 失败条目(v1.6.34 分类入库;v1.6.51 起只用于底部「N 个仓库未统计」提示,
+  // 失败明细块与「立即重试」按用户要求移除)
   const failedEntries = repos
     .map((full) => entries[full])
     .filter((e): e is { ok: false; full: string; attemptedAt: number; error: string; reason?: StatsFailReason } => e?.ok === false);
-  const goneList = failedEntries.filter((e) => e.reason === 'gone');
-  const retryList = failedEntries.filter((e) => e.reason !== 'gone');
-  // v1.6.50:因匿名配额失败的条目数(用于提示"去编辑视图设置 GitHub Token")
-  const rateLimitCount = failedEntries.filter((e) => e.reason === 'rate-limit').length;
-  // 下一次自动重试时刻 = 各失败条目「尝试时刻 + 其退避时长」里最早的一个
-  const nextRetryMs = retryList.length
-    ? Math.min(...retryList.map((e) => e.attemptedAt + retryBackoffMs(e.reason)))
-    : 0;
-  const nextRetryText = nextRetryMs > now
-    ? `最早 ${new Date(nextRetryMs).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })} 自动重试`
-    : '';
-
-  /** 「立即重试」:清掉这些仓库的会话退避并强制重新入队(不等下次访问)。 */
-  function handleRetryFailed() {
-    for (const e of failedEntries) {
-      forcedReposRef.current.add(e.full);
-      sessionAttemptedAt.delete(e.full);
-    }
-    setRetryTick((t) => t + 1);
-  }
-
-  // ── v1.6.45 失败提示收敛 ──────────────────────────────────────────────
-  // 一行汇总 = 数量 + 按原因分组的计数(「2 个链接无效 · 18 个匿名配额已用尽」),
-  // 逐条明细只在这行下面,默认收起。原因分组直接吃 FAIL_REASON_LABEL。
-  const failReasonSummary = (() => {
-    const parts: string[] = [];
-    if (goneList.length > 0) parts.push(`${goneList.length} 个链接无效`);
-    const byReason = new Map<string, number>();
-    for (const e of retryList) {
-      const label = FAIL_REASON_LABEL[e.reason ?? 'unknown'];
-      byReason.set(label, (byReason.get(label) ?? 0) + 1);
-    }
-    for (const [label, n] of byReason) parts.push(`${n} 个${label}`);
-    return parts.join(' · ');
-  })();
-  // v1.6.46:失败提示一律收成一行汇总(默认关闭),明细点开再看 ——
-  // 此前 ≤3 条直接展开会把表格上方占掉一大截,窄屏尤其顶破一屏。
-  const failList = (
-    <ul className="sl-gh-gstat__fails">
-      {goneList.map((e) => (
-        <li key={e.full} className="sl-gh-gstat__fail is-gone">
-          <i className="sl-gh-gstat__fail-dot" aria-hidden="true" />
-          <span className="sl-gh-gstat__fail-repo">{e.full}</span>
-          <span className="sl-gh-gstat__fail-why">{FAIL_REASON_LABEL[e.reason ?? 'unknown']},请检查链接</span>
-        </li>
-      ))}
-      {retryList.map((e) => (
-        <li key={e.full} className="sl-gh-gstat__fail is-retry">
-          <i className="sl-gh-gstat__fail-dot" aria-hidden="true" />
-          <span className="sl-gh-gstat__fail-repo">{e.full}</span>
-          <span className="sl-gh-gstat__fail-why">{FAIL_REASON_LABEL[e.reason ?? 'unknown']}</span>
-        </li>
-      ))}
-    </ul>
-  );
 
   return (
     <div className={`sl-gh-gstat${split ? ' is-split' : ''}`}>
@@ -504,29 +444,6 @@ export default function CommitStats({ doc, publicParams, variant = 'full' }: Com
             );
           })}
         </div>
-        <div className="sl-gh-heat__foot">
-          {/* split:连续天数挪到右侧文字卡片,foot 只留色阶图例 */}
-          {!split ? (
-            <span className="sl-gh-heat__streaks">
-              {summary ? (
-                `当前连续 ${summary.currentStreak} 天 · 最长连续 ${summary.longestStreak} 天`
-              ) : renewing.length > 0 ? (
-                `统计中(${doneList.length}/${repos.length})…`
-              ) : mayFetch ? (
-                '暂无统计数据,将分批自动续期'
-              ) : (
-                '未统计(编辑者访问本页时自动生成)'
-              )}
-            </span>
-          ) : null}
-          <span className="sl-gh-heat__legend">
-            少
-            {[0, 1, 2, 3, 4].map((l) => (
-              <i key={l} className={`sl-gh-heat__cell is-l${l}`} />
-            ))}
-            多
-          </span>
-        </div>
       </div>
       </div>
       {split ? (
@@ -593,46 +510,6 @@ export default function CommitStats({ doc, publicParams, variant = 'full' }: Com
       {staleOkCount > 0 ? (
         <div className="sl-gh-gstat__note">
           {staleOkCount} 个仓库数据已超 24h,为上传时快照;编辑者访问本页会自动刷新。
-        </div>
-      ) : null}
-      {failedEntries.length > 0 ? (
-        <div className="sl-gh-gstat__note sl-gh-gstat__note--fails">
-          {/* v1.6.46:始终一行汇总 + 默认关闭的明细;重试钮挂在摘要行右侧,
-              不再单独占一条 fail-foot(收起态也只高一行)。 */}
-          <details className="sl-gh-gstat__failbox">
-            <summary className="sl-gh-gstat__failsum">
-              <span className="sl-gh-gstat__failsum-lead">{failedEntries.length} 个仓库未统计</span>
-              {failReasonSummary ? (
-                <span className="sl-gh-gstat__failsum-why">{failReasonSummary}</span>
-              ) : null}
-              <span className="sl-gh-gstat__failsum-toggle" aria-hidden="true" />
-              {mayFetch ? (
-                <button
-                  type="button"
-                  className="sl-gh-gstat__retry"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    handleRetryFailed();
-                  }}
-                  disabled={renewing.length > 0}
-                >
-                  {renewing.length > 0 ? '重试中…' : '立即重试'}
-                </button>
-              ) : null}
-            </summary>
-            {failList}
-            <div className="sl-gh-gstat__fail-foot">
-              <span className="sl-gh-gstat__fail-hint">
-                {retryList.length > 0 && nextRetryText ? nextRetryText : retryList.length > 0 ? '失败项稍后自动重试' : ''}
-                {retryList.length > 0 && goneList.length > 0 ? ' · ' : ''}
-                {goneList.length > 0 ? '无效链接每 7 天复查一次' : ''}
-                {/* v1.6.50:匿名配额耗尽时给出出路 —— 设置入口在编辑视图的
-                    顶栏操作行,这里只留一句指引(展示视图不摆 token 控件)。 */}
-                {rateLimitCount > 0 ? ' · 在编辑视图设置 GitHub Token 可解除匿名限流' : ''}
-              </span>
-            </div>
-          </details>
         </div>
       ) : null}
       {missingCount > 0 && failedEntries.length === 0 && renewing.length === 0 && !mayFetch ? (
