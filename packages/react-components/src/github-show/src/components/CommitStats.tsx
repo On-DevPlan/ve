@@ -150,6 +150,7 @@ import {
   type HeatCell,
 } from '../engine/githubStats';
 import { loadStatsSeed, runRenewal } from '../engine/renewal';
+import { diag, maskToken } from '../engine/diagnostics';
 import {
   GithubShowStatsStore,
   STATS_FRESH_MS,
