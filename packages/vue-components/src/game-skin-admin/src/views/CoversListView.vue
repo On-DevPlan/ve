@@ -1,7 +1,7 @@
 <!-- CoversListView — 「游戏封面」tab 的列表页。
-     游戏列表来自 fr 发布的 KV 目录（game-center_catalog:index），
+     游戏列表来自 fr 自动同步的 KV 目录（game-center_catalog:index）：
+     fr 侧从注册表现算目录，owner 打开 fr 游戏中心即自动比对写回，无需手动发布。
      封面资产管理走 game-center_skin:index（small 卡片小图 / large 轮播大图）。
-     目录缺失（未发布）时给出发布命令提示；封面缺图的行给 warn 徽标。
      深链：?tab=covers 直达本页。 -->
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
@@ -120,9 +120,9 @@ function onRejectFile(info: RejectInfo) {
 <template>
   <section>
     <p class="csa-help">
-      游戏封面按 fr 发布的 KV 目录（<code>game-center_catalog:index</code>）列出全部游戏；
+      游戏列表由 fr App 自动同步：fr 从注册表现算目录（<code>game-center_catalog:index</code>），
+      owner 打开 fr 游戏中心时与 KV 比对、有差异自动写回（无需手动发布命令）；
       封面资产写在 <code>game-center_skin:index</code>（每款 <code>small</code> / <code>large</code>，<strong>visibility=public</strong>）。
-      封面索引尚未创建时会显示 0 条记录，上传第一张图时自动建 key。
       fr 走匿名 public 读；若索引误落 private，ve 能预览但 App 看不见。
     </p>
 
@@ -194,7 +194,7 @@ function onRejectFile(info: RejectInfo) {
       class="csa-empty"
     >
       <span>KV 目录为空或未发布</span>
-      <span>先运行 <code>dart run tool/publish_game_center_index.dart</code>（fr 仓库，需已登录 kvcli），发布后点刷新。</span>
+      <span>用 owner 账号登录 fr App，打开一次游戏中心即自动发布；发布后点刷新。</span>
       <button
         class="csa-btn csa-btn--primary"
         @click="loadCatalog"
