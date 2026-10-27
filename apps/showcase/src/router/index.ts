@@ -33,6 +33,15 @@ export const router = createRouter({
       component: () => import('../pages/login/LoginPage.vue'),
       meta: { public: true },
     },
+    // 统一身份登录回调页 —— 认证中心(go-ah)302 回 ?code=&state= 的落地路由。
+    // redirect_uri = `${origin}/oidc/callback`,认证中心按其逐字匹配白名单,
+    // 改路径要同步改认证中心 dev-ctr-hello 客户端的 redirect_uris。
+    {
+      path: '/oidc/callback',
+      name: 'oidc-callback',
+      component: () => import('../pages/login/OidcCallbackPage.vue'),
+      meta: { public: true },
+    },
     // 通配 404 —— 任何未命中路由都落这里(顺序必须在最后)
     {
       path: '/:pathMatch(.*)*',

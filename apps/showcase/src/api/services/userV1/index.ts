@@ -6,31 +6,32 @@
 // 薄包装 api/http/request.ts 的 api.post/api.get(THROW 模型):
 //   - 自有后端统一信封 {code, data, message} 由 request.ts 自动解包/抛 ApiError
 //   - 鉴权(Bearer JWT)由 setBearerProvider 注入,call() 自动带 Authorization 头
-//   - sendCode/register/login 尚无 token,且密码错误会返回 401;
-//     用 skipUnauthorized:true 跳过全局 markRequiresLogin(logout 信号),
-//     由调用方(jwtAuth.login)自行 catch ApiError 决定如何处理
+//   - OIDC 回调端点尚无 token;401 走 skipUnauthorized:true 跳过全局登出信号,
+//     由调用方(jwtAuth.completeOidcLogin)自行 catch ApiError 决定如何处理
+//
+// 登录/注册已迁到统一身份认证中心(go-ah auth-hub / OIDC):
+//   - ve 前端不再走 /user/login 邮箱密码,也不再有 /user/send-code + /user/register
+//   - 认证协议封装在 api/http/oidc.ts(PKCE / state / authorize URL)
+//   - 邮箱密码端点后端仍保留(其他客户端 fr-app 等在用),ve 不再封装
 
 import { HttpService } from '../base';
 import { apiPaths } from '../../registry';
-import type { UserInfo, RegisterArgs, DefaultGroupInfo } from './types';
+import type { UserInfo, OidcConfig, OidcCallbackArgs, OidcCallbackResult, DefaultGroupInfo } from './types';
 
 export { ApiError } from '../base';
-export type { UserInfo, RegisterArgs, DefaultGroupInfo } from './types';
+export type { UserInfo, OidcConfig, OidcCallbackArgs, OidcCallbackResult, DefaultGroupInfo } from './types';
 
 export class UserV1Service extends HttpService {
   readonly BASE = apiPaths.userV1;
 
-  /** 发邮箱验证码。purpose 默认 'register';'reset' 用于密码找回(后端 email_codes.purpose 已支持)。 */
-  sendCode(email: string, purpose: 'register' | 'reset' = 'register'): Promise<void> {
-    return this.reqPost('/send-code', { email, purpose }, { skipUnauthorized: true });
+  /** GET /oidc/config —— 统一身份登录公开参数(无需登录)。 */
+  oidcConfig(): Promise<OidcConfig> {
+    return this.reqGet<OidcConfig>('/oidc/config');
   }
 
-  register(args: RegisterArgs): Promise<{ userId: number }> {
-    return this.reqPost<{ userId: number }>('/register', args, { skipUnauthorized: true });
-  }
-
-  login(args: { email: string; password: string }): Promise<{ token: string; userId: number }> {
-    return this.reqPost<{ token: string; userId: number }>('/login', args, { skipUnauthorized: true });
+  /** POST /oidc/callback —— OIDC 授权码换本系统 JWT(公开端点)。 */
+  oidcCallback(args: OidcCallbackArgs): Promise<OidcCallbackResult> {
+    return this.reqPost<OidcCallbackResult>('/oidc/callback', args, { skipUnauthorized: true });
   }
 
   info(): Promise<UserInfo> {

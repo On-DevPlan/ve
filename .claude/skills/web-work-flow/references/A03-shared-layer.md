@@ -22,7 +22,7 @@ apps/showcase/src/
 
 | 文件 | 导出 | 怎么用 |
 |---|---|---|
-| `auth-store.ts` | `jwtAuth`(login/register/logout/init)、`useJwtAuth()`(React)、`subscribeJwtAuth`、`TOKEN_KEY` | **JWT 认证单例**。Vue:`jwtAuth.state` + computed;React:re-export `useJwtAuth()`;经 `setBearerProvider` 注入 `api/http/request` |
+| `auth-store.ts` | `jwtAuth`(beginOidcLogin/completeOidcLogin/logout/init/refreshUser)、`useJwtAuth()`(React)、`subscribeJwtAuth`、`TOKEN_KEY` | **JWT 认证单例**。登录/注册走统一身份认证中心(OIDC,协议在 `api/http/oidc.ts`);Vue:`jwtAuth.state` + computed;React:re-export `useJwtAuth()`;经 `setBearerProvider` 注入 `api/http/request` |
 | `useLoginModal.ts` | `openLoginModal` / `closeLoginModal` / `useLoginModalState` / `subscribeLoginModal` + `getLoginModalSnapshot` | **登录入口(路由式)**。`openLoginModal()` = `router.push('/login')`(带 from query),React 端 `useLoginModal()` re-export;`isOpen` = `window.location.pathname === '/login'` |
 | `canvas-engine.ts` | `startCanvas(canvas)` | `pages/login/LoginPage.vue` 的背景画布,一般不外调 |
 | `router-accessor.ts` | `setRouter` / `getRouter` | shared 层拿 vue-router 实例的窗口(避免 shared 依赖 router 包);`main.ts` 启动时 `setRouter(router)` |

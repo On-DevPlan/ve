@@ -1,8 +1,9 @@
-// api/components/user-space/sha256.ts —— 纯 TS 增量 SHA-256(FIPS 180-4)。
+// api/tools/sha256.ts —— 纯 TS 增量 SHA-256(FIPS 180-4)。
 //
 // 为什么不用 WebCrypto:subtle.digest 只支持一次性整块,没有流式增量;
 // 分片上传 init 要整文件指纹,大文件不能整个读进内存,必须边读边算
 // (py 模拟器的 hashlib 流式对应物)。fileMd5 后端可选,前端不发,
+// 另一个消费方是 OIDC PKCE(http/oidc.ts 的 S256 challenge)。
 // 避免再实现一份 JS MD5(WebCrypto 也没有 MD5)。
 //
 // 单一代码路径的好处:浏览器 / vitest / 非安全上下文(http)行为一致,
