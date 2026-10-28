@@ -395,3 +395,42 @@
   .sl-sl-card { padding: 22px 20px; }
   .sl-sl-card h1 { font-size: 25px; }
 }
+
+/* ───── 统一身份登录(SSO) —— LoginPage / OidcCallbackPage 共用 ───── */
+
+.sl-sl-sso-sub {
+  margin: 2px 0 18px;
+  font-size: 12px;
+  letter-spacing: .05em;
+  color: var(--ink-2);
+}
+
+.sl-sl-sso-btn { width: 100%; }
+
+.sl-sl-sso-hint {
+  margin: 14px 2px 0;
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--ink-2);
+}
+
+.sl-sl-sso-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+.sl-sl-sso-actions .sl-sl-btn-primary { flex: 1; }
+
+.sl-sl-sso-link-btn {
+  padding: 0 14px;
+  font: inherit;
+  font-size: 12px;
+  letter-spacing: .08em;
+  color: var(--ink-2);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  cursor: pointer;
+  transition: color .18s, border-color .18s;
+}
+.sl-sl-sso-link-btn:hover { color: var(--ink); border-color: var(--ink); }

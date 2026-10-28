@@ -7,7 +7,7 @@
 
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { Sha256 } from '../src/api/components/user-space/sha256';
+import { Sha256 } from '../src/api/tools/sha256';
 
 function nodeSha256(bytes: Uint8Array): string {
   return createHash('sha256').update(bytes).digest('hex');

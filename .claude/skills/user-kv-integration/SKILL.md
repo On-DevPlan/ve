@@ -1,13 +1,13 @@
 ---
 name: user-kv-integration
-description: 把前端组件接到后端 user/kv + user/groups + file 体系(/api/v1,邮箱 + JWT + group 维度键值存储 + 文件图床 + 匿名上传 + 共享 key)。Triggers on building email login flows, JWT-bearer storage, single-blob cloud sync with offline LS fallback, sync mode toggles (auto/manual), dirty-state tracking, group/RBAC-aware KV or file reads, backend default-group resolution, anonymous file upload, file shared-key (by-key) access, or adding a new component that needs backend API.
+description: 把前端组件接到后端 user/kv + user/groups + file 体系(/api/v1,OIDC 统一身份 + JWT + group 维度键值存储 + 文件图床 + 匿名上传 + 共享 key)。Triggers on building OIDC/SSO login flows, JWT-bearer storage, single-blob cloud sync with offline LS fallback, sync mode toggles (auto/manual), dirty-state tracking, group/RBAC-aware KV or file reads, backend default-group resolution, anonymous file upload, file shared-key (by-key) access, or adding a new component that needs backend API.
 ---
 
 # user-kv-integration
 
 把前端组件接到 **user/kv + user/groups + file**(`/api/v1`)的标准化模式。本 skill 是**路由表** —— 按你要做的事选 ref。
 
-> 基于 dev_ctr_hello 后端的 user + kv + file 模块。覆盖邮箱登录、邮箱 + JWT 身份、组维度 RBAC、单 key 云端同步、离线降级、同步模式 + 脏状态、跨组复制、图床文件、新增组件接入。
+> 基于 dev_ctr_hello(go-co)后端的 user + kv + file 模块。登录/注册走统一身份认证中心 go-ah(OIDC 授权码 + PKCE)。覆盖统一身份登录、JWT 身份、组维度 RBAC、单 key 云端同步、离线降级、同步模式 + 脏状态、跨组复制、图床文件、新增组件接入。
 
 ## 路由表
 

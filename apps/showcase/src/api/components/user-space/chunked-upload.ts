@@ -20,7 +20,7 @@
 
 import { fileV1Service } from '../../services';
 import type { FileInfo } from '../../services/fileV1/types';
-import { Sha256 } from './sha256';
+import { Sha256 } from '../../tools/sha256';
 import type { FileUploadProgress } from './types';
 
 /** 大于此值走分片(后端 [[chunked-upload]] 建议 >10MB;小文件单发直传更省往返) */

@@ -11,6 +11,8 @@ parent: user-kv-integration
 > - **文件域(file/v1)**:`files` / `file_tags` / `file_shares` / `file_access_logs` 表,value 是**文件本体**(磁盘),图床 / 工作空间文件 + 分享 + 匿名上传 + 共享 key。共 13 个端点(2026-08-08 新增)。
 >
 > 登录注册 / JWT 见 [[auth-jwt]];「我这种组件该用哪几个接口」见 [[usage-scope]];groupId 契约两者完全一致。
+>
+> 📌 **登录已迁统一身份认证中心(go-ah / OIDC)**:ve 前端不再调本文之外遗留的邮箱密码端点;OIDC 两个公开端点(`GET /user/oidc/config`、`POST /user/oidc/callback`)的字段见 [[auth-jwt]]。
 
 > **2026-08-04 模型迁移**:旧的 `kv_items.visibility (private/public)` 已废弃。所有 KV 现在归属 `kv_items.group_id` (FK → `user_groups`),权限由 `group_members.role` 决定。**不要传 `visibility` / `?ownerId=`** —— 那是历史残留。
 

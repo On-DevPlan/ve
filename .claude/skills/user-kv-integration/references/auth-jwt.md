@@ -3,158 +3,78 @@ ref: auth-jwt
 parent: user-kv-integration
 ---
 
-# ref1 — 登录注册流程 + JWT 身份
+# ref1 — 统一身份登录(OIDC)+ JWT 身份
 
-> 给前端组件对接 **邮箱注册/登录 + JWT** 的完整流程。接口字段见 [[api-reference]];「我这种组件该用哪些接口」见 [[usage-scope]]。
+> ve 的登录/注册走**统一身份认证中心 go-ah(auth-hub,OIDC 授权码 + PKCE)**。
+> 接口字段见 [[api-reference]];「我这种组件该用哪些接口」见 [[usage-scope]]。
 
 ## 概览
 
 | 事项 | 值 |
 |---|---|
-| Base URL | `http://<host>:8080/api/v1`(前端走同源相对路径 `/api/v1`,见 [[adding-a-component]]) |
-| 公开接口 | `send-code` / `register` / `login`(无需 token) |
+| Base URL | `/api/v1`(前端走同源相对路径,见 [[adding-a-component]]) |
+| 登录方式 | **仅** OIDC 统一身份(认证中心托管登录 + 注册) |
+| 公开端点 | `GET /user/oidc/config`、`POST /user/oidc/callback`(无需 token) |
 | 需登录接口 | 其余全部,带 `Authorization: Bearer <JWT>` |
-| JWT 有效期 | **30 天**(HS256) |
+| JWT 有效期 | 后端配置(默认 24h,HS256);过期 401 → 重新点一次统一登录(IdP 会话在,免密即过) |
 | 响应信封 | `{ code, message, data }` —— **业务错误(code 50/51/52)HTTP 仍是 200**,看 `body.code` 判断成败 |
 
 > ⚠️ **例外(file 域)**:`/files/*` 管理接口走 **VirtualUser 中间件**,无 token 也能调(落匿名公共组 + 强制 public)—— 免费图床场景。user / groups / kv 域仍全部 MustAuth。见 [[api-reference]] 文件域引言。
+>
+> 📌 **后端仍保留**邮箱验证码注册 / 邮箱密码登录端点(`send-code` / `register` / `login`),供其他客户端使用;**ve 前端已不再封装**(2026-10 起,`services/userV1` 只有 OIDC 两个端点)。
 
-## 流程总览
+## 前端流程(ve 已实现的,组件作者只需知道入口)
 
 ```
-1. POST /user/send-code              → 发邮件验证码
-2. POST /user/register               → { userId }(自动建「个人空间」+ 生成用户自己的邀请码)
-3. POST /user/login                  → { token, userId }
-4. 前端持久化 token 到 localStorage
-5. 所有请求带 Authorization: Bearer <token>
-6. GET /user/info                    → 拿自己的 invitationCode,分享给朋友注册
+1. 组件调 useLoginModal().open()        → router.push('/login?from=<当前页>')
+2. /login 页点「统一身份登录」           → startOidcLogin():
+     GET  /user/oidc/config             → 拿 issuer / clientId / authorize 地址
+     生成 state + code_verifier(S256)   → 存 sessionStorage(跨全站跳转)
+     location.assign(authorize URL)     → 整页跳认证中心
+3. 认证中心完成登录 / 注册(凭邀请码)     → 302 回 /oidc/callback?code=&state=
+4. OidcCallbackPage:exchangeOidcCode()
+     校验 state(防 CSRF)               → POST /user/oidc/callback 换本系统 JWT
+     → token 落 localStorage → 拉 /user/info → logged-in
+5. 回跳 returnTo(发起前的目标页)
 ```
 
-## 1. `POST /user/send-code`
+ve 侧实现位置:
 
-```json
-{ "email": "a@b.c", "purpose": "register" }
-```
+| 关注点 | 文件 |
+|---|---|
+| 协议(PKCE / state / authorize URL / 换票) | `apps/showcase/src/api/http/oidc.ts` |
+| 会话状态机(token / LS / Bearer / 401) | `apps/showcase/src/api/http/auth-store.ts` |
+| 登录入口页 | `apps/showcase/src/pages/login/LoginPage.vue` |
+| 回调落地页 | `apps/showcase/src/pages/login/OidcCallbackPage.vue`(路由 `/oidc/callback`) |
 
-| 字段 | 必填 | 说明 |
+**redirect_uri 契约**:前端用 `${origin}/oidc/callback`,认证中心按其**逐字**匹配
+`dev-ctr-hello` 客户端的 redirect_uris 白名单(回环通配 `http://localhost:*/oidc/callback`
+覆盖 dev;prod 精确条目 `https://abc.jokelx.xyz/oidc/callback`)。**不要**用
+`/user/oidc/config` 返回的 `redirectUri` —— 那是 go-co 自带参考页的地址。
+
+## 首次登录的账号落地(SignInWithIdP,后端行为)
+
+| 落地方式 | 响应字段 | 用户看到的效果 |
 |---|---|---|
-| `email` | ✅ | 收件邮箱 |
-| `purpose` | 默认 `register` | `register` / `reset` |
+| 邮箱命中既有本地账号(含旧邮箱密码注册的) | `identityBound=true` | 自动接管原账号,**原有数据全在** |
+| 邮箱本系统没有 → 自动建号 | `provisioned=true` | 自动建「个人空间」默认组 + 生成自己的邀请码;**password 留空**,该账号只能走统一登录 |
+| 外部身份原本绑在别的账号,按邮箱改绑 | `rebound=true` | 归属变更,后端落 warning 日志 |
 
-- 同一邮箱 + 用途 **60 秒冷却**(超时报「发送太频繁」)
-- 验证码 6 位数字,**10 分钟有效、一次性**
-
-## 2. `POST /user/register`
-
-```json
-{
-  "email": "a@b.c",
-  "password": "pass123",
-  "code": "123456",
-  "invitationCode": "ABC12345",
-  "nickname": "昵称(可选)"
-}
-```
-
-| 字段 | 必填 | 说明 |
-|---|---|---|
-| `email` | ✅ | 唯一,登录主标识 |
-| `password` | ✅ | ≥6 位 |
-| `code` | ✅ | 邮箱验证码(6 位) |
-| `invitationCode` | ✅ | **邀请码必填**(`ROOT-INIT-2026` 是默认引导码) |
-| `nickname` | 可选 | |
-
-响应:`{ "userId": 1 }`
-
-**注册副作用**(同事务):
-- 创建 `user_groups(name='个人空间', owner_id=userId)` + `group_members(role='owner')` + 写回 `users.default_group_id`
-- 创建用户自己的邀请码(8 位)
-- 若有邀请人,记录 `referral_responses` + 加 `referral_codes.used_count`
-- consume 验证码
-
-> 所以**每个用户天生有一个「个人空间」** —— 这就是后端 KV 端点把 `groupId=0` 解析成「caller 的 default_group_id」的原因。
-
-## 3. `POST /user/login`
-
-```json
-{ "email": "a@b.c", "password": "pass123" }
-```
-
-响应:`{ "token": "<JWT>", "userId": 1 }`
-
-- token 有效期 **30 天**
-- 后续请求带 `Authorization: Bearer <token>`
-
-## 4. `GET /user/info`
-
-响应:
-```json
-{
-  "id": 1,
-  "email": "a@b.c",
-  "username": "",
-  "nickname": "",
-  "invitationCode": "ABC12345"
-}
-```
-
-> ⚠️ 当前 DTO **不返回 `defaultGroupId`**。前端需要「我的默认组是哪个」时,用 `GET /groups` 然后看哪个 `isDefault`,或直接让后端解析(见 [[usage-scope]] §决策:不解析 defaultGroupId)。**不要**写 GET 端点查 default。
-
-## 5. `POST /user/invitation/regenerate`
-
-响应:`{ "invitationCode": "NEWCODE99" }`
-
-- 旧码停用(他人再拿旧码注册会失败),历史邀请关系保留
-
-## 6. `PATCH /user/default-group`
-
-切换默认工作空间。**必须**已是目标组成员。
-
-```json
-{ "groupId": 42 }
-```
-
-响应:`{ "groupId": 42, "message": "default group updated" }`
-
-> **没有 GET 端点**。后端 KV 端点(`/kv/*`)接受 `groupId` 参数 `0` 或缺失 → 自动用 caller 的 `default_group_id`,前端不需要知道具体值就能命中「个人空间」。
-
----
-
-## 前端集成要点(JWT 生命周期)
+## 组件侧集成要点(JWT 生命周期)
 
 ### token 存 localStorage,登出必须清
 
-```ts
-// 登录成功
-localStorage.setItem('token', token);
-
-// 登出 —— 必须清 LS token,否则下次启动拿坏 token 试
-function logout() {
-  localStorage.removeItem('token');
-  setLoggedOut();
-}
-```
+auth-store 已实现(`logout()` → `handleUnauthorized()`:清 token / LS / Bearer 注入)。
+组件只调 `jwtAuth.logout()`(React:`useAuth().logout`),**不要自己碰 localStorage**。
 
 ### 401 不要立刻登出(关键反直觉点)
 
 **默认行为**(原 e2ekv)是 401 → 自动清 creds + 跳游客模式。
-**问题**:save 中途遇 401(后端 jwt 中间件 bug)→ 用户**莫名其妙被退出**,sync pill 状态混乱。
+**问题**:save 中途遇 401 → 用户**莫名其妙被退出**,sync pill 状态混乱。
 
-**正确**:遇 401 设 `error` 状态 + 抛错,**保留 creds**。让用户看到错误,**自己决定重登或重试**。
-
-```ts
-// ❌ 错:遇 401 就清 token
-if (res.status === 401) {
-  localStorage.removeItem('token');
-  setLoggedOut();
-}
-
-// ✅ 对:401 留 token,显示错误让用户决定
-if (res.status === 401) {
-  showSyncError('会话过期,请重新登录');
-  // token 仍留着,用户点「重登录」才清
-}
-```
+**正确**:遇 401 设 `error` 状态 + 抛错,**保留 creds**。request.ts 对 Bearer 401 的
+默认分流是"发信号 + 静默降级"(auth-store `handleUnauthorized`);业务组件想在
+401 时保留现场,自己 catch `ApiError(401)` 处理,**不要**在组件里裸 fetch。
 
 **唯一例外**:启动时 `init()` 的 401(无操作可丢)→ 自动 logout。
 
@@ -187,9 +107,8 @@ init 完成后态变 `logged-in` → effect 重跑 → 真正发请求。
 // ❌ 错:只看 HTTP 状态
 if (!res.ok) { showError(); return; }
 
-// ✅ 对:看 body.code
-const body = await res.json();
-if (body.code !== 0) { showError(body.message); return; }
+// ✅ 对:看 body.code(request.ts 已解包为 ApiError,组件层 catch 即可)
+try { await service.xxx(); } catch (e) { showError(e.message); }
 ```
 
 ---
@@ -200,10 +119,10 @@ if (body.code !== 0) { showError(body.message); return; }
 |---|---|---|---|
 | 未登录 | 401 | 401 | `unauthorized` |
 | JWT 无效/过期 | 401 | 401 | `unauthorized: invalid token` |
-| 邮箱密码错 | 50 | 200 | `邮箱或密码错误` |
-| 验证码错 | 50 | 200 | `验证码无效或已过期` |
-| 邀请码无效 | 50 | 200 | `invitation code not found` |
-| 邀请被撤 / 用完 / 过期 | 50 | 200 | `invitation revoked` / `invitation used up` / `invitation expired` |
+| 服务端未启用统一登录 | Error | - | `服务端未启用统一身份登录`(startOidcLogin 抛) |
+| 认证中心不可达 | Error | - | `认证中心不可达：<原因>`(config.idpError) |
+| state 校验失败 | Error | - | `state 校验失败,拒绝该授权码`(前端防 CSRF) |
+| 授权码无效/已用 | 50 | 200 | `授权码换取 token 失败: invalid_grant ...` |
 | 参数校验 | 51 | 200 | `InvalidRules: ...` |
 | 无默认组 | 50 | 200 | `user has no default group, set default_group_id first` |
 
@@ -213,12 +132,12 @@ if (body.code !== 0) { showError(body.message); return; }
 
 | 维度 | user/kv(本协议) | e2ekv |
 |---|---|---|
-| 身份 | 邮箱 + 密码 + JWT | 密码派生的 AuthHash |
+| 身份 | 统一身份中心(OIDC)+ JWT | 密码派生的 AuthHash |
 | 服务端能解密? | ✅ 能(value 明文) | ❌ 不能(只看见 ciphertext) |
-| 找回密码 | ✅ 邮箱验证码 | ❌ 没,数据丢失 |
-| 邀请 / 共享 | ✅ referral_codes + group invitations | ❌ 无 |
-| 跨设备 | ✅ JWT + 邮箱 | ✅ 输密码 |
+| 找回密码 | ✅ 走认证中心(账号在 IdP 侧管理) | ❌ 没,数据丢失 |
+| 邀请 / 共享 | ✅ group invitations(kv 共享走 kv_shares 短码) | ❌ 无 |
+| 跨设备 | ✅ JWT + IdP 会话 | ✅ 输密码 |
 | 多组隔离 | ✅ group_id + RBAC | ❌ 单用户 |
 | 适合场景 | 公开 SaaS,中等隐私,多组协作 | 私密 vault,强加密 |
 
-**user/kv 不替代 e2ekv**:它给的是「便利 + 找回密码 + 多组协作」,代价是「服务端能看」。对真正私密的数据(如密码 vault),仍应走 e2ekv 或同类零知识方案。
+**user/kv 不替代 e2ekv**:它给的是「便利 + 找回 + 多组协作」,代价是「服务端能看」。对真正私密的数据(如密码 vault),仍应走 e2ekv 或同类零知识方案。

@@ -15,9 +15,12 @@
 //   - setBearerProvider(() => token) 注入 request.ts 的 Authorization 头。
 //   - 401(request.ts 分流):Bearer 请求 → jwtAuth.handleUnauthorized() 静默降级。
 //   - React 端跨框架订阅:useJwtAuth()(force-rerender,见文件尾)。
+//   - 登录/注册走统一身份认证中心(go-ah / OIDC 授权码 + PKCE):
+//     beginOidcLogin 整页跳走,completeOidcLogin 在 /oidc/callback 收尾;
+//     协议细节(state/verifier/authorize URL)在 ./oidc.ts,本文件只管会话状态。
 //
 // 状态机:
-//   logged-out → init/login/register → logged-in
+//   logged-out → init / completeOidcLogin → logged-in
 //   logged-in  → logout / 401 → logged-out
 //   任意操作中 → syncing → logged-in / error / logged-out
 
@@ -27,9 +30,21 @@ import { ref } from 'vue';
 // 见 api/services/README.md「目录内部 import 规则」。
 import { userV1Service, type UserInfo } from '../services';
 import { setBearerProvider, setBearerUnauthorizedHandler } from './request';
+import { startOidcLogin, exchangeOidcCode } from './oidc';
 
 export const TOKEN_KEY = 'sl-userkv:v1:token';
 const EMAIL_KEY = 'sl-userkv:v1:email';
+
+// ───── 整页跳转通道(注入点) ────────────────────────────────────────
+// beginOidcLogin 要把浏览器整页带去认证中心。默认 window.location.assign;
+// 注入点与 setBearerProvider 同款理由:jsdom 的 location 不可伪造,测试
+// (auth-store.test.ts)注入收集器断言跳转目标,不真导航。
+type PageNavigator = (url: string) => void;
+let pageNavigate: PageNavigator = (url) => window.location.assign(url);
+
+export function setPageNavigator(fn: PageNavigator): void {
+  pageNavigate = fn;
+}
 
 export type JwtAuthState = 'logged-out' | 'logged-in' | 'syncing' | 'error';
 
@@ -151,56 +166,59 @@ export const jwtAuth = {
     }
   },
 
-  async login(email: string, password: string): Promise<void> {
+  /**
+   * 发起统一身份登录:生成 PKCE 后整页跳到认证中心。
+   * 本方法正常不返回(浏览器已离站);认证中心登录/注册完成后回跳
+   * /oidc/callback,由 completeOidcLogin 收尾。
+   *
+   * @param returnTo 登录完成后的回跳页(/login?from= 带进来的原目标路径)。
+   */
+  async beginOidcLogin(returnTo?: string): Promise<void> {
     jwtAuthStateRef.value = 'syncing';
     lastErrorRef.value = null;
     notifyJwt();
     try {
-      const result = await userV1Service.login({ email, password });
+      const url = await startOidcLogin({ returnTo });
+      pageNavigate(url);
+    } catch (error) {
+      jwtAuthStateRef.value = 'logged-out';
+      lastErrorRef.value = error instanceof Error ? error.message : '发起统一身份登录失败';
+      notifyJwt();
+      throw error;
+    }
+  },
+
+  /**
+   * OIDC 回调收尾:校验 state → 授权码换本系统 JWT → 落 LS / Bearer / 拉用户信息。
+   * 调用方是 /oidc/callback 路由页;成败都会把会话状态落定。
+   */
+  async completeOidcLogin(code: string, state: string): Promise<UserInfo | null> {
+    jwtAuthStateRef.value = 'syncing';
+    lastErrorRef.value = null;
+    notifyJwt();
+    try {
+      const result = await exchangeOidcCode(code, state);
       tokenRef.value = result.token;
       writeLS(TOKEN_KEY, result.token);
-      writeLS(EMAIL_KEY, email);
       setBearerProvider(() => tokenRef.value);
       try {
         jwtUserRef.value = await userV1Service.info();
+        if (jwtUserRef.value) writeLS(EMAIL_KEY, jwtUserRef.value.email);
       } catch {
         jwtUserRef.value = null;
       }
       jwtAuthStateRef.value = 'logged-in';
       notifyJwt();
+      return jwtUserRef.value;
     } catch (error) {
       jwtAuthStateRef.value = 'logged-out';
-      lastErrorRef.value = error instanceof Error ? error.message : 'login failed';
+      lastErrorRef.value = error instanceof Error ? error.message : '统一身份登录失败';
       tokenRef.value = null;
       jwtUserRef.value = null;
+      setBearerProvider(() => null);
       notifyJwt();
       throw error;
     }
-  },
-
-  async register(args: {
-    email: string;
-    password: string;
-    code: string;
-    invitationCode: string;
-    nickname?: string;
-  }): Promise<void> {
-    jwtAuthStateRef.value = 'syncing';
-    lastErrorRef.value = null;
-    notifyJwt();
-    try {
-      await userV1Service.register(args);
-      await this.login(args.email, args.password);
-    } catch (error) {
-      jwtAuthStateRef.value = 'logged-out';
-      lastErrorRef.value = error instanceof Error ? error.message : 'register failed';
-      notifyJwt();
-      throw error;
-    }
-  },
-
-  async sendCode(email: string): Promise<void> {
-    await userV1Service.sendCode(email);
   },
 
   logout(): void {
